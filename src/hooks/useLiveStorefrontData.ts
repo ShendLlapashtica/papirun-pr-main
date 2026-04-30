@@ -76,6 +76,14 @@ export const useLiveMenuItems = () => {
     let isMounted = true;
 
     const syncFromDatabase = async () => {
+      // Safety timeout: if Supabase takes > 5s, stop waiting and show local data
+      const timeout = setTimeout(() => {
+        if (isMounted && isLoading) {
+          console.warn('Supabase fetch timed out, falling back to local data');
+          setIsLoading(false);
+        }
+      }, 5000);
+
       try {
         // Only run seed check if we've never done it in this browser
         if (!hasSeedRun()) {
@@ -83,6 +91,8 @@ export const useLiveMenuItems = () => {
           markSeedDone();
         }
         const liveItems = await fetchProducts();
+        clearTimeout(timeout);
+        
         const merged = liveItems.map((dbItem) => {
           const hasValidImage = dbItem.image && !dbItem.image.startsWith('/src/') && dbItem.image.startsWith('http');
           if (!hasValidImage) {
@@ -97,6 +107,7 @@ export const useLiveMenuItems = () => {
           writeCache(PRODUCTS_CACHE_KEY, merged);
         }
       } catch (error) {
+        clearTimeout(timeout);
         console.error('Failed to sync products from database:', error);
         if (isMounted) setIsLoading(false);
       }
@@ -199,9 +210,18 @@ export const useLiveVisibleOffers = () => {
     let isMounted = true;
 
     const sync = async () => {
+      const timeout = setTimeout(() => {
+        if (isMounted && isLoading) {
+          console.warn('Supabase offers fetch timed out');
+          setIsLoading(false);
+        }
+      }, 5000);
+
       try {
         await ensureSeedStorefrontOffers(initialOffers);
         const liveOffers = await fetchStorefrontOffers();
+        clearTimeout(timeout);
+        
         const visibleOffers = liveOffers
           .filter((offer) => offer.isActive)
           .map(({ isActive: _isActive, sortOrder: _sortOrder, ...offer }) => offer);
@@ -212,6 +232,7 @@ export const useLiveVisibleOffers = () => {
           writeCache(OFFERS_CACHE_KEY, visibleOffers);
         }
       } catch {
+        clearTimeout(timeout);
         if (isMounted) setIsLoading(false);
       }
     };

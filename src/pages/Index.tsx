@@ -106,7 +106,7 @@ const Index = () => {
               </div>
             ) : filteredItems.length === 0 ? (
               <div className="text-center py-12 sm:py-16">
-                <p className="text-muted-foreground">{language === 'sq' ? 'Duke u ngarkuar...' : 'Loading...'}</p>
+                <p className="text-muted-foreground">{language === 'sq' ? 'Nuk u gjet asnjë produkt.' : 'No products found.'}</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 overflow-x-clip">
