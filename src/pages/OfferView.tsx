@@ -1,10 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ArrowLeft, Check } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveVisibleOffers } from '@/hooks/useLiveStorefrontData';
 import Header from '@/components/Header';
-import ViberIcon from '@/components/ViberIcon';
 
 interface OfferViewProps {
   cartCount: number;
@@ -16,7 +15,6 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { offers } = useLiveVisibleOffers();
-  const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -36,23 +34,6 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
       </div>
     );
   }
-
-  const handleOrder = () => {
-    setShowFallback(false);
-    const message = `Përshëndetje! Dëshiroj të porosis: ${offer.title} - €${offer.price.toFixed(2)}`;
-    const viberUrl = `viber://chat?number=38349644168&draft=${encodeURIComponent(message)}`;
-    
-    const opened = window.open(viberUrl, '_blank');
-    if (!opened) {
-      setShowFallback(true);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setShowFallback(true);
-    }, 2500);
-    window.addEventListener('blur', () => clearTimeout(timer), { once: true });
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -112,23 +93,6 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
                   ))}
                 </div>
               </div>
-
-              {showFallback && (
-                <div className="bg-destructive/10 text-destructive rounded-xl p-3 text-sm text-center">
-                  {language === 'sq' 
-                    ? 'Ju lutem instaloni Viber për të dërguar këtë mesazh.' 
-                    : 'Please install Viber to send this message.'}
-                </div>
-              )}
-
-              <button
-                onClick={handleOrder}
-                className="w-full flex items-center justify-center gap-2.5 font-semibold py-3.5 px-6 rounded-2xl text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
-                style={{ backgroundColor: '#7360F2' }}
-              >
-                <ViberIcon className="w-5 h-5" />
-                {language === 'sq' ? 'Porosit përmes Viber' : 'Order via Viber'} - €{offer.price.toFixed(2)}
-              </button>
             </div>
           </div>
         </div>

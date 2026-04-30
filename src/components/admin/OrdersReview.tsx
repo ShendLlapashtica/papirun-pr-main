@@ -17,6 +17,8 @@ import OrderChat from '@/components/OrderChat';
 import OrderActionDrawer from '@/components/admin/OrderActionDrawer';
 import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
+import { generateInvoice } from '@/lib/invoiceGenerator';
+import { fetchDrivers, assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
 
 const statusColor = (s: string) => {
   if (s === 'pending') return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30 animate-pulse';
@@ -111,6 +113,12 @@ const OrdersReview = () => {
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
   const now = useNow(5000);
+  const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
+
+  // Load drivers list once
+  useEffect(() => {
+    fetchDrivers().then((d) => setDrivers(d.filter((x) => x.isActive))).catch(() => {});
+  }, []);
 
   const archiveOrder = (id: string) => {
     setArchivedIds((prev) => {
@@ -299,11 +307,7 @@ const OrdersReview = () => {
   };
 
   const handlePrint = (o: OrderRecord) => {
-    const w = window.open('', '_blank');
-    if (!w) return;
-    const itemsHtml = o.items.map((it: any) => `<li>${it.quantity}x ${it.name?.sq || it.name?.en || it.id}</li>`).join('');
-    w.document.write(`<html><head><title>Porosi ${o.id.slice(0, 8)}</title><style>body{font-family:system-ui;padding:20px;max-width:400px}h1{font-size:18px}ul{padding-left:20px}.tot{font-weight:bold;border-top:1px solid #000;padding-top:8px;margin-top:8px}</style></head><body><h1>Papirun · Porosi</h1><p><strong>${o.customerName}</strong><br/>${o.customerPhone}<br/>${o.deliveryAddress}</p><ul>${itemsHtml}</ul><p class="tot">Totali: €${o.total.toFixed(2)}</p>${o.notes ? `<p><em>${o.notes}</em></p>` : ''}<script>window.print()</script></body></html>`);
-    w.document.close();
+    generateInvoice(o);
   };
 
   const openDrawer = (o: OrderRecord, mode: 'approve' | 'reject') => {
@@ -807,6 +811,38 @@ const OrdersReview = () => {
                         <CheckCheck className="w-4 h-4" /> Përfundo
                       </button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Driver assignment */}
+              {(selected.status === 'approved' || selected.status === 'preparing' || selected.status === 'out_for_delivery') && drivers.length > 0 && (
+                <div className="bg-blue-500/5 rounded-2xl p-3 border border-blue-500/20">
+                  <p className="text-[10px] uppercase tracking-wider text-blue-600 font-bold mb-2 flex items-center gap-1">
+                    <Bike className="w-3 h-3" /> Cakto shoferin
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {drivers.map((d) => {
+                      const isAssigned = (selected as any).assigned_driver_id === d.id;
+                      return (
+                        <button
+                          key={d.id}
+                          onClick={async () => {
+                            try {
+                              await assignDriverToOrder(selected.id, d.id);
+                              toast.success(`Shoferi ${d.name} u caktua`);
+                            } catch { toast.error('Gabim'); }
+                          }}
+                          className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all active:scale-95 ${
+                            isAssigned
+                              ? 'bg-blue-600 text-white shadow'
+                              : 'bg-secondary hover:bg-blue-500/10'
+                          }`}
+                        >
+                          {d.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

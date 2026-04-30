@@ -49,6 +49,33 @@ const OrderTrackingPill = () => {
 
   useEffect(() => {
     if (!orderId) { setOrder(null); return; }
+    // Optimistic ID — show pending overlay immediately, no server fetch
+    if (orderId.startsWith('optimistic-')) {
+      setOrder({
+        id: orderId,
+        userId: null,
+        customerName: '',
+        customerPhone: '',
+        deliveryAddress: '',
+        deliveryLat: null,
+        deliveryLng: null,
+        locationId: null,
+        items: [],
+        subtotal: 0,
+        deliveryFee: 0,
+        total: 0,
+        status: 'pending',
+        adminNote: '',
+        notes: '',
+        statusHistory: [],
+        source: 'web',
+        prepEtaMinutes: null,
+        isVisible: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as OrderRecord);
+      return;
+    }
     let active = true;
     fetchOrder(orderId).then((o) => {
       if (!active) return;

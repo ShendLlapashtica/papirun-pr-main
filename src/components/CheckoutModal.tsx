@@ -9,7 +9,7 @@ import AddressMapPicker from '@/components/checkout/AddressMapPicker';
 // OrderStatusModal handled globally via OrderTrackingPill
 import { getCartLineTotal } from '@/lib/cartPricing';
 import { createOrder, detectOrderSource } from '@/lib/ordersApi';
-import { setActiveOrderId } from '@/components/OrderTrackingPill';
+import { setActiveOrderId, clearActiveOrderId } from '@/components/OrderTrackingPill';
 import { fetchAddresses, saveAddress, deleteAddress, type SavedAddress } from '@/lib/addressesApi';
 
 interface CheckoutModalProps {
@@ -97,50 +97,59 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
       return;
     }
     if (!isFormValid) return;
-    setSubmitting(true);
+
+    // --- Optimistic UI: close modal & show pending overlay INSTANTLY ---
+    const optimisticId = `optimistic-${Date.now()}`;
+    setActiveOrderId(optimisticId);
+    onSuccess();
+    const savedFormData = { ...formData };
+    const savedPosition = selectedPosition;
+    const savedItems = [...items];
+    const savedTotal = total;
+    resetForm();
+    onClose();
+
+    // --- Fire the actual request in the background ---
     try {
       const order = await createOrder({
         userId: user?.id ?? null,
-        customerName: formData.name.trim(),
-        customerPhone: formData.phone.trim(),
-        deliveryAddress: formData.address.trim(),
-        deliveryLat: selectedPosition?.[0] ?? null,
-        deliveryLng: selectedPosition?.[1] ?? null,
-        items,
-        subtotal: total,
+        customerName: savedFormData.name.trim(),
+        customerPhone: savedFormData.phone.trim(),
+        deliveryAddress: savedFormData.address.trim(),
+        deliveryLat: savedPosition?.[0] ?? null,
+        deliveryLng: savedPosition?.[1] ?? null,
+        items: savedItems,
+        subtotal: savedTotal,
         deliveryFee: 0,
-        total,
-        notes: formData.notes.trim(),
+        total: savedTotal,
+        notes: savedFormData.notes.trim(),
         source: detectOrderSource(),
       });
+      // Replace optimistic ID with real server ID
       try { localStorage.setItem(ORDER_STORAGE_KEY, order.id); } catch {}
-      // Save address for logged-in users (if requested and not already saved)
-      // Save address ONLY when user explicitly opted in AND provided a label.
-      if (user && saveAddrFlag && selectedPosition && saveAddrLabel.trim()) {
-        const exists = savedAddresses.some((a) => a.address.trim() === formData.address.trim());
+      setActiveOrderId(order.id);
+
+      // Save address for logged-in users if requested
+      if (user && saveAddrFlag && savedPosition && saveAddrLabel.trim()) {
+        const exists = savedAddresses.some((a) => a.address.trim() === savedFormData.address.trim());
         if (!exists) {
           saveAddress({
             userId: user.id,
             label: saveAddrLabel.trim(),
-            address: formData.address.trim(),
-            lat: selectedPosition[0],
-            lng: selectedPosition[1],
+            address: savedFormData.address.trim(),
+            lat: savedPosition[0],
+            lng: savedPosition[1],
             isDefault: savedAddresses.length === 0,
           }).catch(() => {});
         }
       }
-      // Trigger global pending overlay (full-screen, unskippable) — do NOT open OrderStatusModal here.
-      setActiveOrderId(order.id);
-      onSuccess();
-      resetForm();
-      onClose();
     } catch (e) {
       console.error(e);
-      toast.error('Gabim gjatë dërgimit të porosisë');
-    } finally {
-      setSubmitting(false);
+      clearActiveOrderId();
+      toast.error(language === 'sq' ? 'Gabim gjatë dërgimit të porosisë — provo përsëri' : 'Order failed — please try again');
     }
   };
+
 
   const handleWhatsAppFallback = () => {
     const foodSummary = items

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send } from 'lucide-react';
+import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send, Star } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchOrder, subscribeOrderRealtime, deleteOrder, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
+import { fetchOrder, subscribeOrderRealtime, softDeleteOrder, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OrderChat from '@/components/OrderChat';
 import { clearActiveOrderId } from '@/components/OrderTrackingPill';
+import { rateDriver } from '@/lib/driversApi';
 
 interface Props {
   orderId: string;
@@ -50,6 +51,8 @@ const formatTime = (iso: string) => {
 const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
   const [order, setOrder] = useState<OrderRecord | null>(null);
   const [chatCount, setChatCount] = useState<number | null>(null);
+  const [driverRating, setDriverRating] = useState<number>(0);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const { language } = useLanguage();
 
   useEffect(() => {
@@ -73,10 +76,10 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
 
   const handleDelete = async () => {
     if (!order) return;
-    if (!window.confirm(language === 'sq' ? 'Fshi këtë porosi?' : 'Delete this order?')) return;
+    if (!window.confirm(language === 'sq' ? 'Arkivo këtë porosi?' : 'Archive this order?')) return;
     try {
-      await deleteOrder(order.id);
-      toast.success(language === 'sq' ? 'Porosia u fshi' : 'Order deleted');
+      await softDeleteOrder(order.id);
+      toast.success(language === 'sq' ? 'Porosia u arkivua' : 'Order archived');
       try {
         const raw = localStorage.getItem('papirun_my_orders');
         if (raw) {
@@ -175,7 +178,7 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
           )}
           {canDelete && (
             <button onClick={handleDelete} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-destructive/10 text-destructive text-sm font-semibold">
-              <Trash2 className="w-4 h-4" /> {language === 'sq' ? 'Fshi porosinë' : 'Delete order'}
+              <Trash2 className="w-4 h-4" /> {language === 'sq' ? 'Arkivo porosinë' : 'Archive order'}
             </button>
           )}
         </div>

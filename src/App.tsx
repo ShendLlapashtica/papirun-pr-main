@@ -17,6 +17,7 @@ import AppProductPage from "./pages/AppProductPage";
 import OfferViewWrapper from "./pages/OfferViewWrapper";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
+import DriverPanel from "./pages/DriverPanel";
 import OrderTrackingPill from "@/components/OrderTrackingPill";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
                   {/* App product page (PWA / logged-in /home users) */}
                   <Route path="/app/product/:id" element={<RequireAuth><AppProductPage /></RequireAuth>} />
                   <Route path="/offer/:id" element={<OfferViewWrapper />} />
+                  <Route path="/driver" element={<DriverPanel />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 {/* Global pending overlay + status pill — visible on every route */}
