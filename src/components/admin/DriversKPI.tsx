@@ -113,9 +113,9 @@ export default function DriversKPI() {
                   <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-2 flex items-center gap-1"><Star className="w-3 h-3"/> Vlerësimet e Klientëve</p>
                   {stat.pieTotal > 0 ? (
                     <div className="flex h-4 rounded-full overflow-hidden mt-2">
-                      <div style={{ width: \`\${(stat.happy / stat.pieTotal) * 100}%\` }} className="bg-emerald-500" title={\`Të kënaqur: \${stat.happy}\`} />
-                      <div style={{ width: \`\${(stat.neutral / stat.pieTotal) * 100}%\` }} className="bg-amber-400" title={\`Neutral: \${stat.neutral}\`} />
-                      <div style={{ width: \`\${(stat.unhappy / stat.pieTotal) * 100}%\` }} className="bg-red-500" title={\`Të pakënaqur: \${stat.unhappy}\`} />
+                      <div style={{ width: `${(stat.happy / stat.pieTotal) * 100}%` }} className="bg-emerald-500" title={`Të kënaqur: ${stat.happy}`} />
+                      <div style={{ width: `${(stat.neutral / stat.pieTotal) * 100}%` }} className="bg-amber-400" title={`Neutral: ${stat.neutral}`} />
+                      <div style={{ width: `${(stat.unhappy / stat.pieTotal) * 100}%` }} className="bg-red-500" title={`Të pakënaqur: ${stat.unhappy}`} />
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground italic">Asnjë vlerësim</p>
