@@ -47,7 +47,7 @@ const STATUS_LABEL: Record<string, string> = {
   completed: 'Përfunduar',
 };
 
-type FilterKey = 'hour' | 'today' | 'week' | 'custom' | 'all';
+type FilterKey = 'hour' | 'today' | 'week' | 'month' | 'custom' | 'all';
 type StatusFilter = 'active' | 'pending' | 'approved' | 'rejected' | 'history';
 
 const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
@@ -56,6 +56,11 @@ const startOfWeek = (d: Date) => {
   const day = x.getDay();
   const diff = (day + 6) % 7;
   x.setDate(x.getDate() - diff);
+  return x;
+};
+const startOfMonth = (d: Date) => {
+  const x = startOfDay(d);
+  x.setDate(1);
   return x;
 };
 
@@ -99,7 +104,7 @@ const savePriority = (s: Set<string>) => {
 
 const OrdersReview = () => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
-  const [filter, setFilter] = useState<FilterKey>('today');
+  const [filter, setFilter] = useState<FilterKey>('month');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -189,6 +194,7 @@ const OrdersReview = () => {
         case 'hour': return created >= new Date(now.getTime() - 60 * 60 * 1000);
         case 'today': return created >= startOfDay(now);
         case 'week': return created >= startOfWeek(now);
+        case 'month': return created >= startOfMonth(now);
         case 'custom': {
           if (!customFrom && !customTo) return true;
           const from = customFrom ? new Date(customFrom) : null;
@@ -202,8 +208,8 @@ const OrdersReview = () => {
     });
   }, [orders, filter, customFrom, customTo]);
 
-  // Helper: an order is "in history" if either soft-deleted server-side or locally archived
-  const isInHistory = (o: OrderRecord) => o.isVisible === false || archivedIds.has(o.id);
+  // Helper: an order is "in history" if either soft-deleted server-side or locally archived or status is histori
+  const isInHistory = (o: OrderRecord) => o.isVisible === false || archivedIds.has(o.id) || o.status === 'histori';
 
   // Counts (exclude history items so deleted/archived don't keep counting in active stats)
   const counts = useMemo(() => {
@@ -262,7 +268,39 @@ const OrdersReview = () => {
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
 
   const handleStatus = async (id: string, status: OrderStatus) => {
-    try { await updateOrderStatus(id, status); toast.success(STATUS_LABEL[status] ?? status); }
+    try {
+      await updateOrderStatus(id, status);
+      toast.success(STATUS_LABEL[status] ?? status);
+
+      // Auto-assign driver logic when an order gets approved
+      if (status === 'approved') {
+        const activeDrivers = drivers.filter(d => d.isActive);
+        if (activeDrivers.length > 0) {
+          const counts = new Map<string, number>();
+          activeDrivers.forEach(d => counts.set(d.id, 0));
+          orders.forEach(o => {
+            if ((o.status === 'out_for_delivery' || o.status === 'preparing' || o.status === 'approved') && o.assignedDriverId) {
+              counts.set(o.assignedDriverId, (counts.get(o.assignedDriverId) || 0) + 1);
+            }
+          });
+          let bestDriver = activeDrivers[0];
+          let minCount = Infinity;
+          activeDrivers.forEach(d => {
+            const c = counts.get(d.id) || 0;
+            if (c < minCount) {
+              minCount = c;
+              bestDriver = d;
+            }
+          });
+          try {
+            await assignDriverToOrder(id, bestDriver.id);
+            toast.success(`U caktua automatikisht tek shoferi: ${bestDriver.name}`);
+          } catch (e) {
+            console.error('Failed to auto assign', e);
+          }
+        }
+      }
+    }
     catch { toast.error('Gabim'); }
   };
 
@@ -359,6 +397,7 @@ const OrdersReview = () => {
           <FilterTab k="hour" label="Kjo orë" />
           <FilterTab k="today" label="Sot" />
           <FilterTab k="week" label="Kjo javë" />
+          <FilterTab k="month" label="Ky muaj" />
           <FilterTab k="custom" label="Intervali" />
           <FilterTab k="all" label="Të gjitha" />
         </div>

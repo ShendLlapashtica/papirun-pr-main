@@ -75,10 +75,12 @@ export const assignDriverToOrder = async (orderId: string, driverId: string) => 
 };
 
 /** Rate a driver for a specific order (1-5) */
-export const rateDriver = async (orderId: string, rating: number) => {
+export const rateDriver = async (orderId: string, rating: number, note?: string) => {
   if (rating < 1 || rating > 5) throw new Error('Rating must be 1-5');
   const client = supabase as any;
-  const { error } = await client.from('orders').update({ driver_rating: rating }).eq('id', orderId);
+  const payload: any = { driver_rating: rating };
+  if (note) payload.driver_rating_note = note;
+  const { error } = await client.from('orders').update(payload).eq('id', orderId);
   if (error) throw error;
 };
 

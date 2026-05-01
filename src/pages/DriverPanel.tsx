@@ -58,11 +58,11 @@ const DriverPanel = () => {
     setError('');
     try {
       const drivers = await fetchDrivers();
-      const found = drivers.find((d) => d.phone === phone.trim() && d.pin === pin.trim() && d.isActive);
+      const found = drivers.find((d) => d.name.toLowerCase() === phone.trim().toLowerCase() && d.pin === pin.trim() && d.isActive);
       if (found) {
         setDriver(found);
       } else {
-        setError('Numri ose PIN-i i gabuar');
+        setError('Emri ose Fjalëkalimi i gabuar');
       }
     } catch {
       setError('Gabim në lidhje');
@@ -114,17 +114,17 @@ const DriverPanel = () => {
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium mb-1.5">Numri i telefonit</label>
+              <label className="block text-xs font-medium mb-1.5">Emri i shoferit (p.sh. Delivery1)</label>
               <input
-                type="tel"
+                type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+383..."
+                placeholder="Delivery1"
                 className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1.5">PIN</label>
+              <label className="block text-xs font-medium mb-1.5">Fjalëkalimi (PIN)</label>
               <input
                 type="password"
                 maxLength={6}

@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { CartItem } from '@/types/menu';
 
-export type OrderStatus = 'pending' | 'approved' | 'preparing' | 'out_for_delivery' | 'rejected' | 'completed';
+export type OrderStatus = 'pending' | 'approved' | 'preparing' | 'out_for_delivery' | 'rejected' | 'completed' | 'histori';
 export type OrderSource = 'web' | 'app';
 
 export interface OrderStatusEvent {
@@ -30,6 +30,8 @@ export interface OrderRecord {
   source: OrderSource;
   prepEtaMinutes: number | null;
   isVisible: boolean;
+  assignedDriverId?: string | null;
+  driverRating?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +56,8 @@ type Row = {
   source: OrderSource | null;
   prep_eta_minutes: number | null;
   is_visible: boolean | null;
+  assigned_driver_id?: string | null;
+  driver_rating?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -80,6 +84,8 @@ const mapRow = (row: Row): OrderRecord => ({
   source: (row.source ?? 'web') as OrderSource,
   prepEtaMinutes: row.prep_eta_minutes,
   isVisible: row.is_visible !== false,
+  assignedDriverId: row.assigned_driver_id,
+  driverRating: row.driver_rating,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -162,7 +168,7 @@ export const setOrderEta = async (id: string, minutes: number | null) => {
 
 export const deleteOrder = async (id: string) => {
   const client = supabase as any;
-  const { error } = await client.from(TABLE).delete().eq('id', id);
+  const { error } = await client.from(TABLE).update({ status: 'histori', is_visible: false }).eq('id', id);
   if (error) throw error;
 };
 

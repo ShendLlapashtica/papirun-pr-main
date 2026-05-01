@@ -41,6 +41,7 @@ import OrdersReview from '@/components/admin/OrdersReview';
 import LocationsEditor from '@/components/admin/LocationsEditor';
 import QuickRepliesEditor from '@/components/admin/QuickRepliesEditor';
 import SubscribersList from '@/components/admin/SubscribersList';
+import DriversKPI from '@/components/admin/DriversKPI';
 
 const SiteTextsEditor = ({ language }: { language: Language }) => {
   const { refreshTexts } = useLanguage();
@@ -181,7 +182,7 @@ const Admin = () => {
   const [items, setItems] = useState<MenuItem[]>(initialMenuItems);
   const [menuExtras, setMenuExtras] = useState<MenuExtra[]>(defaultMenuExtras);
   const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers'>('orders');
   const [contentSubTab, setContentSubTab] = useState<'texts' | 'locations' | 'replies'>('texts');
   const [ofertaEnabled, setOfertaEnabled] = useState(true);
   const [offers, setOffers] = useState<StorefrontOffer[]>(() =>
@@ -453,10 +454,10 @@ const Admin = () => {
       <div className="container mx-auto px-4 py-6">
         {/* Main tabs (big navbar) */}
         <div className="flex gap-2 mb-4 overflow-x-auto -mx-1 px-1">
-          {(['orders', 'users', 'menu', 'offers', 'content'] as const).map((tab) => (
+          {(['orders', 'users', 'drivers', 'menu', 'offers', 'content'] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => setActiveTab(tab as any)}
               className={`px-6 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${
                 activeTab === tab
                   ? 'bg-primary text-primary-foreground shadow-glow'
@@ -465,6 +466,7 @@ const Admin = () => {
             >
               {tab === 'orders' ? (language === 'sq' ? 'Porositë' : 'Orders')
                 : tab === 'users' ? (language === 'sq' ? 'Përdoruesit' : 'Users')
+                : tab === 'drivers' ? (language === 'sq' ? 'Shoferët' : 'Drivers')
                 : tab === 'menu' ? (language === 'sq' ? 'Menuja' : 'Menu')
                 : tab === 'offers' ? (language === 'sq' ? 'Ofertat' : 'Offers')
                 : (language === 'sq' ? 'Tekstet' : 'Content')}
@@ -495,6 +497,7 @@ const Admin = () => {
 
         {activeTab === 'orders' && <OrdersReview />}
         {activeTab === 'users' && <SubscribersList />}
+        {activeTab === 'drivers' && <DriversKPI />}
         {activeTab === 'content' && contentSubTab === 'locations' && <LocationsEditor />}
         {activeTab === 'content' && contentSubTab === 'replies' && <QuickRepliesEditor />}
         {activeTab === 'content' && contentSubTab === 'texts' && <SiteTextsEditor language={language} />}
