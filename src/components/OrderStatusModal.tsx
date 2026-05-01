@@ -174,7 +174,7 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
                   onClick={async () => {
                     setDriverRating(5);
                     const note = prompt(language === 'sq' ? 'Mund të lini një koment (opsionale):' : 'Leave a note (optional):');
-                    await rateDriver(order.id, 5, note || undefined);
+                    await rateDriver(order!.id, 5, note || undefined);
                     setRatingSubmitted(true);
                     toast.success(language === 'sq' ? 'Faleminderit për vlerësimin!' : 'Thanks for rating!');
                   }}
@@ -183,7 +183,7 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
                   onClick={async () => {
                     setDriverRating(3);
                     const note = prompt(language === 'sq' ? 'Mund të lini një koment (opsionale):' : 'Leave a note (optional):');
-                    await rateDriver(order.id, 3, note || undefined);
+                    await rateDriver(order!.id, 3, note || undefined);
                     setRatingSubmitted(true);
                     toast.success(language === 'sq' ? 'Faleminderit për vlerësimin!' : 'Thanks for rating!');
                   }}
@@ -192,7 +192,7 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
                   onClick={async () => {
                     setDriverRating(1);
                     const note = prompt(language === 'sq' ? 'Mund të lini një koment (opsionale):' : 'Leave a note (optional):');
-                    await rateDriver(order.id, 1, note || undefined);
+                    await rateDriver(order!.id, 1, note || undefined);
                     setRatingSubmitted(true);
                     toast.success(language === 'sq' ? 'Faleminderit për vlerësimin!' : 'Thanks for rating!');
                   }}
