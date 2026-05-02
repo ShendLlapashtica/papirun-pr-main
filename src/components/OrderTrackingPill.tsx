@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon } from 'lucide-react';
@@ -145,17 +145,16 @@ const OrderTrackingPill = () => {
   }, [order?.status]);
 
   // Auto-open chat the moment admin approves the order + haptic feedback
-  const prevStatusRef = (OrderTrackingPill as any)._prev || { current: undefined as OrderStatus | undefined };
-  (OrderTrackingPill as any)._prev = prevStatusRef;
+  const prevStatusRef = useRef<OrderStatus | undefined>(undefined);
   useEffect(() => {
     const prev = prevStatusRef.current;
+    prevStatusRef.current = order?.status;
     if (prev === 'pending' && order?.status === 'approved') {
       haptic('success');
       setOpen(true);
     } else if (prev === 'pending' && order?.status === 'rejected') {
       haptic('error');
     }
-    prevStatusRef.current = order?.status;
   }, [order?.status]);
 
   if (isHiddenRoute) return null;

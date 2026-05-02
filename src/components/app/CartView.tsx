@@ -7,6 +7,7 @@ import { getIngredientName } from '@/data/ingredientTranslations';
 import { getCartLineTotal, getCartTotal } from '@/lib/cartPricing';
 import { getCartItemKey } from '@/lib/cartItemKey';
 import CheckoutModal from '@/components/CheckoutModal';
+import { getOptimizedImage } from '@/lib/utils';
 
 const SLATE = '#0F1311';
 const SAGE = '#749D79';
@@ -116,9 +117,9 @@ const CartView = () => {
                       style={{ background: 'rgba(255,255,255,0.55)' }}
                     >
                       <img
-                        src={item.image}
+                        src={getOptimizedImage(item.image)}
                         alt={item.name[language]}
-                        className="w-16 h-16 object-contain p-1.5"
+                        className="w-16 h-16 object-contain mix-blend-screen bg-white p-1.5"
                       />
                     </button>
 

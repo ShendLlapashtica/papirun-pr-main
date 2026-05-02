@@ -4,6 +4,8 @@ import { ArrowLeft, Check } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveVisibleOffers } from '@/hooks/useLiveStorefrontData';
 import Header from '@/components/Header';
+import { getOptimizedImage } from '@/lib/utils';
+
 
 interface OfferViewProps {
   cartCount: number;
@@ -53,9 +55,9 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
             {/* Offer Image */}
             <div className="rounded-3xl overflow-hidden">
               <img
-                src={offer.image}
+                src={getOptimizedImage(offer.image)}
                 alt={offer.title}
-                className="w-full h-auto object-cover"
+                className="w-full h-auto object-contain mix-blend-screen bg-white"
               />
             </div>
 

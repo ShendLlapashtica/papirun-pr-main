@@ -9,7 +9,7 @@ import { useLiveMenuExtras, useLiveMenuItems } from '@/hooks/useLiveStorefrontDa
 import MenuCard from '@/components/MenuCard';
 import SearchBar from '@/components/SearchBar';
 import Header from '@/components/Header';
-import { cn } from '@/lib/utils';
+import { cn, getOptimizedImage } from '@/lib/utils';
 
 interface ProductViewProps {
   cart: { id: string; quantity: number }[];
@@ -169,9 +169,9 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
             <div className="relative group">
               <div className="aspect-square rounded-3xl overflow-hidden bg-white">
                 <img
-                  src={item.image}
+                  src={getOptimizedImage(item.image)}
                   alt={item.name[language]}
-                  className="w-full h-full object-contain p-6 sm:p-10 transition-transform duration-700 group-hover:scale-105"
+                  className="w-full h-full object-contain mix-blend-screen bg-white p-6 sm:p-10 transition-transform duration-700 group-hover:scale-105"
                 />
               </div>
             </div>

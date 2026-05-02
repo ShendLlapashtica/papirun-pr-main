@@ -6,6 +6,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveMenuItems } from '@/hooks/useLiveStorefrontData';
 import { fetchAllOrders, type OrderRecord } from '@/lib/ordersApi';
+import { getOptimizedImage } from '@/lib/utils';
 
 /**
  * Shows the user's most recent order with a "Reorder" CTA.
@@ -57,7 +58,7 @@ const LastOrderCard = () => {
             if (!product) return null;
             return (
               <div key={i} className="w-11 h-11 rounded-full bg-white border-2 border-background overflow-hidden">
-                <img src={product.image} alt="" className="w-full h-full object-contain p-1" />
+                <img src={getOptimizedImage(product.image)} alt="" className="w-full h-full object-contain mix-blend-screen bg-white p-1" />
               </div>
             );
           })}

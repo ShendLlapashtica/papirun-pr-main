@@ -97,6 +97,22 @@ export const fetchDriverOrders = async (driverId: string) => {
   return data;
 };
 
+/** Ensure default drivers (Delivery1/2/3 with Pass123) exist — idempotent */
+export const seedDefaultDrivers = async (): Promise<void> => {
+  const client = supabase as any;
+  const { data: existing } = await client.from(TABLE).select('name');
+  const names: string[] = (existing ?? []).map((r: any) => r.name);
+  const defaults = [
+    { name: 'Delivery1', phone: '', pin: 'Pass123', is_active: true },
+    { name: 'Delivery2', phone: '', pin: 'Pass123', is_active: true },
+    { name: 'Delivery3', phone: '', pin: 'Pass123', is_active: true },
+  ];
+  const toInsert = defaults.filter((d) => !names.includes(d.name));
+  if (toInsert.length > 0) {
+    await client.from(TABLE).insert(toInsert);
+  }
+};
+
 export const subscribeDriverOrdersRealtime = (driverId: string, onChange: () => void) => {
   const channel = supabase
     .channel(`driver-orders-${driverId}`)

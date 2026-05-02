@@ -6,6 +6,8 @@ import { useCart } from '@/contexts/CartContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveMenuItems } from '@/hooks/useLiveStorefrontData';
 import { fetchAllOrders, type OrderRecord } from '@/lib/ordersApi';
+import { getOptimizedImage } from '@/lib/utils';
+
 
 /**
  * Horizontal scroll of items the user has previously ordered.
@@ -64,9 +66,8 @@ const QuickReorder = () => {
             }}
             className="shrink-0 w-32 rounded-2xl bg-white border border-border/40 shadow-sm overflow-hidden active:scale-95 transition-all"
           >
-            <div className="h-20 bg-white flex items-center justify-center">
-              <img src={product!.image} alt={product!.name[language]} className="h-full w-full object-contain p-2" />
-            </div>
+              <img src={getOptimizedImage(product!.image)} alt={product!.name[language]} className="h-full w-full object-contain mix-blend-screen bg-white p-2" />
+
             <div className="p-2 text-left">
               <p className="text-[11px] font-semibold line-clamp-1">{product!.name[language]}</p>
               <div className="flex items-center justify-between mt-1">

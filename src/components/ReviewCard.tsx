@@ -1,6 +1,8 @@
 import { Star, Camera } from 'lucide-react';
 import type { Review } from '@/types/menu';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getOptimizedImage } from '@/lib/utils';
+
 
 interface ReviewCardProps {
   review: Review;
@@ -55,20 +57,22 @@ const ReviewCard = ({ review }: ReviewCardProps) => {
           {review.photos.map((photo, idx) => (
             <img
               key={idx}
-              src={photo}
+              src={getOptimizedImage(photo)}
               alt={`Review photo ${idx + 1}`}
-              className="w-[140px] sm:w-[180px] h-[100px] sm:h-[130px] rounded-xl object-cover shrink-0"
+              className="w-[140px] sm:w-[180px] h-[100px] sm:h-[130px] rounded-xl object-contain mix-blend-screen bg-white shrink-0"
             />
+
           ))}
         </div>
       )}
       {review.photo && !review.photos && (
         <div className="mt-3">
           <img
-            src={review.photo}
+            src={getOptimizedImage(review.photo)}
             alt="Review photo"
-            className="w-full max-w-[200px] h-auto rounded-xl object-cover"
+            className="w-full max-w-[200px] h-auto rounded-xl object-contain mix-blend-screen bg-white"
           />
+
         </div>
       )}
       {review.photoCount && !review.photo && (

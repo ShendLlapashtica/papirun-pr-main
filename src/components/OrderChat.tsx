@@ -14,13 +14,13 @@ import { fetchQuickReplies, type QuickReply } from '@/lib/quickRepliesApi';
 
 interface Props {
   orderId: string;
-  /** 'user' = customer view, 'admin' = staff view */
+  /** 'user' = customer view, 'admin' = staff view, 'driver' = delivery driver view */
   viewerSide: MessageSender;
   /** Disable input (e.g. when order is rejected/completed) */
   disabled?: boolean;
   /** Compact height for embedding inside modals */
   maxHeightClass?: string;
-  /** When true (admin), show a "delete chat" button */
+  /** When true (admin/driver), show a "delete chat" button */
   allowDelete?: boolean;
   /** Notify parent when message count changes (used to hide chat for users) */
   onMessagesCountChange?: (count: number) => void;
@@ -29,6 +29,12 @@ interface Props {
 const formatTime = (iso: string) => {
   try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
   catch { return ''; }
+};
+
+const SENDER_LABEL: Record<MessageSender, string> = {
+  user: 'Klient',
+  admin: 'Papirun',
+  driver: 'Shofer',
 };
 
 const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64', allowDelete, onMessagesCountChange }: Props) => {
@@ -59,7 +65,6 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
         });
       },
       () => {
-        // Chat was wiped (by admin or user) — refetch to re-sync
         fetchOrderMessages(orderId).then((rows) => {
           if (!active) return;
           setMessages(rows);
@@ -68,7 +73,9 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
       },
     );
 
-    fetchQuickReplies('chat').then((rows) => { if (active) setQuickReplies(rows); }).catch(() => {});
+    if (viewerSide === 'admin') {
+      fetchQuickReplies('chat').then((rows) => { if (active) setQuickReplies(rows); }).catch(() => {});
+    }
 
     return () => { active = false; unsub(); };
   }, [orderId]);
@@ -90,10 +97,6 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
     }
   };
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages.length]);
-
   const handleSend = async (override?: string) => {
     const body = (override ?? text).trim();
     if (!body || sending || disabled) return;
@@ -112,7 +115,9 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
 
   const placeholder = viewerSide === 'admin'
     ? (language === 'sq' ? 'Përgjigju klientit...' : 'Reply to customer...')
-    : (language === 'sq' ? 'Shkruaj Papirun-it...' : 'Message Papirun...');
+    : viewerSide === 'driver'
+      ? (language === 'sq' ? 'Mesazh klientit...' : 'Message customer...')
+      : (language === 'sq' ? 'Shkruaj Papirun-it...' : 'Message Papirun...');
 
   return (
     <div className="flex flex-col bg-secondary/30 rounded-2xl overflow-hidden border border-border/40">
@@ -138,32 +143,52 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
         )}
         {!loading && messages.length === 0 && (
           <div className="text-center py-6 text-xs text-muted-foreground">
-            {viewerSide === 'admin'
-              ? (language === 'sq' ? 'Asnjë mesazh ende.' : 'No messages yet.')
-              : (language === 'sq' ? 'Bisedo me Papirun këtu 👋' : 'Chat with Papirun here 👋')}
+            {viewerSide === 'user'
+              ? (language === 'sq' ? 'Bisedo me Papirun këtu 👋' : 'Chat with Papirun here 👋')
+              : (language === 'sq' ? 'Asnjë mesazh ende.' : 'No messages yet.')}
           </div>
         )}
         {messages.map((m) => {
           const mine = m.sender === viewerSide;
-          const isAdminNote = m.sender === 'admin' && /pa\s*stok|nuk\s*ka(më)?|jasht[eë]\s*stok|out\s*of\s*stock|unavailable|s'ka|sosur/i.test(m.message);
+          const isStockNote = m.sender === 'admin' && /pa\s*stok|nuk\s*ka(më)?|jasht[eë]\s*stok|out\s*of\s*stock|unavailable|s'ka|sosur/i.test(m.message);
+
+          // Determine bubble style
+          let bubbleClass = '';
+          let labelEl: JSX.Element | null = null;
+
+          if (mine) {
+            bubbleClass = 'px-3 py-1.5 bg-primary text-primary-foreground rounded-br-sm';
+          } else if (m.sender === 'admin') {
+            if (isStockNote) {
+              bubbleClass = 'px-4 py-3 bg-amber-50 dark:bg-amber-500/10 text-foreground border border-amber-300/50 dark:border-amber-500/30 rounded-bl-sm shadow-sm';
+            } else {
+              bubbleClass = 'px-3 py-1.5 bg-background text-foreground rounded-bl-sm border border-border/40 shadow-sm';
+            }
+            if (viewerSide === 'user') {
+              labelEl = (
+                <div className={`text-[10px] font-semibold mb-0.5 ${isStockNote ? 'text-amber-700 dark:text-amber-400 uppercase tracking-wider' : 'text-primary'}`}>
+                  {isStockNote ? 'Shënim nga Papirun' : SENDER_LABEL.admin}
+                </div>
+              );
+            }
+          } else if (m.sender === 'driver') {
+            bubbleClass = 'px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-foreground rounded-bl-sm border border-blue-200/60 dark:border-blue-700/40 shadow-sm';
+            if (viewerSide === 'user' || viewerSide === 'admin') {
+              labelEl = (
+                <div className="text-[10px] font-semibold mb-0.5 text-blue-600 dark:text-blue-400">
+                  {SENDER_LABEL.driver}
+                </div>
+              );
+            }
+          } else {
+            // user message viewed by admin/driver
+            bubbleClass = 'px-3 py-1.5 bg-background text-foreground rounded-bl-sm border border-border/40';
+          }
+
           return (
             <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[80%] rounded-2xl text-sm ${
-                  isAdminNote
-                    ? 'px-4 py-3 bg-amber-50 dark:bg-amber-500/10 text-foreground border border-amber-300/50 dark:border-amber-500/30 rounded-bl-sm shadow-sm'
-                    : mine
-                      ? 'px-3 py-1.5 bg-primary text-primary-foreground rounded-br-sm'
-                      : m.sender === 'admin'
-                        ? 'px-3 py-1.5 bg-background text-foreground rounded-bl-sm border border-border/40 shadow-sm'
-                        : 'px-3 py-1.5 bg-background text-foreground rounded-bl-sm border border-border/40'
-                }`}
-              >
-                {m.sender === 'admin' && viewerSide === 'user' && (
-                  <div className={`text-[10px] font-semibold mb-0.5 ${isAdminNote ? 'text-amber-700 dark:text-amber-400 uppercase tracking-wider' : 'text-primary'}`}>
-                    {isAdminNote ? 'Shënim nga Papirun' : 'Papirun'}
-                  </div>
-                )}
+              <div className={`max-w-[80%] rounded-2xl text-sm ${bubbleClass}`}>
+                {labelEl}
                 <div className="whitespace-pre-wrap leading-snug">{m.message}</div>
                 <div className={`text-[9px] mt-0.5 ${mine ? 'opacity-80' : 'opacity-60'}`}>{formatTime(m.createdAt)}</div>
               </div>
@@ -189,7 +214,7 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
             </div>
           )}
           <div className="flex items-center gap-1.5 p-2">
-            {quickReplies.length > 0 && (
+            {quickReplies.length > 0 && viewerSide === 'admin' && (
               <button
                 type="button"
                 onClick={() => setShowReplies((v) => !v)}

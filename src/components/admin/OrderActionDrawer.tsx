@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
-import { Check, X, Clock, Loader2 } from 'lucide-react';
+import { Check, X, Clock, Loader2, Bike, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchQuickReplies, type QuickReply } from '@/lib/quickRepliesApi';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
-import { updateOrderStatus, setOrderEta, type OrderRecord } from '@/lib/ordersApi';
+import { updateOrderStatus, setOrderEta, fetchAllOrders, type OrderRecord } from '@/lib/ordersApi';
+import { fetchDrivers, assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
 
 interface Props {
   order: OrderRecord | null;
@@ -14,31 +15,78 @@ interface Props {
 
 const ETA_OPTIONS = [15, 20, 30, 45];
 
+/** ECT: sum remaining prep/delivery time for each active order assigned to a driver */
+const calcDriverECT = (driverId: string, activeOrders: OrderRecord[]): number => {
+  const driverOrders = activeOrders.filter(
+    (o) =>
+      o.assignedDriverId === driverId &&
+      ['approved', 'preparing', 'out_for_delivery'].includes(o.status),
+  );
+  if (driverOrders.length === 0) return 0;
+  const now = Date.now();
+  return driverOrders.reduce((sum, o) => {
+    const elapsedMins = (now - new Date(o.createdAt).getTime()) / 60_000;
+    const etaMins = o.prepEtaMinutes ?? 20;
+    return sum + Math.max(0, etaMins - elapsedMins);
+  }, 0);
+};
+
+const getBestDriverECT = (drivers: DeliveryDriver[], activeOrders: OrderRecord[]): DeliveryDriver | null => {
+  if (drivers.length === 0) return null;
+  return drivers.reduce((best, d) => {
+    return calcDriverECT(d.id, activeOrders) < calcDriverECT(best.id, activeOrders) ? d : best;
+  }, drivers[0]);
+};
+
 const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
   const [replies, setReplies] = useState<QuickReply[]>([]);
   const [note, setNote] = useState('');
   const [eta, setEta] = useState<number | null>(20);
   const [submitting, setSubmitting] = useState(false);
+  const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
+  const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('auto');
 
   const open = !!order && !!mode;
+  const isApprove = mode === 'approve';
 
   useEffect(() => {
-    if (!mode) return;
+    if (!open) return;
     setNote('');
-    setEta(mode === 'approve' ? 20 : null);
-    fetchQuickReplies(mode).then(setReplies).catch(() => setReplies([]));
-  }, [mode, order?.id]);
+    setEta(isApprove ? 20 : null);
+    setSelectedDriverId('auto');
+    fetchQuickReplies(mode!).then(setReplies).catch(() => setReplies([]));
+    if (isApprove) {
+      fetchDrivers().then((d) => setDrivers(d.filter((x) => x.isActive))).catch(() => {});
+      fetchAllOrders().then(setAllOrders).catch(() => {});
+    }
+  }, [open, mode, order?.id]);
 
   const handleConfirm = async () => {
     if (!order || !mode) return;
     setSubmitting(true);
     try {
       const trimmed = note.trim();
-      if (mode === 'approve') {
+      if (isApprove) {
         await updateOrderStatus(order.id, 'approved', trimmed);
         if (eta) await setOrderEta(order.id, eta);
         const msg = trimmed || (eta ? `Po e përgatisim — gati për ~${eta} min ✓` : 'Porosia u aprovua ✓');
         await sendOrderMessage(order.id, 'admin', msg);
+
+        // Assign driver via ECT or manual selection
+        if (drivers.length > 0) {
+          let targetDriver: DeliveryDriver | null = null;
+          if (selectedDriverId === 'auto') {
+            targetDriver = getBestDriverECT(drivers, allOrders);
+          } else {
+            targetDriver = drivers.find((d) => d.id === selectedDriverId) ?? null;
+          }
+          if (targetDriver) {
+            await assignDriverToOrder(order.id, targetDriver.id);
+            const mode = selectedDriverId === 'auto' ? 'ECT Auto' : 'Manual';
+            toast.success(`Shoferi: ${targetDriver.name} (${mode})`);
+          }
+        }
         toast.success('Aprovuar');
       } else {
         const reason = trimmed || 'Porosia u refuzua';
@@ -54,8 +102,6 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
       setSubmitting(false);
     }
   };
-
-  const isApprove = mode === 'approve';
 
   return (
     <Drawer.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -111,6 +157,52 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
                     Pa ETA
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Driver assignment — only shown when approving */}
+            {isApprove && drivers.length > 0 && (
+              <div className="mb-4 bg-blue-500/5 rounded-2xl p-3 border border-blue-500/20">
+                <p className="text-[11px] uppercase tracking-wider font-semibold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1">
+                  <Bike className="w-3 h-3" /> Cakto Shoferin
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setSelectedDriverId('auto')}
+                    className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+                      selectedDriverId === 'auto'
+                        ? 'bg-primary text-primary-foreground shadow'
+                        : 'bg-secondary hover:bg-primary/10'
+                    }`}
+                  >
+                    <Zap className="w-3 h-3" /> Auto (ECT)
+                  </button>
+                  {drivers.map((d) => {
+                    const ect = calcDriverECT(d.id, allOrders);
+                    return (
+                      <button
+                        key={d.id}
+                        onClick={() => setSelectedDriverId(d.id)}
+                        className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
+                          selectedDriverId === d.id
+                            ? 'bg-blue-600 text-white shadow'
+                            : 'bg-secondary hover:bg-blue-500/10'
+                        }`}
+                        title={`ECT: ${ect.toFixed(0)} min`}
+                      >
+                        {d.name}
+                        {ect > 0 && (
+                          <span className="ml-1 text-[9px] opacity-70">~{ect.toFixed(0)}m</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedDriverId === 'auto' && (
+                  <p className="text-[10px] text-muted-foreground mt-1.5">
+                    Sistemi zgjedh shoferin me kohën më të shkurtër të pritjes (ECT).
+                  </p>
+                )}
               </div>
             )}
 

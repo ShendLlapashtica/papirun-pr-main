@@ -7,7 +7,7 @@ import type { SelectedExtra } from '@/types/menuExtra';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useLiveMenuExtras } from '@/hooks/useLiveStorefrontData';
-import { cn } from '@/lib/utils';
+import { cn, getOptimizedImage } from '@/lib/utils';
 import { haptic } from '@/lib/native';
 
 interface Props {
@@ -110,9 +110,12 @@ const AppProductModal = ({ item, isOpen, onClose }: Props) => {
             </button>
 
             <div className="flex-1 overflow-y-auto px-5 pb-5">
-              {/* Image */}
               <div className="aspect-square max-h-[40vh] rounded-2xl overflow-hidden bg-white mb-4 mt-2">
-                <img src={item.image} alt={item.name[language]} className="w-full h-full object-contain p-6" />
+                <img 
+                  src={getOptimizedImage(item.image)} 
+                  alt={item.name[language]} 
+                  className="w-full h-full object-contain mix-blend-screen bg-white p-6" 
+                />
               </div>
 
               {/* Title + price */}

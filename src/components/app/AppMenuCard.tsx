@@ -5,7 +5,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { ingredientNames } from '@/data/ingredientTranslations';
-import { cn } from '@/lib/utils';
+import { cn, getOptimizedImage } from '@/lib/utils';
 
 interface AppMenuCardProps {
   item: MenuItem;
@@ -75,14 +75,14 @@ const AppMenuCard = ({ item, index = 0, onAddToCart, onCardClick }: AppMenuCardP
 
           {/* Premium image presentation with scale effect */}
           <img
-            src={item.image}
+            src={getOptimizedImage(item.image)}
             alt={item.name[language]}
             loading={isEager ? 'eager' : 'lazy'}
             decoding="async"
             fetchPriority={isEager ? 'high' : undefined}
             onLoad={() => setImageLoaded(true)}
             className={cn(
-              'w-[85%] h-[85%] object-contain drop-shadow-2xl transition-all duration-700 cubic-bezier(0.4, 0, 0.2, 1)',
+              'w-[85%] h-[85%] object-contain mix-blend-screen bg-white drop-shadow-2xl transition-all duration-700 cubic-bezier(0.4, 0, 0.2, 1)',
               imageLoaded ? 'opacity-100 scale-100 group-hover:scale-110 group-hover:-rotate-3' : 'opacity-0 scale-95 blur-md'
             )}
           />

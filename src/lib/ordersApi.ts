@@ -185,6 +185,19 @@ export const restoreOrder = async (id: string) => {
   if (error) throw error;
 };
 
+export const hardDeleteOrder = async (id: string) => {
+  const client = supabase as any;
+  const { error } = await client.from(TABLE).delete().eq('id', id);
+  if (error) throw error;
+};
+
+export const hardDeleteOrdersBatch = async (ids: string[]) => {
+  if (ids.length === 0) return;
+  const client = supabase as any;
+  const { error } = await client.from(TABLE).delete().in('id', ids);
+  if (error) throw error;
+};
+
 export const subscribeOrderRealtime = (id: string, onChange: (order: OrderRecord) => void) => {
   const channel = supabase
     .channel(`order-${id}`)

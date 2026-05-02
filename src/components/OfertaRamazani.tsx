@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveVisibleOffers } from '@/hooks/useLiveStorefrontData';
+import { getOptimizedImage } from '@/lib/utils';
 
 const OfertaRamazani = () => {
   const { language } = useLanguage();
@@ -35,9 +36,9 @@ const OfertaRamazani = () => {
             >
               <div className="relative aspect-[3/4] overflow-hidden">
                 <img
-                  src={offer.image}
+                  src={getOptimizedImage(offer.image)}
                   alt={offer.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  className="w-full h-full object-contain mix-blend-screen bg-white transition-transform duration-500 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type } from 'lucide-react';
+import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2 } from 'lucide-react';
+import { fetchDrivers, createDriver, updateDriver, deleteDriver, seedDefaultDrivers, type DeliveryDriver } from '@/lib/driversApi';
 import { menuItems as initialMenuItems, ofertaRamazani as initialOffers } from '@/data/menuData';
 import { defaultMenuExtras } from '@/data/menuExtras';
 import { getIngredientName } from '@/data/ingredientTranslations';
@@ -31,7 +32,9 @@ import {
   uploadStorefrontOfferImage,
   updateProductSortOrder,
 } from '@/lib/productsApi';
+import { getOptimizedImage } from '@/lib/utils';
 import { useLanguage, translations } from '@/contexts/LanguageContext';
+
 import type { Language } from '@/contexts/LanguageContext';
 import Header from '@/components/Header';
 import { useLiveMenuItems } from '@/hooks/useLiveStorefrontData';
@@ -174,9 +177,167 @@ const SiteTextsEditor = ({ language }: { language: Language }) => {
 };
 
 const ADMIN_PASSWORD = 'Pass123.';
+const ADMIN_AUTH_KEY = 'papirun_admin_authed';
+
+// ---- Drivers Manager ----
+const DriversManager = () => {
+  const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showPinFor, setShowPinFor] = useState<Set<string>>(new Set());
+  const [editForm, setEditForm] = useState<{ name: string; phone: string; pin: string }>({ name: '', phone: '', pin: '' });
+  const [addMode, setAddMode] = useState(false);
+  const [newForm, setNewForm] = useState({ name: '', phone: '', pin: 'Pass123' });
+
+  const reload = () => {
+    setLoading(true);
+    fetchDrivers().then((d) => { setDrivers(d); setLoading(false); }).catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    seedDefaultDrivers().catch(() => {}).finally(reload);
+  }, []);
+
+  const togglePin = (id: string) => {
+    setShowPinFor((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const startEdit = (d: DeliveryDriver) => {
+    setEditingId(d.id);
+    setEditForm({ name: d.name, phone: d.phone, pin: d.pin });
+  };
+
+  const saveEdit = async (id: string) => {
+    try {
+      await updateDriver(id, { name: editForm.name, phone: editForm.phone, pin: editForm.pin });
+      setEditingId(null);
+      reload();
+    } catch { /* silent */ }
+  };
+
+  const toggleActive = async (d: DeliveryDriver) => {
+    try { await updateDriver(d.id, { isActive: !d.isActive }); reload(); } catch {}
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Fshij këtë shofer?')) return;
+    try { await deleteDriver(id); reload(); } catch {}
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newForm.name.trim()) return;
+    try {
+      await createDriver(newForm.name.trim(), newForm.phone.trim(), newForm.pin.trim() || 'Pass123');
+      setNewForm({ name: '', phone: '', pin: 'Pass123' });
+      setAddMode(false);
+      reload();
+    } catch {}
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-display font-bold text-lg">Menaxhimi i Shoferëve</h3>
+        <button
+          onClick={() => setAddMode((v) => !v)}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Shto Shofer
+        </button>
+      </div>
+
+      {addMode && (
+        <form onSubmit={handleAdd} className="bg-card rounded-2xl p-4 shadow-card space-y-3 border border-blue-500/20">
+          <p className="text-sm font-semibold text-blue-600">Shofer i Ri</p>
+          <div className="grid grid-cols-3 gap-2">
+            <input value={newForm.name} onChange={(e) => setNewForm((p) => ({ ...p, name: e.target.value }))} placeholder="Emri (Delivery4)" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+            <input value={newForm.phone} onChange={(e) => setNewForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Telefon (opsional)" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+            <input value={newForm.pin} onChange={(e) => setNewForm((p) => ({ ...p, pin: e.target.value }))} placeholder="Fjalëkalimi" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Shto</button>
+            <button type="button" onClick={() => setAddMode(false)} className="px-4 py-2 rounded-full bg-secondary text-sm font-semibold">Anulo</button>
+          </div>
+        </form>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">Duke ngarkuar…</p>
+      ) : drivers.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">Nuk ka shoferë. Shto njërin me butonin lart.</p>
+      ) : (
+        <div className="space-y-2">
+          {drivers.map((d) => (
+            <div key={d.id} className={`bg-card rounded-2xl p-4 shadow-card border border-border/40 transition-opacity ${!d.isActive ? 'opacity-60' : ''}`}>
+              {editingId === d.id ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} placeholder="Emri" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+                    <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Telefon" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+                    <input value={editForm.pin} onChange={(e) => setEditForm((p) => ({ ...p, pin: e.target.value }))} placeholder="Fjalëkalimi" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => saveEdit(d.id)} className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center gap-1"><Save className="w-3.5 h-3.5" /> Ruaj</button>
+                    <button onClick={() => setEditingId(null)} className="px-4 py-2 rounded-full bg-secondary text-sm font-semibold">Anulo</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                    <span className="text-blue-600 font-bold text-sm">{d.name.slice(0, 2)}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm">{d.name}</p>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${d.isActive ? 'bg-emerald-500/15 text-emerald-600' : 'bg-secondary text-muted-foreground'}`}>
+                        {d.isActive ? 'Aktiv' : 'Jo aktiv'}
+                      </span>
+                    </div>
+                    {d.phone && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Phone className="w-3 h-3" /> {d.phone}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[10px] text-muted-foreground font-medium">PIN:</span>
+                      <span className="text-xs font-mono bg-secondary/60 px-2 py-0.5 rounded-md">
+                        {showPinFor.has(d.id) ? d.pin : '••••••'}
+                      </span>
+                      <button onClick={() => togglePin(d.id)} className="p-1 rounded hover:bg-secondary transition-colors">
+                        {showPinFor.has(d.id) ? <EyeOff className="w-3 h-3 text-muted-foreground" /> : <Eye className="w-3 h-3 text-muted-foreground" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => toggleActive(d)} className={`text-[10px] font-bold px-2.5 py-1.5 rounded-full transition-all ${d.isActive ? 'bg-secondary hover:bg-red-500/10 hover:text-red-600' : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'}`}>
+                      {d.isActive ? 'Çaktivizo' : 'Aktivizo'}
+                    </button>
+                    <button onClick={() => startEdit(d)} className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground" title="Ndrysho">
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => handleDelete(d.id)} className="p-2 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground/60" title="Fshij">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Admin = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    try { return localStorage.getItem(ADMIN_AUTH_KEY) === '1'; } catch { return false; }
+  });
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [items, setItems] = useState<MenuItem[]>(initialMenuItems);
@@ -244,6 +405,7 @@ const Admin = () => {
     e.preventDefault();
     if (password === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
+      try { localStorage.setItem(ADMIN_AUTH_KEY, '1'); } catch {}
       setError('');
     } else {
       setError(language === 'sq' ? 'Fjalekalimi i gabuar' : 'Wrong password');
@@ -442,7 +604,10 @@ const Admin = () => {
             </div>
           </div>
           <button
-            onClick={() => setIsAuthenticated(false)}
+            onClick={() => {
+              setIsAuthenticated(false);
+              try { localStorage.removeItem(ADMIN_AUTH_KEY); } catch {}
+            }}
             className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
           >
             <LogOut className="w-4 h-4" />
@@ -497,7 +662,12 @@ const Admin = () => {
 
         {activeTab === 'orders' && <OrdersReview />}
         {activeTab === 'users' && <SubscribersList />}
-        {activeTab === 'drivers' && <DriversKPI />}
+        {activeTab === 'drivers' && (
+          <div className="space-y-8">
+            <DriversManager />
+            <DriversKPI />
+          </div>
+        )}
         {activeTab === 'content' && contentSubTab === 'locations' && <LocationsEditor />}
         {activeTab === 'content' && contentSubTab === 'replies' && <QuickRepliesEditor />}
         {activeTab === 'content' && contentSubTab === 'texts' && <SiteTextsEditor language={language} />}
@@ -587,9 +757,9 @@ const Admin = () => {
                   >
                     {item.image ? (
                       <img
-                        src={item.image}
+                        src={getOptimizedImage(item.image)}
                         alt={item.name[language]}
-                        className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain bg-cream ${editingItem === item.id ? 'ring-2 ring-primary/30 ring-dashed' : ''}`}
+                        className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain mix-blend-screen bg-white ${editingItem === item.id ? 'ring-2 ring-primary/30 ring-dashed' : ''}`}
                       />
                     ) : (
                       <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-secondary flex items-center justify-center ${editingItem === item.id ? 'ring-2 ring-primary/30 ring-dashed' : ''}`}>
@@ -950,7 +1120,7 @@ const Admin = () => {
                     <div className="flex items-start gap-3">
                       <div className="relative shrink-0">
                         {offer.image ? (
-                          <img src={offer.image} alt={offer.title} className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover" />
+                          <img src={getOptimizedImage(offer.image)} alt={offer.title} className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain mix-blend-screen bg-white" />
                         ) : (
                           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-secondary flex items-center justify-center">
                             <Image className="w-6 h-6 text-muted-foreground" />

@@ -321,16 +321,17 @@ const DriverPanel = () => {
                     </button>
                   )}
 
-                  {/* Chat with customer — forwarded from admin */}
+                  {/* Chat with customer */}
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2 flex items-center gap-1">
                       <MessageCircle className="w-3 h-3" /> Chat me klientin
                     </p>
                     <OrderChat
                       orderId={selected.id}
-                      viewerSide="admin"
+                      viewerSide="driver"
                       disabled={selected.status === 'completed' || selected.status === 'rejected'}
                       maxHeightClass="max-h-72"
+                      allowDelete={selected.status === 'completed'}
                     />
                   </div>
                 </div>

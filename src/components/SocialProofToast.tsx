@@ -3,6 +3,7 @@ import { MapPin } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveMenuItems } from '@/hooks/useLiveStorefrontData';
 import type { MenuItem } from '@/types/menu';
+import { getOptimizedImage } from '@/lib/utils';
 
 const SocialProofToast = () => {
   const [visible, setVisible] = useState(false);
@@ -44,9 +45,9 @@ const SocialProofToast = () => {
   return (
     <div className="toast-notification flex items-center gap-3">
       <img
-        src={currentItem.image}
+        src={getOptimizedImage(currentItem.image)}
         alt={currentItem.name[language]}
-        className="w-12 h-12 rounded-lg object-contain bg-cream"
+        className="w-12 h-12 rounded-lg object-contain mix-blend-screen bg-white"
       />
       <div>
         <p className="text-xs sm:text-sm font-medium">

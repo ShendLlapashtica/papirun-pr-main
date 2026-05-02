@@ -7,7 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useLiveMenuExtras, useLiveMenuItems } from '@/hooks/useLiveStorefrontData';
 import AppMenuCard from './AppMenuCard';
-import { cn } from '@/lib/utils';
+import { cn, getOptimizedImage } from '@/lib/utils';
 import { haptic } from '@/lib/native';
 
 /**
@@ -118,9 +118,9 @@ const AppProductView = () => {
         <div className="app-glass-strong rounded-[36px] overflow-hidden p-3.5">
           <div className="aspect-square rounded-[28px] overflow-hidden bg-white/35 backdrop-blur-md">
             <img
-              src={item.image}
+              src={getOptimizedImage(item.image)}
               alt={item.name[language]}
-              className="w-full h-full object-contain p-7"
+              className="w-full h-full object-contain mix-blend-screen bg-white p-7"
               loading="eager"
             />
           </div>

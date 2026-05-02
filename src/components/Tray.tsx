@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type { CartItem } from '@/types/menu';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getIngredientName } from '@/data/ingredientTranslations';
-import { cn } from '@/lib/utils';
+import { cn, getOptimizedImage } from '@/lib/utils';
 import { getCartLineTotal, getCartTotal } from '@/lib/cartPricing';
 import { getCartItemKey } from '@/lib/cartItemKey';
 
@@ -127,7 +127,7 @@ const Tray = ({ items, isOpen, onClose, onUpdateQuantity, onRemove, onCheckout, 
                       onClick={() => openProduct(item.id)}
                       className="rounded-xl overflow-hidden shrink-0"
                     >
-                      <img src={item.image} alt={item.name[language]} className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-contain bg-cream" />
+                      <img src={getOptimizedImage(item.image)} alt={item.name[language]} className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-contain mix-blend-screen bg-white" />
                     </button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1">

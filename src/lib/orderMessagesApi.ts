@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type MessageSender = 'user' | 'admin';
+export type MessageSender = 'user' | 'admin' | 'driver';
 
 export interface OrderMessage {
   id: string;

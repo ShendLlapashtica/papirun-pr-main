@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, X, MapPin, Phone, Calendar, Smartphone, Globe, Clock, Printer, Trash2, ChefHat, Bike, CheckCheck, AlertCircle, Hourglass, Star, MessageCircle, Copy, Navigation, Receipt, Search } from 'lucide-react';
+import { Check, X, MapPin, Phone, Calendar, Smartphone, Globe, Clock, Printer, Trash2, ChefHat, Bike, CheckCheck, AlertCircle, Hourglass, Star, MessageCircle, Copy, Navigation, Receipt, Search, Download, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchAllOrders,
   subscribeAllOrdersRealtime,
   updateOrderStatus,
-  deleteOrder,
   softDeleteOrder,
   restoreOrder,
   setOrderEta,
+  hardDeleteOrder,
+  hardDeleteOrdersBatch,
   type OrderRecord,
   type OrderStatus,
 } from '@/lib/ordersApi';
@@ -18,7 +19,8 @@ import OrderActionDrawer from '@/components/admin/OrderActionDrawer';
 import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
 import { generateInvoice } from '@/lib/invoiceGenerator';
-import { fetchDrivers, assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
+import { assignDriverToOrder, fetchDrivers, type DeliveryDriver } from '@/lib/driversApi';
+import { sendOrderMessage } from '@/lib/orderMessagesApi';
 
 const statusColor = (s: string) => {
   if (s === 'pending') return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30 animate-pulse';
@@ -28,7 +30,6 @@ const statusColor = (s: string) => {
   return 'bg-secondary text-muted-foreground';
 };
 
-// Used to drive the pulsing red alert badge after 60s without admin action
 const useNow = (intervalMs = 5000) => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -54,8 +55,7 @@ const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0);
 const startOfWeek = (d: Date) => {
   const x = startOfDay(d);
   const day = x.getDay();
-  const diff = (day + 6) % 7;
-  x.setDate(x.getDate() - diff);
+  x.setDate(x.getDate() - (day + 6) % 7);
   return x;
 };
 const startOfMonth = (d: Date) => {
@@ -64,7 +64,6 @@ const startOfMonth = (d: Date) => {
   return x;
 };
 
-// --- Sound ---
 let _audioCtx: AudioContext | null = null;
 const playDing = () => {
   try {
@@ -102,6 +101,82 @@ const savePriority = (s: Set<string>) => {
   try { localStorage.setItem(PRIORITY_KEY, JSON.stringify(Array.from(s))); } catch {}
 };
 
+// ---- CSV/JSON export helpers ----
+const exportOrdersCSV = (orders: OrderRecord[]) => {
+  const header = 'ID,Emri,Telefon,Adresa,Totali,Statusi,Data,Artikujt';
+  const rows = orders.map((o) => {
+    const items = o.items.map((i: any) => `${i.quantity}x ${i.name?.sq || i.name?.en || i.id}`).join(' | ');
+    const safe = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+    return [o.id, safe(o.customerName), safe(o.customerPhone), safe(o.deliveryAddress), o.total.toFixed(2), o.status, o.createdAt, safe(items)].join(',');
+  });
+  const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `papirun-histori-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const exportOrdersJSON = (orders: OrderRecord[]) => {
+  const blob = new Blob([JSON.stringify(orders, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `papirun-histori-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ---- Confirm-text delete dialog ----
+const CONFIRM_PHRASE = 'konfirmoj fshirjen';
+
+interface ConfirmDeleteDialogProps {
+  title: string;
+  description: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+const ConfirmDeleteDialog = ({ title, description, onConfirm, onCancel }: ConfirmDeleteDialogProps) => {
+  const [text, setText] = useState('');
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-background rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
+        <h3 className="font-bold text-base text-destructive">{title}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+        <p className="text-xs text-muted-foreground">
+          Shkruaj <strong className="text-foreground font-mono">{CONFIRM_PHRASE}</strong> për të vazhduar:
+        </p>
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={CONFIRM_PHRASE}
+          autoFocus
+          className="w-full px-4 py-2.5 rounded-xl bg-secondary text-sm focus:outline-none focus:ring-2 focus:ring-destructive/30"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80 transition-colors"
+          >
+            Anulo
+          </button>
+          <button
+            disabled={text !== CONFIRM_PHRASE}
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold transition-all disabled:opacity-40 hover:bg-destructive/90 active:scale-[0.98]"
+          >
+            Fshi
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const OrdersReview = () => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [filter, setFilter] = useState<FilterKey>('month');
@@ -120,7 +195,9 @@ const OrdersReview = () => {
   const now = useNow(5000);
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
 
-  // Load drivers list once
+  // Confirm-delete dialog state
+  const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
+
   useEffect(() => {
     fetchDrivers().then((d) => setDrivers(d.filter((x) => x.isActive))).catch(() => {});
   }, []);
@@ -145,17 +222,16 @@ const OrdersReview = () => {
   const togglePriority = (id: string) => {
     setPriorityIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       savePriority(next);
       return next;
     });
   };
+
   useEffect(() => {
     const sync = async () => {
       try {
         const all = await fetchAllOrders();
-        // Detect new orders (not seen yet AND we already have an initial baseline)
         if (initializedRef.current) {
           const newOnes = all.filter((o) => !seenIdsRef.current.has(o.id));
           if (newOnes.length) {
@@ -185,7 +261,6 @@ const OrdersReview = () => {
     return () => { unsub(); };
   }, []);
 
-  // Apply time-range filter first
   const timeFiltered = useMemo(() => {
     const now = new Date();
     return orders.filter((o) => {
@@ -208,15 +283,13 @@ const OrdersReview = () => {
     });
   }, [orders, filter, customFrom, customTo]);
 
-  // Helper: an order is "in history" if either soft-deleted server-side or locally archived or status is histori
   const isInHistory = (o: OrderRecord) => o.isVisible === false || archivedIds.has(o.id) || o.status === 'histori';
 
-  // Counts (exclude history items so deleted/archived don't keep counting in active stats)
   const counts = useMemo(() => {
     const visible = timeFiltered.filter((o) => !isInHistory(o));
     return {
       pending: visible.filter((o) => o.status === 'pending').length,
-      approved: visible.filter((o) => ['approved','preparing','out_for_delivery','completed'].includes(o.status)).length,
+      approved: visible.filter((o) => ['approved', 'preparing', 'out_for_delivery', 'completed'].includes(o.status)).length,
       rejected: visible.filter((o) => o.status === 'rejected').length,
       history: timeFiltered.filter(isInHistory).length,
     };
@@ -229,7 +302,6 @@ const OrdersReview = () => {
     [timeFiltered, now, archivedIds]
   );
 
-  // Apply status filter on top, then sort by priority (starred first)
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const arr = timeFiltered.filter((o) => {
@@ -238,7 +310,7 @@ const OrdersReview = () => {
         switch (statusFilter) {
           case 'history': return inHistory;
           case 'pending': return !inHistory && o.status === 'pending';
-          case 'approved': return !inHistory && ['approved','preparing','out_for_delivery','completed'].includes(o.status);
+          case 'approved': return !inHistory && ['approved', 'preparing', 'out_for_delivery', 'completed'].includes(o.status);
           case 'rejected': return !inHistory && o.status === 'rejected';
           case 'active':
           default: return !inHistory;
@@ -246,7 +318,6 @@ const OrdersReview = () => {
       })();
       if (!matchesStatus) return false;
       if (!q) return true;
-      // Search across name, phone, address, items
       const itemsStr = o.items.map((i: any) => `${i.name?.sq || ''} ${i.name?.en || ''}`).join(' ').toLowerCase();
       return (
         o.customerName.toLowerCase().includes(q) ||
@@ -259,7 +330,7 @@ const OrdersReview = () => {
     return arr.sort((a, b) => {
       const ap = priorityIds.has(a.id) ? 1 : 0;
       const bp = priorityIds.has(b.id) ? 1 : 0;
-      if (ap !== bp) return bp - ap; // starred first
+      if (ap !== bp) return bp - ap;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -271,41 +342,9 @@ const OrdersReview = () => {
     try {
       await updateOrderStatus(id, status);
       toast.success(STATUS_LABEL[status] ?? status);
-
-      // Auto-assign driver logic when an order gets approved
-      if (status === 'approved') {
-        const activeDrivers = drivers.filter(d => d.isActive);
-        if (activeDrivers.length > 0) {
-          const counts = new Map<string, number>();
-          activeDrivers.forEach(d => counts.set(d.id, 0));
-          orders.forEach(o => {
-            if ((o.status === 'out_for_delivery' || o.status === 'preparing' || o.status === 'approved') && o.assignedDriverId) {
-              counts.set(o.assignedDriverId, (counts.get(o.assignedDriverId) || 0) + 1);
-            }
-          });
-          let bestDriver = activeDrivers[0];
-          let minCount = Infinity;
-          activeDrivers.forEach(d => {
-            const c = counts.get(d.id) || 0;
-            if (c < minCount) {
-              minCount = c;
-              bestDriver = d;
-            }
-          });
-          try {
-            await assignDriverToOrder(id, bestDriver.id);
-            toast.success(`U caktua automatikisht tek shoferi: ${bestDriver.name}`);
-          } catch (e) {
-            console.error('Failed to auto assign', e);
-          }
-        }
-      }
-    }
-    catch { toast.error('Gabim'); }
+    } catch { toast.error('Gabim'); }
   };
 
-  // Soft-delete: hide from Aktive immediately with a 1.6s "U fshi" fade,
-  // then it remains in Histori (server-side is_visible=false).
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const handleDelete = async (id: string) => {
     if (deletingIds.has(id)) return;
@@ -313,7 +352,6 @@ const OrdersReview = () => {
     try {
       await softDeleteOrder(id);
       toast.success('U fshi · ruajtur në Histori');
-      // Local archive marker too, so it appears in Histori tab without refetch
       setArchivedIds((prev) => { const next = new Set(prev); next.add(id); saveArchive(next); return next; });
       setTimeout(() => {
         setDeletingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
@@ -325,10 +363,27 @@ const OrdersReview = () => {
     }
   };
 
-  const handleHardDelete = async (id: string) => {
-    if (!window.confirm('Fshi këtë porosi përfundimisht? Ky veprim nuk mund të zhbëhet.')) return;
-    try { await deleteOrder(id); toast.success('U fshi përfundimisht'); if (selectedId === id) setSelectedId(null); }
-    catch { toast.error('Gabim'); }
+  const performHardDelete = async (id: string) => {
+    try {
+      await hardDeleteOrder(id);
+      toast.success('U fshi përfundimisht');
+      setArchivedIds((prev) => { const next = new Set(prev); next.delete(id); saveArchive(next); return next; });
+      if (selectedId === id) setSelectedId(null);
+    } catch { toast.error('Gabim'); }
+  };
+
+  const performHardDeleteAll = async (ids: string[]) => {
+    try {
+      await hardDeleteOrdersBatch(ids);
+      setArchivedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        saveArchive(next);
+        return next;
+      });
+      if (ids.includes(selectedId ?? '')) setSelectedId(null);
+      toast.success(`U fshinë ${ids.length} porosi`);
+    } catch { toast.error('Gabim'); }
   };
 
   const handleRestore = async (id: string) => {
@@ -344,14 +399,30 @@ const OrdersReview = () => {
     catch { toast.error('Gabim'); }
   };
 
-  const handlePrint = (o: OrderRecord) => {
-    generateInvoice(o);
-  };
+  const handlePrint = (o: OrderRecord) => { generateInvoice(o); };
 
   const openDrawer = (o: OrderRecord, mode: 'approve' | 'reject') => {
     setDrawerOrder(o);
     setDrawerMode(mode);
   };
+
+  const handleForwardToDriver = async (o: OrderRecord) => {
+    if (!o.assignedDriverId) {
+      toast.error('Nuk ka shofer të caktuar ende');
+      return;
+    }
+    try {
+      const driverName = drivers.find((d) => d.id === o.assignedDriverId)?.name ?? 'Shoferi';
+      await sendOrderMessage(o.id, 'admin', `🚴 ${driverName} do të kujdeset për dërgesën tuaj.`);
+      toast.success(`Biseda u kalua tek ${driverName}`);
+    } catch { toast.error('Gabim'); }
+  };
+
+  const historyOrders = useMemo(
+    () => timeFiltered.filter(isInHistory),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [timeFiltered, archivedIds]
+  );
 
   const FilterTab = ({ k, label }: { k: FilterKey; label: string }) => (
     <button
@@ -366,9 +437,29 @@ const OrdersReview = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-4">
+      {/* Confirm-delete dialog */}
+      {confirmDeleteTarget && (
+        <ConfirmDeleteDialog
+          title={'all' in confirmDeleteTarget ? 'Fshij të gjithë historinë' : 'Fshij porosinë përfundimisht'}
+          description={
+            'all' in confirmDeleteTarget
+              ? `Do të fshihen ${historyOrders.length} porosi përfundimisht nga databaza. Ky veprim nuk mund të zhbëhet.`
+              : 'Kjo porosi do të fshihet përfundimisht nga databaza. Ky veprim nuk mund të zhbëhet.'
+          }
+          onConfirm={async () => {
+            if ('all' in confirmDeleteTarget) {
+              await performHardDeleteAll(historyOrders.map((o) => o.id));
+            } else {
+              await performHardDelete(confirmDeleteTarget.id);
+            }
+            setConfirmDeleteTarget(null);
+          }}
+          onCancel={() => setConfirmDeleteTarget(null)}
+        />
+      )}
+
       {/* List */}
       <div className="space-y-3">
-        {/* Search bar — logbook search across all customers/orders */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <input
@@ -392,7 +483,6 @@ const OrdersReview = () => {
           )}
         </div>
 
-        {/* Time-range tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           <FilterTab k="hour" label="Kjo orë" />
           <FilterTab k="today" label="Sot" />
@@ -435,7 +525,6 @@ const OrdersReview = () => {
           </div>
         )}
 
-        {/* Status filter buttons (clickable) — Duke pritur / Konfirmuar / Anuluar / Histori */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <button
             onClick={() => setStatusFilter(statusFilter === 'pending' ? 'active' : 'pending')}
@@ -506,6 +595,34 @@ const OrdersReview = () => {
           </button>
         </div>
 
+        {/* History export + delete-all toolbar */}
+        {statusFilter === 'history' && historyOrders.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 bg-secondary/40 rounded-xl p-2.5">
+            <span className="text-xs text-muted-foreground font-medium flex-1">{historyOrders.length} porosi në histori</span>
+            <button
+              onClick={() => exportOrdersCSV(historyOrders)}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-background border border-border/50 hover:bg-secondary transition-colors"
+              title="Shkarko CSV"
+            >
+              <Download className="w-3.5 h-3.5" /> CSV
+            </button>
+            <button
+              onClick={() => exportOrdersJSON(historyOrders)}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-background border border-border/50 hover:bg-secondary transition-colors"
+              title="Shkarko JSON"
+            >
+              <Download className="w-3.5 h-3.5" /> JSON
+            </button>
+            <button
+              onClick={() => setConfirmDeleteTarget({ all: true })}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+              title="Fshij të gjithë historinë"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Fshij Historinë
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-between px-1">
           <p className="text-xs text-muted-foreground">
             {filtered.length} porosi · {
@@ -562,7 +679,6 @@ const OrdersReview = () => {
                   'hover:shadow-md'
                 } ${!isPending && !isDeleting ? 'cursor-grab active:cursor-grabbing' : ''} ${isDeleting ? 'pointer-events-none grayscale' : ''}`}
               >
-                {/* Top-right action strip: Star (priority) + Delete / Restore */}
                 <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
                   <button
                     onClick={(e) => { e.stopPropagation(); togglePriority(o.id); }}
@@ -596,10 +712,10 @@ const OrdersReview = () => {
                         Rikthe
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleHardDelete(o.id); }}
+                        onClick={(e) => { e.stopPropagation(); setConfirmDeleteTarget({ id: o.id }); }}
                         className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-all active:scale-90"
-                        title="Fshi përfundimisht"
-                        aria-label="Fshi përfundimisht"
+                        title="Fshij komplet nga historia"
+                        aria-label="Fshij komplet"
                       >
                         <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
                       </button>
@@ -657,7 +773,6 @@ const OrdersReview = () => {
                   </div>
                 </button>
 
-                {/* Tik / Iks actions for pending */}
                 {isPending && (
                   <div className="flex items-center justify-end gap-2 pt-2 mt-1 border-t border-border/40">
                     <button
@@ -708,7 +823,7 @@ const OrdersReview = () => {
             </div>
 
             <div className="p-4 space-y-4 text-xs">
-              {/* Quick actions row — bigger, prominent */}
+              {/* Quick actions row */}
               <div className="grid grid-cols-4 gap-2">
                 <a
                   href={`tel:${selected.customerPhone}`}
@@ -777,7 +892,6 @@ const OrdersReview = () => {
                 <p className="leading-snug">{selected.deliveryAddress}</p>
               </div>
 
-              {/* Routing map */}
               {selected.deliveryLat !== null && selected.deliveryLng !== null && (
                 <DeliveryRouteMap
                   customerLat={selected.deliveryLat}
@@ -856,13 +970,13 @@ const OrdersReview = () => {
 
               {/* Driver assignment */}
               {(selected.status === 'approved' || selected.status === 'preparing' || selected.status === 'out_for_delivery') && drivers.length > 0 && (
-                <div className="bg-blue-500/5 rounded-2xl p-3 border border-blue-500/20">
-                  <p className="text-[10px] uppercase tracking-wider text-blue-600 font-bold mb-2 flex items-center gap-1">
-                    <Bike className="w-3 h-3" /> Cakto shoferin
+                <div className="bg-blue-500/5 rounded-2xl p-3 border border-blue-500/20 space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-blue-600 font-bold flex items-center gap-1">
+                    <Bike className="w-3 h-3" /> Shoferi
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {drivers.map((d) => {
-                      const isAssigned = (selected as any).assigned_driver_id === d.id;
+                      const isAssigned = selected.assignedDriverId === d.id;
                       return (
                         <button
                           key={d.id}
@@ -873,9 +987,7 @@ const OrdersReview = () => {
                             } catch { toast.error('Gabim'); }
                           }}
                           className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all active:scale-95 ${
-                            isAssigned
-                              ? 'bg-blue-600 text-white shadow'
-                              : 'bg-secondary hover:bg-blue-500/10'
+                            isAssigned ? 'bg-blue-600 text-white shadow' : 'bg-secondary hover:bg-blue-500/10'
                           }`}
                         >
                           {d.name}
@@ -883,6 +995,15 @@ const OrdersReview = () => {
                       );
                     })}
                   </div>
+                  {/* Forward to driver button */}
+                  {selected.assignedDriverId && (
+                    <button
+                      onClick={() => handleForwardToDriver(selected)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 text-xs font-bold hover:bg-blue-600/20 active:scale-95 transition-all border border-blue-500/20"
+                    >
+                      <Share2 className="w-3.5 h-3.5" /> Kaloj bisedën te shoferi
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -897,22 +1018,22 @@ const OrdersReview = () => {
                   <button onClick={() => handleRestore(selected.id)} className="py-3 rounded-2xl bg-primary/10 text-primary text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-primary/20 transition-all">
                     <Check className="w-4 h-4" /> Rikthe
                   </button>
-                  <button onClick={() => handleHardDelete(selected.id)} className="py-3 rounded-2xl bg-destructive/10 text-destructive text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-destructive/20 transition-all">
-                    <Trash2 className="w-4 h-4" /> Fshi përfundimisht
+                  <button
+                    onClick={() => setConfirmDeleteTarget({ id: selected.id })}
+                    className="py-3 rounded-2xl bg-destructive/10 text-destructive text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-destructive/20 transition-all"
+                    title="Fshij komplet nga historia"
+                  >
+                    <Trash2 className="w-4 h-4" /> Fshij komplet
                   </button>
                 </div>
               )}
 
-              {/* "Mbyll bisedën" — only available when order is mid-lifecycle (approved/preparing/out_for_delivery).
-                  Marks the order as completed (which makes the user-side pill disappear via its own
-                  TERMINAL auto-dismiss logic in OrderTrackingPill), then archives the chat transcript. */}
               {(selected.status === 'approved' || selected.status === 'preparing' || selected.status === 'out_for_delivery') && (
                 <button
                   onClick={async () => {
                     if (!window.confirm('Mbyll bisedën dhe mark-o porosinë si të përfunduar?')) return;
                     try {
                       await updateOrderStatus(selected.id, 'completed');
-                      // Archive + clear live chat so it disappears from user side too
                       const { deleteOrderMessages } = await import('@/lib/orderMessagesApi');
                       await deleteOrderMessages(selected.id);
                       toast.success('Biseda u mbyll · porosia u përfundua');
@@ -926,8 +1047,6 @@ const OrdersReview = () => {
                 </button>
               )}
 
-              {/* Chat — branded as PapirunChat; admin-side. If order is in History
-                  (archived), show the archived transcript read-only instead. */}
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2 flex items-center gap-1">
                   <MessageCircle className="w-3 h-3" /> PapirunChat · me klientin
@@ -943,7 +1062,6 @@ const OrdersReview = () => {
         )}
       </div>
 
-      {/* Approve/Reject drawer — auto-select order on close so admin continues chatting */}
       <OrderActionDrawer
         order={drawerOrder}
         mode={drawerMode}

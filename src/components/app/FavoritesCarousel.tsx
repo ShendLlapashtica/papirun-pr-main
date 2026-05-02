@@ -5,6 +5,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveMenuItems } from '@/hooks/useLiveStorefrontData';
+import { getOptimizedImage } from '@/lib/utils';
 
 /**
  * Horizontal carousel of the user's favorite products.
@@ -40,7 +41,7 @@ const FavoritesCarousel = () => {
             className="shrink-0 w-28 rounded-2xl green-glass overflow-hidden active:scale-95 transition-all"
           >
             <div className="h-20 bg-white/70 flex items-center justify-center">
-              <img src={p.image} alt={p.name[language]} className="h-full w-full object-contain p-2" />
+              <img src={getOptimizedImage(p.image)} alt={p.name[language]} className="h-full w-full object-contain mix-blend-screen bg-white p-2" />
             </div>
             <div className="p-2 text-left">
               <p className="text-[11px] font-semibold line-clamp-1">{p.name[language]}</p>
