@@ -77,16 +77,23 @@ const OrderTrackingPill = () => {
       return;
     }
     let active = true;
-    fetchOrder(orderId).then((o) => {
-      if (!active) return;
-      if (!o) { clearActiveId(); setOrderId(null); return; }
-      setOrder(o);
-    }).catch(() => {});
+    const fetchIt = async () => {
+      try {
+        const o = await fetchOrder(orderId);
+        if (!active) return;
+        if (!o) { clearActiveId(); setOrderId(null); return; }
+        setOrder(o);
+      } catch {}
+    };
+
+    fetchIt();
+    const pollInterval = setInterval(fetchIt, 4000); // Polling fallback every 4s to guarantee spot-on updates
+
     const unsub = subscribeOrderRealtime(orderId, (updated) => {
       if (!active) return;
       setOrder(updated);
     });
-    return () => { active = false; unsub(); };
+    return () => { active = false; clearInterval(pollInterval); unsub(); };
   }, [orderId]);
 
   // Auto-dismiss terminal states after 8s (so user sees the result)
