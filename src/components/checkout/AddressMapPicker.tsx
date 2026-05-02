@@ -138,8 +138,10 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
     const timer = setTimeout(async () => {
       const fullAddress = await reverseGeocode(position[0], position[1]);
       if (cancelled) return;
-      const streetName = fullAddress.split(',')[0]?.trim() || fullAddress;
-      onSelectRef.current({ address: streetName, fullAddress, position });
+      const coordFallback = `${position[0].toFixed(5)}, ${position[1].toFixed(5)}`;
+      const addressText = fullAddress || coordFallback;
+      const streetName = fullAddress ? (fullAddress.split(',')[0]?.trim() || addressText) : coordFallback;
+      onSelectRef.current({ address: streetName, fullAddress: addressText, position });
       setResolvingAddress(false);
     }, 400);
 
