@@ -70,7 +70,7 @@ const SubscribersList = () => {
     load();
     const client = supabase as any;
     const channel = client
-      .channel('admin-subscribers')
+      .channel(`admin-subscribers-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'marketing_subscribers' },

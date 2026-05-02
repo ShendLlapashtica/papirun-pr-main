@@ -200,7 +200,7 @@ export const hardDeleteOrdersBatch = async (ids: string[]) => {
 
 export const subscribeOrderRealtime = (id: string, onChange: (order: OrderRecord) => void) => {
   const channel = supabase
-    .channel(`order-${id}`)
+    .channel(`order-${id}-${Math.random().toString(36).slice(2)}`)
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: TABLE, filter: `id=eq.${id}` },
@@ -216,7 +216,7 @@ export const subscribeOrderRealtime = (id: string, onChange: (order: OrderRecord
 
 export const subscribeAllOrdersRealtime = (onChange: () => void) => {
   const channel = supabase
-    .channel('orders-live')
+    .channel(`orders-live-${Math.random().toString(36).slice(2)}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: TABLE },

@@ -119,7 +119,7 @@ export const subscribeOrderMessages = (
   onDeleteAll?: () => void,
 ) => {
   const channel = supabase
-    .channel(`order-messages-${orderId}`)
+    .channel(`order-messages-${orderId}-${Math.random().toString(36).slice(2)}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: TABLE, filter: `order_id=eq.${orderId}` },

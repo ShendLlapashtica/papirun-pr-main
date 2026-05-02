@@ -115,7 +115,7 @@ export const seedDefaultDrivers = async (): Promise<void> => {
 
 export const subscribeDriverOrdersRealtime = (driverId: string, onChange: () => void) => {
   const channel = supabase
-    .channel(`driver-orders-${driverId}`)
+    .channel(`driver-orders-${driverId}-${Math.random().toString(36).slice(2)}`)
     .on(
       'postgres_changes',
       {
