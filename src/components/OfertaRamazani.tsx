@@ -1,10 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveVisibleOffers } from '@/hooks/useLiveStorefrontData';
 import { getOptimizedImage } from '@/lib/utils';
 
 const OfertaRamazani = () => {
-  const { language } = useLanguage();
   const navigate = useNavigate();
   const { offers, isLoading } = useLiveVisibleOffers();
 
@@ -15,15 +13,9 @@ const OfertaRamazani = () => {
     <section className="py-8 sm:py-12 bg-primary/5">
       <div className="container mx-auto px-4">
         <div className="text-center mb-6 sm:mb-8">
-          <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-xs sm:text-sm font-semibold mb-3">
-            🌙 Ramazan
-          </span>
           <h2 className="font-display font-bold text-2xl sm:text-3xl lg:text-4xl">
-            {language === 'sq' ? 'Oferta Ramazani' : 'Ramadan Offers'}
+            Oferta
           </h2>
-          <p className="text-sm text-muted-foreground mt-2">
-            {language === 'sq' ? 'Oferta speciale për muajin e Ramazanit' : 'Special offers for the month of Ramadan'}
-          </p>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">

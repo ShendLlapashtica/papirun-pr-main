@@ -159,8 +159,8 @@ const OrderTrackingPill = () => {
 
   if (isHiddenRoute) return null;
   if (!order || hidden) return null;
-  // Soft-deleted orders should not surface to the user.
-  if (order.isVisible === false) return null;
+  // Archived orders (isVisible=false or status=histori) must not surface to the customer.
+  if (order.isVisible === false || (order.status as string) === 'histori') return null;
 
   const status = order.status;
   const isPending = status === 'pending';

@@ -67,40 +67,43 @@ function markSeedDone() {
   localStorage.setItem(SEED_DONE_KEY, '1');
 }
 
+const applyLocalImages = (items: MenuItem[]): MenuItem[] =>
+  items.map((item) => {
+    const hasValidImage = item.image && !item.image.startsWith('/src/') && item.image.startsWith('http');
+    if (!hasValidImage) {
+      const localImg = localImageMap.get(item.id);
+      if (localImg) return { ...item, image: localImg };
+    }
+    return item;
+  });
+
 export const useLiveMenuItems = () => {
   const cached = readCache<MenuItem[]>(PRODUCTS_CACHE_KEY);
-  const [items, setItems] = useState<MenuItem[]>(cached ?? initialMenuItems);
+  // Apply localImageMap immediately to fix stale hash paths from previous builds
+  const initialItems = cached ? applyLocalImages(cached) : initialMenuItems;
+  const [items, setItems] = useState<MenuItem[]>(initialItems);
   const [isLoading, setIsLoading] = useState(!cached);
 
   useEffect(() => {
     let isMounted = true;
 
     const syncFromDatabase = async () => {
-      // Safety timeout: if Supabase takes > 5s, stop waiting and show local data
       const timeout = setTimeout(() => {
         if (isMounted && isLoading) {
-          console.warn('Supabase fetch timed out, falling back to local data');
+          setItems(applyLocalImages(initialMenuItems));
           setIsLoading(false);
         }
       }, 5000);
 
       try {
-        // Only run seed check if we've never done it in this browser
         if (!hasSeedRun()) {
           await ensureSeedProducts(initialMenuItems);
           markSeedDone();
         }
         const liveItems = await fetchProducts();
         clearTimeout(timeout);
-        
-        const merged = liveItems.map((dbItem) => {
-          const hasValidImage = dbItem.image && !dbItem.image.startsWith('/src/') && dbItem.image.startsWith('http');
-          if (!hasValidImage) {
-            const localImg = localImageMap.get(dbItem.id);
-            if (localImg) return { ...dbItem, image: localImg };
-          }
-          return dbItem;
-        });
+
+        const merged = applyLocalImages(liveItems);
         if (isMounted) {
           setItems(merged);
           setIsLoading(false);
@@ -109,11 +112,13 @@ export const useLiveMenuItems = () => {
       } catch (error) {
         clearTimeout(timeout);
         console.error('Failed to sync products from database:', error);
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setItems(applyLocalImages(initialMenuItems));
+          setIsLoading(false);
+        }
       }
     };
 
-    // If we have fresh cache, show it instantly but revalidate in background
     if (cached) {
       setIsLoading(false);
       const timer = setTimeout(syncFromDatabase, 2000);
