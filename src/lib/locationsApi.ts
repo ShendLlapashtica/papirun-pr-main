@@ -116,7 +116,7 @@ export const deleteLocation = async (id: string) => {
 
 export const subscribeLocationsRealtime = (onChange: () => void) => {
   const channel = supabase
-    .channel('storefront-locations-live')
+    .channel(`storefront-locations-live-${Math.random().toString(36).slice(2)}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: TABLE },

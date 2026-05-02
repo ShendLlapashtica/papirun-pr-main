@@ -183,7 +183,7 @@ export const updateProductSortOrder = async (id: string, sortOrder: number) => {
 
 export const subscribeProductsRealtime = (onChange: () => void) => {
   const channel = supabase
-    .channel('products-live')
+    .channel(`products-live-${Math.random().toString(36).slice(2)}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: PRODUCTS_TABLE },
@@ -258,7 +258,7 @@ export const deleteMenuExtra = async (id: string) => {
 
 export const subscribeMenuExtrasRealtime = (onChange: () => void) => {
   const channel = supabase
-    .channel('menu-extras-live')
+    .channel(`menu-extras-live-${Math.random().toString(36).slice(2)}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: MENU_EXTRAS_TABLE },
