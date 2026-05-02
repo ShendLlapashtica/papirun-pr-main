@@ -201,17 +201,29 @@ export const hardDeleteOrdersBatch = async (ids: string[]) => {
 export const subscribeOrderRealtime = (id: string, onChange: (order: OrderRecord) => void) => {
   const channel = supabase
     .channel(`order-${id}`)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: TABLE, filter: `id=eq.${id}` }, (payload) => {
-      onChange(mapRow(payload.new as Row));
-    })
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: TABLE, filter: `id=eq.${id}` },
+      (payload) => {
+        onChange(mapRow(payload.new as Row));
+      }
+    )
     .subscribe();
-  return () => { supabase.removeChannel(channel); };
+  return () => {
+    supabase.removeChannel(channel);
+  };
 };
 
 export const subscribeAllOrdersRealtime = (onChange: () => void) => {
   const channel = supabase
     .channel('orders-live')
-    .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, onChange)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: TABLE },
+      onChange
+    )
     .subscribe();
-  return () => { supabase.removeChannel(channel); };
+  return () => {
+    supabase.removeChannel(channel);
+  };
 };

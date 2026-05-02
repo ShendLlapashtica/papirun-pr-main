@@ -64,7 +64,13 @@ export const deleteQuickReply = async (id: string) => {
 export const subscribeQuickReplies = (onChange: () => void) => {
   const channel = supabase
     .channel('quick-replies-live')
-    .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, onChange)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: TABLE },
+      onChange
+    )
     .subscribe();
-  return () => { supabase.removeChannel(channel); };
+  return () => {
+    supabase.removeChannel(channel);
+  };
 };

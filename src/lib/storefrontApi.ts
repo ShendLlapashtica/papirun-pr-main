@@ -172,7 +172,11 @@ export const deleteStorefrontOffer = async (id: string) => {
 export const subscribeStorefrontOffersRealtime = (onChange: () => void) => {
   const channel = supabase
     .channel('storefront-offers-live')
-    .on('postgres_changes', { event: '*', schema: 'public', table: STOREFRONT_OFFERS_TABLE }, onChange)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: STOREFRONT_OFFERS_TABLE },
+      onChange
+    )
     .subscribe();
 
   return () => {
@@ -235,7 +239,11 @@ export const upsertStorefrontSetting = async <T>(key: string, value: T) => {
 export const subscribeStorefrontSettingsRealtime = (onChange: () => void) => {
   const channel = supabase
     .channel('storefront-settings-live')
-    .on('postgres_changes', { event: '*', schema: 'public', table: STOREFRONT_SETTINGS_TABLE }, onChange)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: STOREFRONT_SETTINGS_TABLE },
+      onChange
+    )
     .subscribe();
 
   return () => {

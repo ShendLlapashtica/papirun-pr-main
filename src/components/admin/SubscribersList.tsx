@@ -71,9 +71,15 @@ const SubscribersList = () => {
     const client = supabase as any;
     const channel = client
       .channel('admin-subscribers')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'marketing_subscribers' }, () => load())
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'marketing_subscribers' },
+        () => load()
+      )
       .subscribe();
-    return () => { client.removeChannel(channel); };
+    return () => {
+      client.removeChannel(channel);
+    };
   }, []);
 
   const filtered = useMemo(() => {

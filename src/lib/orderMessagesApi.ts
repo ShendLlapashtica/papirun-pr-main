@@ -131,5 +131,7 @@ export const subscribeOrderMessages = (
       () => { onDeleteAll?.(); },
     )
     .subscribe();
-  return () => { supabase.removeChannel(channel); };
+  return () => {
+    supabase.removeChannel(channel);
+  };
 };

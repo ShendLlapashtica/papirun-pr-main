@@ -117,9 +117,15 @@ export const deleteLocation = async (id: string) => {
 export const subscribeLocationsRealtime = (onChange: () => void) => {
   const channel = supabase
     .channel('storefront-locations-live')
-    .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, onChange)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: TABLE },
+      onChange
+    )
     .subscribe();
-  return () => { supabase.removeChannel(channel); };
+  return () => {
+    supabase.removeChannel(channel);
+  };
 };
 
 export const isLocationOpenNow = (loc: StorefrontLocation): boolean => {

@@ -116,12 +116,18 @@ export const seedDefaultDrivers = async (): Promise<void> => {
 export const subscribeDriverOrdersRealtime = (driverId: string, onChange: () => void) => {
   const channel = supabase
     .channel(`driver-orders-${driverId}`)
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'orders',
-      filter: `assigned_driver_id=eq.${driverId}`,
-    }, onChange)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `assigned_driver_id=eq.${driverId}`,
+      },
+      onChange
+    )
     .subscribe();
-  return () => { supabase.removeChannel(channel); };
+  return () => {
+    supabase.removeChannel(channel);
+  };
 };
