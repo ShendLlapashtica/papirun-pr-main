@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2 } from 'lucide-react';
 import { fetchDrivers, createDriver, updateDriver, deleteDriver, seedDefaultDrivers, type DeliveryDriver } from '@/lib/driversApi';
 import { menuItems as initialMenuItems, ofertaRamazani as initialOffers } from '@/data/menuData';
@@ -216,7 +217,7 @@ const DriversManager = () => {
       await updateDriver(id, { name: editForm.name, phone: editForm.phone, pin: editForm.pin });
       setEditingId(null);
       reload();
-    } catch { /* silent */ }
+    } catch (err: any) { toast.error('Gabim: ' + (err?.message ?? 'Nuk u ruajt')); }
   };
 
   const toggleActive = async (d: DeliveryDriver) => {
@@ -233,10 +234,13 @@ const DriversManager = () => {
     if (!newForm.name.trim()) return;
     try {
       await createDriver(newForm.name.trim(), newForm.phone.trim(), newForm.pin.trim() || 'Pass123.');
-      setNewForm({ name: '', phone: '', pin: 'Pass123' });
+      setNewForm({ name: '', phone: '', pin: 'Pass123.' });
       setAddMode(false);
       reload();
-    } catch {}
+      toast.success('Shoferi u shtua');
+    } catch (err: any) {
+      toast.error('Gabim: ' + (err?.message ?? 'Shoferi nuk u shtua'));
+    }
   };
 
   return (

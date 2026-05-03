@@ -73,11 +73,23 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
       },
     );
 
+    const syncMessages = () => {
+      fetchOrderMessages(orderId).then((rows) => {
+        if (!active) return;
+        setMessages((prev) => {
+          if (prev.length === rows.length && prev.every((m, i) => m.id === rows[i].id)) return prev;
+          onMessagesCountChange?.(rows.length);
+          return rows;
+        });
+      }).catch(() => {});
+    };
+    const poll = setInterval(syncMessages, 4000);
+
     if (viewerSide === 'admin') {
       fetchQuickReplies('chat').then((rows) => { if (active) setQuickReplies(rows); }).catch(() => {});
     }
 
-    return () => { active = false; unsub(); };
+    return () => { active = false; unsub(); clearInterval(poll); };
   }, [orderId]);
 
   useEffect(() => {
