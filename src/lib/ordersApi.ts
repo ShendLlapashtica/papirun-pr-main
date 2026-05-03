@@ -32,6 +32,7 @@ export interface OrderRecord {
   isVisible: boolean;
   assignedDriverId?: string | null;
   driverRating?: number | null;
+  driverRatingNote?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,6 +59,7 @@ type Row = {
   is_visible: boolean | null;
   assigned_driver_id?: string | null;
   driver_rating?: number | null;
+  driver_rating_note?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -86,6 +88,7 @@ const mapRow = (row: Row): OrderRecord => ({
   isVisible: row.is_visible !== false,
   assignedDriverId: row.assigned_driver_id,
   driverRating: row.driver_rating,
+  driverRatingNote: row.driver_rating_note,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });

@@ -82,7 +82,7 @@ const AppMenuCard = ({ item, index = 0, onAddToCart, onCardClick }: AppMenuCardP
             fetchPriority={isEager ? 'high' : undefined}
             onLoad={() => setImageLoaded(true)}
             className={cn(
-              'w-[85%] h-[85%] object-contain mix-blend-screen bg-white drop-shadow-2xl transition-all duration-700 cubic-bezier(0.4, 0, 0.2, 1)',
+              'w-[85%] h-[85%] object-contain drop-shadow-2xl transition-all duration-700 cubic-bezier(0.4, 0, 0.2, 1)',
               imageLoaded ? 'opacity-100 scale-100 group-hover:scale-110 group-hover:-rotate-3' : 'opacity-0 scale-95 blur-md'
             )}
           />

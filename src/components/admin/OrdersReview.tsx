@@ -258,7 +258,9 @@ const OrdersReview = () => {
     };
     sync();
     const unsub = subscribeAllOrdersRealtime(sync);
-    return () => { unsub(); };
+    // Polling fallback every 12s in case realtime misses events
+    const poll = setInterval(sync, 12000);
+    return () => { unsub(); clearInterval(poll); };
   }, []);
 
   const timeFiltered = useMemo(() => {

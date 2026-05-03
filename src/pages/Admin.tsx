@@ -187,7 +187,7 @@ const DriversManager = () => {
   const [showPinFor, setShowPinFor] = useState<Set<string>>(new Set());
   const [editForm, setEditForm] = useState<{ name: string; phone: string; pin: string }>({ name: '', phone: '', pin: '' });
   const [addMode, setAddMode] = useState(false);
-  const [newForm, setNewForm] = useState({ name: '', phone: '', pin: 'Pass123' });
+  const [newForm, setNewForm] = useState({ name: '', phone: '', pin: 'Pass123.' });
 
   const reload = () => {
     setLoading(true);
@@ -232,7 +232,7 @@ const DriversManager = () => {
     e.preventDefault();
     if (!newForm.name.trim()) return;
     try {
-      await createDriver(newForm.name.trim(), newForm.phone.trim(), newForm.pin.trim() || 'Pass123');
+      await createDriver(newForm.name.trim(), newForm.phone.trim(), newForm.pin.trim() || 'Pass123.');
       setNewForm({ name: '', phone: '', pin: 'Pass123' });
       setAddMode(false);
       reload();
@@ -759,7 +759,7 @@ const Admin = () => {
                       <img
                         src={getOptimizedImage(item.image)}
                         alt={item.name[language]}
-                        className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain mix-blend-screen bg-white ${editingItem === item.id ? 'ring-2 ring-primary/30 ring-dashed' : ''}`}
+                        className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain ${editingItem === item.id ? 'ring-2 ring-primary/30 ring-dashed' : ''}`}
                       />
                     ) : (
                       <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-secondary flex items-center justify-center ${editingItem === item.id ? 'ring-2 ring-primary/30 ring-dashed' : ''}`}>
@@ -1120,7 +1120,7 @@ const Admin = () => {
                     <div className="flex items-start gap-3">
                       <div className="relative shrink-0">
                         {offer.image ? (
-                          <img src={getOptimizedImage(offer.image)} alt={offer.title} className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain mix-blend-screen bg-white" />
+                          <img src={getOptimizedImage(offer.image)} alt={offer.title} className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain" />
                         ) : (
                           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-secondary flex items-center justify-center">
                             <Image className="w-6 h-6 text-muted-foreground" />

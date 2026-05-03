@@ -50,9 +50,15 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetchOrderMessages(orderId)
-      .then((rows) => { if (active) { setMessages(rows); setLoading(false); onMessagesCountChange?.(rows.length); } })
-      .catch(() => { if (active) setLoading(false); });
+
+    const syncMessages = () => fetchOrderMessages(orderId).then((rows) => {
+      if (!active) return;
+      setMessages(rows);
+      setLoading(false);
+      onMessagesCountChange?.(rows.length);
+    }).catch(() => { if (active) setLoading(false); });
+
+    syncMessages();
 
     const unsub = subscribeOrderMessages(
       orderId,
@@ -64,20 +70,18 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
           return next;
         });
       },
-      () => {
-        fetchOrderMessages(orderId).then((rows) => {
-          if (!active) return;
-          setMessages(rows);
-          onMessagesCountChange?.(rows.length);
-        }).catch(() => {});
-      },
+      () => syncMessages(),
     );
+
+    // Polling fallback — guarantees messages appear within 3.5s even if the
+    // realtime WebSocket is slow or drops (especially on mobile/poor connections)
+    const poll = setInterval(syncMessages, 3500);
 
     if (viewerSide === 'admin') {
       fetchQuickReplies('chat').then((rows) => { if (active) setQuickReplies(rows); }).catch(() => {});
     }
 
-    return () => { active = false; unsub(); };
+    return () => { active = false; unsub(); clearInterval(poll); };
   }, [orderId]);
 
   useEffect(() => {

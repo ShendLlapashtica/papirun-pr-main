@@ -59,7 +59,7 @@ const MenuCard = ({ item, index = 0, onAddToCart, revealed = true, onImageReady 
           fetchPriority={isEager ? 'high' : undefined}
           onLoad={handleImageLoad}
           className={cn(
-            'w-full h-full object-contain mix-blend-screen bg-white px-4 sm:px-5 transition-all duration-500 group-hover:scale-105',
+            'w-full h-full object-contain px-4 sm:px-5 transition-all duration-500 group-hover:scale-105',
             imageLoaded ? 'opacity-100 blur-0' : 'opacity-40 blur-sm'
           )}
         />

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon } from 'lucide-react';
+import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star } from 'lucide-react';
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
+import { rateDriver } from '@/lib/driversApi';
 import OrderStatusModal from '@/components/OrderStatusModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
@@ -26,7 +27,7 @@ export const clearActiveOrderId = () => {
 
 const TERMINAL: OrderStatus[] = ['rejected', 'completed'];
 
-const HIDDEN_ROUTES = ['/login', '/signup', '/verify', '/admin'];
+const HIDDEN_ROUTES = ['/login', '/signup', '/verify', '/admin', '/driver'];
 
 const OrderTrackingPill = () => {
   const { language } = useLanguage();
@@ -36,6 +37,10 @@ const OrderTrackingPill = () => {
   const [order, setOrder] = useState<OrderRecord | null>(null);
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [showRating, setShowRating] = useState(false);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingNote, setRatingNote] = useState('');
+  const ratingTriggeredRef = useRef(false);
 
   useEffect(() => {
     const onChange = () => { setOrderId(getActiveId()); setHidden(false); };
@@ -96,10 +101,22 @@ const OrderTrackingPill = () => {
     return () => { active = false; clearInterval(pollInterval); unsub(); };
   }, [orderId]);
 
-  // Auto-dismiss terminal states after 8s (so user sees the result)
+  // Trigger rating form when order completes and has a driver
   useEffect(() => {
     if (!order) return;
-    if (TERMINAL.includes(order.status)) {
+    if (order.status === 'completed' && order.assignedDriverId && !ratingTriggeredRef.current) {
+      const alreadyRated = localStorage.getItem(`papirun_rated_${order.id}`);
+      if (!alreadyRated) {
+        ratingTriggeredRef.current = true;
+        setShowRating(true);
+      }
+    }
+  }, [order?.status, order?.id, order?.assignedDriverId]);
+
+  // Auto-dismiss terminal states after 8s (so user sees the result) — skip if rating form is showing
+  useEffect(() => {
+    if (!order) return;
+    if (TERMINAL.includes(order.status) && !showRating) {
       const t = setTimeout(() => {
         clearActiveId();
         setHidden(true);
@@ -107,7 +124,7 @@ const OrderTrackingPill = () => {
       }, 8000);
       return () => clearTimeout(t);
     }
-  }, [order?.status]);
+  }, [order?.status, showRating]);
 
   // Lock body scroll AND hardware back button while pending overlay is up.
   // The user MUST wait for admin to approve/reject — no escape possible.
@@ -165,6 +182,84 @@ const OrderTrackingPill = () => {
   const status = order.status;
   const isPending = status === 'pending';
   const isApproved = status === 'approved' || status === 'preparing' || status === 'out_for_delivery';
+
+  // ===== RATING FORM — appears when order is completed and driver was assigned =====
+  if (showRating) {
+    const dismiss = () => {
+      setShowRating(false);
+      clearActiveId();
+      setHidden(true);
+      setOrderId(null);
+    };
+    const submitRating = async () => {
+      try {
+        await rateDriver(order.id, ratingValue, ratingNote.trim() || undefined);
+        try { localStorage.setItem(`papirun_rated_${order.id}`, '1'); } catch {}
+      } catch { /* silent — still dismiss */ }
+      dismiss();
+    };
+    return (
+      <AnimatePresence>
+        <motion.div
+          key="rating-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-[9998] flex flex-col items-center justify-center px-6"
+          style={{ background: 'hsl(var(--background) / 0.88)', backdropFilter: 'blur(18px)' }}
+        >
+          <motion.div
+            initial={{ scale: 0.88, opacity: 0, y: 24 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+            className="w-full max-w-sm bg-card rounded-3xl p-8 shadow-xl text-center"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-amber-400/15 flex items-center justify-center mx-auto mb-5">
+              <Star className="w-8 h-8 text-amber-500" fill="currentColor" />
+            </div>
+            <h2 className="font-display text-2xl font-bold mb-2 tracking-tight">
+              {language === 'sq' ? 'Si ishte dërgesa?' : 'How was your delivery?'}
+            </h2>
+            <p className="text-muted-foreground text-sm mb-6">
+              {language === 'sq' ? 'Vlerëso shoferin tënd' : 'Rate your driver'}
+            </p>
+            <div className="flex items-center justify-center gap-3 mb-6">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button key={star} onClick={() => setRatingValue(star)} className="transition-all duration-150 active:scale-90 hover:scale-110">
+                  <Star
+                    className={`w-10 h-10 transition-colors ${star <= ratingValue ? 'text-amber-400' : 'text-muted-foreground/25'}`}
+                    fill={star <= ratingValue ? 'currentColor' : 'none'}
+                    strokeWidth={1.5}
+                  />
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={ratingNote}
+              onChange={(e) => setRatingNote(e.target.value)}
+              placeholder={language === 'sq' ? 'Koment (opsional)...' : 'Comment (optional)...'}
+              rows={2}
+              className="w-full px-4 py-3 rounded-xl bg-secondary text-sm resize-none mb-5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={dismiss}
+                className="flex-1 py-3 rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80 transition-colors"
+              >
+                {language === 'sq' ? 'Kalo' : 'Skip'}
+              </button>
+              <button
+                disabled={ratingValue === 0}
+                onClick={submitRating}
+                className="flex-[1.4] py-3 rounded-xl bg-amber-400 text-amber-900 text-sm font-bold disabled:opacity-40 hover:bg-amber-500 active:scale-[0.98] transition-all shadow-lg shadow-amber-400/30"
+              >
+                {language === 'sq' ? 'Dërgo' : 'Submit'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
 
   // ===== UNSKIPPABLE FULLSCREEN OVERLAY for PENDING — light glassmorphism, sage spinner =====
   if (isPending) {

@@ -82,7 +82,9 @@ const DriverPanel = () => {
     };
     sync();
     const unsub = subscribeDriverOrdersRealtime(driver.id, sync);
-    return () => { active = false; unsub(); };
+    // Polling fallback every 8s to guarantee spot-on updates
+    const poll = setInterval(sync, 8000);
+    return () => { active = false; unsub(); clearInterval(poll); };
   }, [driver]);
 
   const selected = orders.find((o) => o.id === selectedId) ?? null;
