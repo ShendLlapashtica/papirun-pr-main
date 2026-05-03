@@ -114,7 +114,7 @@ const AppProductModal = ({ item, isOpen, onClose }: Props) => {
                 <img 
                   src={getOptimizedImage(item.image)} 
                   alt={item.name[language]} 
-                  className="w-full h-full object-contain mix-blend-screen bg-white p-6" 
+                  className="w-full h-full object-contain bg-white p-6" 
                 />
               </div>
 

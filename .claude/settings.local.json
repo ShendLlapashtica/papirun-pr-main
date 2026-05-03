@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(git add src/components/checkout/AddressMapPicker.tsx src/lib/utils.ts)",
+      "PowerShell(git push origin main)",
+      "PowerShell(npx vercel deploy --prod 2>&1)"
+    ]
+  }
+}

@@ -145,7 +145,7 @@ const ProfileView = () => {
           ) : (
             favProducts.map((p) => (
               <div key={p.id} className="app-glass flex items-center gap-3 rounded-2xl p-3">
-                <img src={getOptimizedImage(p.image)} alt={p.name[language]} className="w-14 h-14 rounded-xl object-contain mix-blend-screen bg-white shrink-0" />
+                <img src={getOptimizedImage(p.image)} alt={p.name[language]} className="w-14 h-14 rounded-xl object-contain bg-white shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-[hsl(var(--app-foreground))] truncate">{p.name[language]}</p>
                   <p className="text-xs font-bold text-[hsl(var(--app-action-bg))]">€{p.price.toFixed(2)}</p>

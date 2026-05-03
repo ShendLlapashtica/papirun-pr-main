@@ -58,7 +58,7 @@ const LastOrderCard = () => {
             if (!product) return null;
             return (
               <div key={i} className="w-11 h-11 rounded-full bg-white border-2 border-background overflow-hidden">
-                <img src={getOptimizedImage(product.image)} alt="" className="w-full h-full object-contain mix-blend-screen bg-white p-1" />
+                <img src={getOptimizedImage(product.image)} alt="" className="w-full h-full object-contain bg-white p-1" />
               </div>
             );
           })}

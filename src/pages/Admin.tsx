@@ -390,6 +390,8 @@ const Admin = () => {
 
     syncOffers();
     syncOfertaEnabled();
+    // Seed all 6 default drivers on every admin mount so they exist before the Shoferët tab is opened
+    seedDefaultDrivers().catch(() => {});
 
     const unsubscribeOffers = subscribeStorefrontOffersRealtime(syncOffers);
     const unsubscribeSettings = subscribeStorefrontSettingsRealtime(syncOfertaEnabled);

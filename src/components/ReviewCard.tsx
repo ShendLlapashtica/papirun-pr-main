@@ -59,7 +59,7 @@ const ReviewCard = ({ review }: ReviewCardProps) => {
               key={idx}
               src={getOptimizedImage(photo)}
               alt={`Review photo ${idx + 1}`}
-              className="w-[140px] sm:w-[180px] h-[100px] sm:h-[130px] rounded-xl object-contain mix-blend-screen bg-white shrink-0"
+              className="w-[140px] sm:w-[180px] h-[100px] sm:h-[130px] rounded-xl object-contain bg-white shrink-0"
             />
 
           ))}
@@ -70,7 +70,7 @@ const ReviewCard = ({ review }: ReviewCardProps) => {
           <img
             src={getOptimizedImage(review.photo)}
             alt="Review photo"
-            className="w-full max-w-[200px] h-auto rounded-xl object-contain mix-blend-screen bg-white"
+            className="w-full max-w-[200px] h-auto rounded-xl object-contain bg-white"
           />
 
         </div>

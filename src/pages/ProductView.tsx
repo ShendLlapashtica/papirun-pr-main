@@ -171,7 +171,7 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
                 <img
                   src={getOptimizedImage(item.image)}
                   alt={item.name[language]}
-                  className="w-full h-full object-contain mix-blend-screen bg-white p-6 sm:p-10 transition-transform duration-700 group-hover:scale-105"
+                  className="w-full h-full object-contain bg-white p-6 sm:p-10 transition-transform duration-700 group-hover:scale-105"
                 />
               </div>
             </div>

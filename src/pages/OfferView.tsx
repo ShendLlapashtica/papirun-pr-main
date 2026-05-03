@@ -57,7 +57,7 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
               <img
                 src={getOptimizedImage(offer.image)}
                 alt={offer.title}
-                className="w-full h-auto object-contain mix-blend-screen bg-white"
+                className="w-full h-auto object-contain bg-white"
               />
             </div>
 

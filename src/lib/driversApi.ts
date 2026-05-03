@@ -97,13 +97,16 @@ export const fetchDriverOrders = async (driverId: string) => {
   return data;
 };
 
-/** Ensure default drivers (Delivery1/2/3 with Pass123.) exist — idempotent, migrates old PIN */
+/** Ensure default drivers (Delivery1-6 with Pass123.) exist — idempotent, migrates old PIN */
 export const seedDefaultDrivers = async (): Promise<void> => {
   const client = supabase as any;
   const defaults = [
     { name: 'Delivery1', phone: '', pin: 'Pass123.', is_active: true },
     { name: 'Delivery2', phone: '', pin: 'Pass123.', is_active: true },
     { name: 'Delivery3', phone: '', pin: 'Pass123.', is_active: true },
+    { name: 'Delivery4', phone: '', pin: 'Pass123.', is_active: true },
+    { name: 'Delivery5', phone: '', pin: 'Pass123.', is_active: true },
+    { name: 'Delivery6', phone: '', pin: 'Pass123.', is_active: true },
   ];
   for (const def of defaults) {
     const { data } = await client.from(TABLE).select('id, pin').eq('name', def.name).maybeSingle();

@@ -47,7 +47,7 @@ const SocialProofToast = () => {
       <img
         src={getOptimizedImage(currentItem.image)}
         alt={currentItem.name[language]}
-        className="w-12 h-12 rounded-lg object-contain mix-blend-screen bg-white"
+        className="w-12 h-12 rounded-lg object-contain bg-white"
       />
       <div>
         <p className="text-xs sm:text-sm font-medium">

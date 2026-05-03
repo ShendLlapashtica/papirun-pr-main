@@ -119,7 +119,7 @@ const CartView = () => {
                       <img
                         src={getOptimizedImage(item.image)}
                         alt={item.name[language]}
-                        className="w-16 h-16 object-contain mix-blend-screen bg-white p-1.5"
+                        className="w-16 h-16 object-contain bg-white p-1.5"
                       />
                     </button>
 

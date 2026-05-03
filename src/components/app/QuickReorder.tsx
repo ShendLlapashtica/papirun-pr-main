@@ -66,7 +66,7 @@ const QuickReorder = () => {
             }}
             className="shrink-0 w-32 rounded-2xl bg-white border border-border/40 shadow-sm overflow-hidden active:scale-95 transition-all"
           >
-              <img src={getOptimizedImage(product!.image)} alt={product!.name[language]} className="h-full w-full object-contain mix-blend-screen bg-white p-2" />
+              <img src={getOptimizedImage(product!.image)} alt={product!.name[language]} className="h-full w-full object-contain bg-white p-2" />
 
             <div className="p-2 text-left">
               <p className="text-[11px] font-semibold line-clamp-1">{product!.name[language]}</p>

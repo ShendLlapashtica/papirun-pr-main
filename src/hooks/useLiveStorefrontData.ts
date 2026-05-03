@@ -26,12 +26,6 @@ initialMenuItems.forEach((item) => {
   if (item.image) localImageMap.set(item.id, item.image);
 });
 
-// Build a lookup of local bundled offer images by offer id
-const offerImageMap = new Map<string, string>();
-initialOffers.forEach((offer) => {
-  if (offer.image) offerImageMap.set(offer.id, offer.image);
-});
-
 // --- Lightweight localStorage cache with TTL ---
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -235,15 +229,7 @@ export const useLiveVisibleOffers = () => {
         
         const visibleOffers = liveOffers
           .filter((offer) => offer.isActive)
-          .map(({ isActive: _isActive, sortOrder: _sortOrder, ...offer }) => {
-            // Apply local image fallback for stale hash paths stored in DB
-            const hasValidImage = offer.image && offer.image.startsWith('http');
-            if (!hasValidImage) {
-              const localImg = offerImageMap.get(offer.id);
-              if (localImg) return { ...offer, image: localImg };
-            }
-            return offer;
-          });
+          .map(({ isActive: _isActive, sortOrder: _sortOrder, ...offer }) => offer);
 
         if (isMounted) {
           setOffers(visibleOffers);
