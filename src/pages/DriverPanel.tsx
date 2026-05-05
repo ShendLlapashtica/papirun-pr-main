@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Star } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchDrivers, fetchDriverOrders, subscribeDriverOrdersRealtime, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, fetchDriverOrders, seedDefaultDrivers, subscribeDriverOrdersRealtime, type DeliveryDriver } from '@/lib/driversApi';
 import { updateOrderStatus, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import OrderChat from '@/components/OrderChat';
 
@@ -47,25 +47,30 @@ const STATUS_LABEL: Record<string, string> = {
 
 const DriverPanel = () => {
   const [driver, setDriver] = useState<DeliveryDriver | null>(null);
-  const [phone, setPhone] = useState('');
-  const [pin, setPin] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    seedDefaultDrivers().catch(console.error);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     try {
       const drivers = await fetchDrivers();
-      const found = drivers.find((d) => d.name.toLowerCase() === phone.trim().toLowerCase() && d.pin === pin.trim() && d.isActive);
+      const found = drivers.find(
+        (d) => d.phone.toLowerCase() === username.trim().toLowerCase() && d.isActive
+      );
       if (found) {
         setDriver(found);
       } else {
-        setError('Emri ose Fjalëkalimi i gabuar');
+        setError('Username i gabuar. Provo: driver1, driver2...');
       }
     } catch {
-      setError('Gabim në lidhje');
+      setError('Gabim në lidhje me bazën e të dhënave');
     }
   };
 
@@ -116,23 +121,12 @@ const DriverPanel = () => {
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium mb-1.5">Emri i shoferit (p.sh. Delivery1)</label>
+              <label className="block text-xs font-medium mb-1.5">Username (p.sh. driver1)</label>
               <input
                 type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Delivery1"
-                className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5">Fjalëkalimi (PIN)</label>
-              <input
-                type="password"
-                maxLength={6}
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder="••••"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="driver1"
                 className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>

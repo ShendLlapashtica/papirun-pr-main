@@ -3,18 +3,23 @@ import { supabase } from '@/integrations/supabase/client';
 export interface DeliveryDriver {
   id: string;
   name: string;
+  username: string;
   phone: string;
   pin: string;
+  role: string;
   isActive: boolean;
   createdAt: string;
 }
 
 type Row = {
   id: string;
-  name: string;
-  phone: string;
-  pin: string;
-  is_active: boolean;
+  name?: string | null;
+  username?: string | null;
+  display_name?: string | null;
+  phone?: string | null;
+  pin?: string | null;
+  role?: string | null;
+  is_active?: boolean | null;
   created_at: string;
 };
 
@@ -22,10 +27,12 @@ const TABLE = 'delivery_drivers';
 
 const mapRow = (row: Row): DeliveryDriver => ({
   id: row.id,
-  name: row.name,
-  phone: row.phone,
-  pin: row.pin,
-  isActive: row.is_active,
+  name: row.name || row.display_name || row.username || 'Driver',
+  username: row.username || row.phone || '',
+  phone: row.phone || row.username || '',
+  pin: row.pin || '',
+  role: row.role || 'driver',
+  isActive: row.is_active !== false,
   createdAt: row.created_at,
 });
 
@@ -43,19 +50,38 @@ export const fetchDriverById = async (id: string): Promise<DeliveryDriver | null
   return data ? mapRow(data as Row) : null;
 };
 
-export const createDriver = async (name: string, phone: string, pin: string): Promise<DeliveryDriver> => {
+export const createDriver = async (
+  name: string,
+  phone: string,
+  pin: string,
+  username?: string,
+  role: string = 'driver'
+): Promise<DeliveryDriver> => {
   const client = supabase as any;
-  const { data, error } = await client.from(TABLE).insert({ name, phone, pin }).select('*').single();
+  const payload: Record<string, unknown> = {
+    name,
+    phone,
+    pin,
+    username: username || phone,
+    role,
+    is_active: true,
+  };
+  const { data, error } = await client.from(TABLE).insert(payload).select('*').single();
   if (error) throw error;
   return mapRow(data as Row);
 };
 
-export const updateDriver = async (id: string, updates: Partial<{ name: string; phone: string; pin: string; isActive: boolean }>) => {
+export const updateDriver = async (
+  id: string,
+  updates: Partial<{ name: string; username: string; phone: string; pin: string; role: string; isActive: boolean }>
+) => {
   const client = supabase as any;
   const payload: Record<string, unknown> = {};
-  if (updates.name !== undefined) payload.name = updates.name;
-  if (updates.phone !== undefined) payload.phone = updates.phone;
-  if (updates.pin !== undefined) payload.pin = updates.pin;
+  if (updates.name     !== undefined) payload.name      = updates.name;
+  if (updates.username !== undefined) payload.username  = updates.username;
+  if (updates.phone    !== undefined) payload.phone     = updates.phone;
+  if (updates.pin      !== undefined) payload.pin       = updates.pin;
+  if (updates.role     !== undefined) payload.role      = updates.role;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   const { error } = await client.from(TABLE).update(payload).eq('id', id);
   if (error) throw error;
@@ -97,23 +123,22 @@ export const fetchDriverOrders = async (driverId: string) => {
   return data;
 };
 
-/** Ensure default drivers (Delivery1-6 with Pass123.) exist — idempotent, migrates old PIN */
+/** Ensure default drivers (Driver 1-6) exist — idempotent upsert via phone. */
 export const seedDefaultDrivers = async (): Promise<void> => {
   const client = supabase as any;
   const defaults = [
-    { name: 'Delivery1', phone: '', pin: 'Pass123.', is_active: true },
-    { name: 'Delivery2', phone: '', pin: 'Pass123.', is_active: true },
-    { name: 'Delivery3', phone: '', pin: 'Pass123.', is_active: true },
-    { name: 'Delivery4', phone: '', pin: 'Pass123.', is_active: true },
-    { name: 'Delivery5', phone: '', pin: 'Pass123.', is_active: true },
-    { name: 'Delivery6', phone: '', pin: 'Pass123.', is_active: true },
+    { name: 'Driver 1', username: 'driver1', display_name: 'Driver 1', phone: 'driver1', pin: '123', role: 'driver', is_active: true },
+    { name: 'Driver 2', username: 'driver2', display_name: 'Driver 2', phone: 'driver2', pin: '123', role: 'driver', is_active: true },
+    { name: 'Driver 3', username: 'driver3', display_name: 'Driver 3', phone: 'driver3', pin: '123', role: 'driver', is_active: true },
+    { name: 'Driver 4', username: 'driver4', display_name: 'Driver 4', phone: 'driver4', pin: '123', role: 'driver', is_active: true },
+    { name: 'Driver 5', username: 'driver5', display_name: 'Driver 5', phone: 'driver5', pin: '123', role: 'driver', is_active: true },
+    { name: 'Driver 6', username: 'driver6', display_name: 'Driver 6', phone: 'driver6', pin: '123', role: 'driver', is_active: true },
   ];
   for (const def of defaults) {
-    const { data } = await client.from(TABLE).select('id, pin').eq('name', def.name).maybeSingle();
+    const { data } = await client.from(TABLE).select('id').eq('phone', def.phone).maybeSingle();
     if (!data) {
-      await client.from(TABLE).insert(def);
-    } else if (data.pin === 'Pass123') {
-      await client.from(TABLE).update({ pin: 'Pass123.' }).eq('id', data.id);
+      const { error } = await client.from(TABLE).insert(def);
+      if (error) console.error(`[seedDrivers] insert failed for ${def.name}:`, error.message);
     }
   }
 };
