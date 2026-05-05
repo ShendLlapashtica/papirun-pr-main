@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2 } from 'lucide-react';
+import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { fetchDrivers, createDriver, updateDriver, deleteDriver, seedDefaultDrivers, type DeliveryDriver } from '@/lib/driversApi';
 import { menuItems as initialMenuItems, ofertaRamazani as initialOffers } from '@/data/menuData';
 import { defaultMenuExtras } from '@/data/menuExtras';
@@ -347,7 +348,7 @@ const Admin = () => {
   const [items, setItems] = useState<MenuItem[]>(initialMenuItems);
   const [menuExtras, setMenuExtras] = useState<MenuExtra[]>(defaultMenuExtras);
   const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'databaze'>('orders');
   const [contentSubTab, setContentSubTab] = useState<'texts' | 'locations' | 'replies'>('texts');
   const [ofertaEnabled, setOfertaEnabled] = useState(true);
   const [offers, setOffers] = useState<StorefrontOffer[]>(() =>
@@ -359,6 +360,16 @@ const Admin = () => {
   const [editingExtraId, setEditingExtraId] = useState<string | null>(null);
   const offerFileRef = useRef<HTMLInputElement>(null);
   const [uploadingOfferId, setUploadingOfferId] = useState<string | null>(null);
+  const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(null);
+  const [confirmDeleteOfferId, setConfirmDeleteOfferId] = useState<string | null>(null);
+
+  // Databaze tab state
+  type StorageFile = { name: string; path: string; size: number; publicUrl: string };
+  const [dbImages, setDbImages] = useState<StorageFile[]>([]);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [confirmDeleteStoragePath, setConfirmDeleteStoragePath] = useState<string | null>(null);
+  const [replacingPath, setReplacingPath] = useState<string | null>(null);
+  const dbReplaceRef = useRef<HTMLInputElement>(null);
   const { language } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
@@ -540,6 +551,66 @@ const Admin = () => {
     }
   };
 
+  const loadDbImages = useCallback(async () => {
+    setDbLoading(true);
+    try {
+      const bucket = 'product-images';
+      const client = supabase as any;
+      const allFiles: StorageFile[] = [];
+
+      const getUrl = (path: string) =>
+        client.storage.from(bucket).getPublicUrl(path).data?.publicUrl ?? '';
+
+      const { data: rootItems } = await client.storage.from(bucket).list('', { limit: 500 });
+      for (const item of rootItems ?? []) {
+        if (item.id) {
+          allFiles.push({ name: item.name, path: item.name, size: item.metadata?.size ?? 0, publicUrl: getUrl(item.name) });
+        } else {
+          // folder — list one level deep
+          const { data: children } = await client.storage.from(bucket).list(item.name, { limit: 500 });
+          for (const child of children ?? []) {
+            if (child.id) {
+              const p = `${item.name}/${child.name}`;
+              allFiles.push({ name: child.name, path: p, size: child.metadata?.size ?? 0, publicUrl: getUrl(p) });
+            }
+          }
+        }
+      }
+      allFiles.sort((a, b) => b.size - a.size);
+      setDbImages(allFiles);
+    } catch (e) {
+      console.error(e);
+      toast.error('Gabim duke ngarkuar imazhet');
+    } finally {
+      setDbLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'databaze') loadDbImages();
+  }, [activeTab, loadDbImages]);
+
+  const handleDbDelete = async (path: string) => {
+    const client = supabase as any;
+    const { error } = await client.storage.from('product-images').remove([path]);
+    if (error) { toast.error('Fshirja dështoi'); return; }
+    toast.success('Imazhi u fshi');
+    setConfirmDeleteStoragePath(null);
+    setDbImages((prev) => prev.filter((f) => f.path !== path));
+  };
+
+  const handleDbReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!replacingPath || !e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    const client = supabase as any;
+    const { error } = await client.storage.from('product-images').upload(replacingPath, file, { upsert: true });
+    if (error) { toast.error('Zëvendësimi dështoi'); return; }
+    toast.success('Imazhi u zëvendësua');
+    setReplacingPath(null);
+    loadDbImages();
+    e.target.value = '';
+  };
+
   const handleDeleteOffer = async (offerId: string) => {
     const previousOffers = offers;
     setOffers((prev) => prev.filter((offer) => offer.id !== offerId));
@@ -625,7 +696,7 @@ const Admin = () => {
       <div className="container mx-auto px-4 py-6">
         {/* Main tabs (big navbar) */}
         <div className="flex gap-2 mb-4 overflow-x-auto -mx-1 px-1">
-          {(['orders', 'users', 'drivers', 'menu', 'offers', 'content'] as const).map((tab) => (
+          {(['orders', 'users', 'drivers', 'menu', 'offers', 'content', 'databaze'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -640,6 +711,7 @@ const Admin = () => {
                 : tab === 'drivers' ? (language === 'sq' ? 'Shoferët' : 'Drivers')
                 : tab === 'menu' ? (language === 'sq' ? 'Menuja' : 'Menu')
                 : tab === 'offers' ? (language === 'sq' ? 'Ofertat' : 'Offers')
+                : tab === 'databaze' ? 'Databaze'
                 : (language === 'sq' ? 'Tekstet' : 'Content')}
             </button>
           ))}
@@ -977,13 +1049,31 @@ const Admin = () => {
                             <Save className="w-4 h-4" />
                             {language === 'sq' ? 'Ruaj' : 'Save'}
                           </button>
-                          <button
-                            onClick={() => deleteItem(item.id)}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            {language === 'sq' ? 'Fshij' : 'Delete'}
-                          </button>
+                          {confirmDeleteItemId === item.id ? (
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => { deleteItem(item.id); setConfirmDeleteItemId(null); }}
+                                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive text-white text-sm font-bold animate-pulse"
+                              >
+                                <AlertTriangle className="w-4 h-4" />
+                                Konfirmo fshirjen
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteItemId(null)}
+                                className="px-3 py-2 rounded-full bg-secondary text-sm"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDeleteItemId(item.id)}
+                              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              {language === 'sq' ? 'Fshij' : 'Delete'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -1167,9 +1257,23 @@ const Admin = () => {
                               <button onClick={() => handleSaveOffer(offer)} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium">
                                 <Save className="w-4 h-4" /> {language === 'sq' ? 'Ruaj' : 'Save'}
                               </button>
-                              <button onClick={() => handleDeleteOffer(offer.id)} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive/10 text-destructive text-sm font-medium">
-                                <Trash2 className="w-4 h-4" /> {language === 'sq' ? 'Fshij' : 'Delete'}
-                              </button>
+                              {confirmDeleteOfferId === offer.id ? (
+                                <div className="flex gap-1.5">
+                                  <button
+                                    onClick={() => { handleDeleteOffer(offer.id); setConfirmDeleteOfferId(null); }}
+                                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive text-white text-sm font-bold animate-pulse"
+                                  >
+                                    <AlertTriangle className="w-4 h-4" /> Konfirmo fshirjen
+                                  </button>
+                                  <button onClick={() => setConfirmDeleteOfferId(null)} className="px-3 py-2 rounded-full bg-secondary text-sm">
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setConfirmDeleteOfferId(offer.id)} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors">
+                                  <Trash2 className="w-4 h-4" /> {language === 'sq' ? 'Fshij' : 'Delete'}
+                                </button>
+                              )}
                             </div>
                           </div>
                         ) : (
@@ -1211,6 +1315,108 @@ const Admin = () => {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Databaze tab — Supabase Storage image manager */}
+        {activeTab === 'databaze' && (
+          <div className="space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <HardDrive className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-display font-bold text-lg">Databaze — Imazhet</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {dbImages.length} foto ·{' '}
+                    {(dbImages.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(2)} MB totale
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={loadDbImages}
+                disabled={dbLoading}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${dbLoading ? 'animate-spin' : ''}`} />
+                Rifresko
+              </button>
+            </div>
+
+            {/* Replace file input (hidden) */}
+            <input ref={dbReplaceRef} type="file" accept="image/*" className="hidden" onChange={handleDbReplace} />
+
+            {dbLoading && (
+              <div className="text-center py-12 text-muted-foreground text-sm">Duke ngarkuar imazhet...</div>
+            )}
+
+            {!dbLoading && dbImages.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground text-sm">
+                Nuk u gjetën imazhe në bucket-in product-images
+              </div>
+            )}
+
+            {!dbLoading && dbImages.length > 0 && (
+              <div className="grid gap-3">
+                {dbImages.map((img) => (
+                  <div key={img.path} className="bg-card rounded-2xl shadow-card p-3 flex items-center gap-3">
+                    {/* Thumbnail */}
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-secondary shrink-0">
+                      <img
+                        src={img.publicUrl}
+                        alt={img.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate text-foreground">{img.path}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {img.size > 0 ? `${(img.size / 1024 / 1024).toFixed(2)} MB` : '— MB'}
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => { setReplacingPath(img.path); dbReplaceRef.current?.click(); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium hover:bg-secondary/80 transition-colors"
+                      >
+                        <Upload className="w-3.5 h-3.5" /> Zëvendëso
+                      </button>
+
+                      {confirmDeleteStoragePath === img.path ? (
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => handleDbDelete(img.path)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive text-white text-xs font-bold animate-pulse"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" /> Konfirmo fshirjen
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteStoragePath(null)}
+                            className="px-2 py-1.5 rounded-full bg-secondary text-xs"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteStoragePath(img.path)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Fshij
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Star } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchDrivers, fetchDriverOrders, seedDefaultDrivers, subscribeDriverOrdersRealtime, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, fetchDriverById, fetchDriverOrders, seedDefaultDrivers, subscribeDriverOrdersRealtime, type DeliveryDriver } from '@/lib/driversApi';
+
+const DRIVER_SESSION_KEY = 'papirun_driver_session';
 import { updateOrderStatus, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import OrderChat from '@/components/OrderChat';
 
@@ -54,6 +56,16 @@ const DriverPanel = () => {
 
   useEffect(() => {
     seedDefaultDrivers().catch(console.error);
+    // Restore session from localStorage
+    const savedId = localStorage.getItem(DRIVER_SESSION_KEY);
+    if (savedId) {
+      fetchDriverById(savedId)
+        .then((d) => {
+          if (d && d.isActive) setDriver(d);
+          else localStorage.removeItem(DRIVER_SESSION_KEY);
+        })
+        .catch(() => localStorage.removeItem(DRIVER_SESSION_KEY));
+    }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -66,6 +78,7 @@ const DriverPanel = () => {
       );
       if (found) {
         setDriver(found);
+        localStorage.setItem(DRIVER_SESSION_KEY, found.id);
       } else {
         setError('Username i gabuar. Provo: driver1, driver2...');
       }
@@ -155,7 +168,7 @@ const DriverPanel = () => {
             </div>
           </div>
           <button
-            onClick={() => setDriver(null)}
+            onClick={() => { setDriver(null); localStorage.removeItem(DRIVER_SESSION_KEY); }}
             className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
           >
             <LogOut className="w-4 h-4" /> Dil
