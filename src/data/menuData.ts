@@ -19,9 +19,9 @@ import reviewMarigona1 from '@/assets/reviews/review-marigona-1.png';
 import reviewMarigona2 from '@/assets/reviews/review-marigona-2.png';
 import reviewSara from '@/assets/reviews/review-sara.png';
 
-import oferta4x4 from '@/assets/offers/oferta-4x4.jpg';
-import oferta4x3 from '@/assets/offers/oferta-4x3.jpg';
-import ofertaPer2 from '@/assets/offers/oferta-per-2.jpg';
+const oferta4x4 = '';
+const oferta4x3 = '';
+const ofertaPer2 = '';
 
 import type { MenuItem, Review } from '@/types/menu';
 
