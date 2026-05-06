@@ -339,6 +339,41 @@ const DriversManager = () => {
   );
 };
 
+const LOCAL_ASSETS = [
+  { path: 'src/assets/reviews/review-marigona-2.png', size: 1660692, category: 'reviews' as const, usedIn: 'ReviewsSection' },
+  { path: 'src/assets/reviews/review-marigona-1.png', size: 1520680, category: 'reviews' as const, usedIn: 'ReviewsSection' },
+  { path: 'src/assets/reviews/review-sara.png',       size: 1245942, category: 'reviews' as const, usedIn: 'ReviewsSection' },
+  { path: 'src/assets/reviews/review-photo-1.png',    size: 1166581, category: 'reviews' as const, usedIn: 'ReviewsSection' },
+  { path: 'src/assets/hero-bg-new.png',               size:  354254, category: 'branding' as const, usedIn: 'HeroSection' },
+  { path: 'src/assets/menu/grill-chicken-salad.png',  size:  212730, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/falafel.png',              size:  210462, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/cold-chicken-salad.png',   size:  188436, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/grill-chicken-fajita.png', size:  183963, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/falafel-fajita.png',       size:  177927, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/beef-salad.png',           size:  147098, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/crunchy-sticks.png',       size:  123968, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/super-mix-salad.png',      size:  117063, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/salad-mix.png',            size:  115480, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/chicken-pesto.png',        size:   58563, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/tuna.png',                 size:   56520, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/roast-beef.png',           size:   55801, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/veggie.png',               size:   55597, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/mozzarella.png',           size:   55388, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/menu/cold-chicken.png',         size:   54596, category: 'menu' as const, usedIn: 'menuData.ts' },
+  { path: 'src/assets/logo.png',                      size:    2767, category: 'branding' as const, usedIn: 'Header' },
+  { path: 'public/favicon.ico',                       size:   46850, category: 'public' as const, usedIn: 'Browser tab' },
+  { path: 'public/placeholder.svg',                   size:    3253, category: 'public' as const, usedIn: 'Fallback images' },
+];
+
+const LOCAL_ASSETS_TOTAL = LOCAL_ASSETS.reduce((s, f) => s + f.size, 0);
+
+const CAT_STYLES = {
+  reviews: { card: 'bg-rose-50 border border-rose-200',     label: 'text-rose-700',    badge: 'bg-rose-100 text-rose-700' },
+  menu:    { card: 'bg-emerald-50 border border-emerald-200', label: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700' },
+  branding:{ card: 'bg-violet-50 border border-violet-200',  label: 'text-violet-700',  badge: 'bg-violet-100 text-violet-700' },
+  public:  { card: 'bg-slate-50 border border-slate-200',    label: 'text-slate-700',   badge: 'bg-slate-100 text-slate-700' },
+} as const;
+
 const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try { return localStorage.getItem(ADMIN_AUTH_KEY) === '1'; } catch { return false; }
@@ -369,6 +404,7 @@ const Admin = () => {
   const [dbLoading, setDbLoading] = useState(false);
   const [confirmDeleteStoragePath, setConfirmDeleteStoragePath] = useState<string | null>(null);
   const [replacingPath, setReplacingPath] = useState<string | null>(null);
+  const [dbSubTab, setDbSubTab] = useState<'storage' | 'local' | 'content'>('storage');
   const dbReplaceRef = useRef<HTMLInputElement>(null);
   const { language } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -561,21 +597,33 @@ const Admin = () => {
       const getUrl = (path: string) =>
         client.storage.from(bucket).getPublicUrl(path).data?.publicUrl ?? '';
 
-      const { data: rootItems } = await client.storage.from(bucket).list('', { limit: 500 });
-      for (const item of rootItems ?? []) {
-        if (item.id) {
-          allFiles.push({ name: item.name, path: item.name, size: item.metadata?.size ?? 0, publicUrl: getUrl(item.name) });
-        } else {
-          // folder — list one level deep
-          const { data: children } = await client.storage.from(bucket).list(item.name, { limit: 500 });
-          for (const child of children ?? []) {
-            if (child.id) {
-              const p = `${item.name}/${child.name}`;
-              allFiles.push({ name: child.name, path: p, size: child.metadata?.size ?? 0, publicUrl: getUrl(p) });
-            }
+      const listRecursive = async (path: string = '') => {
+        const { data, error } = await client.storage.from(bucket).list(path, {
+          limit: 500,
+          sortBy: { column: 'name', order: 'asc' }
+        });
+        
+        if (error) throw error;
+        if (!data) return;
+
+        for (const item of data) {
+          const itemPath = path ? `${path}/${item.name}` : item.name;
+          if (item.id) {
+            // It's a file
+            allFiles.push({
+              name: item.name,
+              path: itemPath,
+              size: item.metadata?.size ?? 0,
+              publicUrl: getUrl(itemPath)
+            });
+          } else {
+            // It's a folder
+            await listRecursive(itemPath);
           }
         }
-      }
+      };
+
+      await listRecursive();
       allFiles.sort((a, b) => b.size - a.size);
       setDbImages(allFiles);
     } catch (e) {
@@ -1321,100 +1369,268 @@ const Admin = () => {
         {/* Databaze tab — Supabase Storage image manager */}
         {activeTab === 'databaze' && (
           <div className="space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+            {/* Header & Sub-tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <HardDrive className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="font-display font-bold text-lg">Databaze — Imazhet</h2>
+                  <h2 className="font-display font-bold text-lg">Databaze & Storage</h2>
                   <p className="text-xs text-muted-foreground">
-                    {dbImages.length} foto ·{' '}
-                    {(dbImages.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(2)} MB totale
+                    Supabase: {dbImages.length} foto · {(dbImages.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(2)} MB
+                    {' · '}Lokale: {(LOCAL_ASSETS_TOTAL / 1024 / 1024).toFixed(2)} MB · Total: {((dbImages.reduce((s, f) => s + f.size, 0) + LOCAL_ASSETS_TOTAL) / 1024 / 1024).toFixed(2)} MB
                   </p>
                 </div>
               </div>
-              <button
-                onClick={loadDbImages}
-                disabled={dbLoading}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${dbLoading ? 'animate-spin' : ''}`} />
-                Rifresko
-              </button>
+
+              <div className="flex items-center gap-2">
+                <div className="flex bg-secondary p-1 rounded-full">
+                  <button
+                    onClick={() => setDbSubTab('storage')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      dbSubTab === 'storage' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                    }`}
+                  >
+                    Supabase
+                  </button>
+                  <button
+                    onClick={() => setDbSubTab('local')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      dbSubTab === 'local' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                    }`}
+                  >
+                    Lokale
+                  </button>
+                  <button
+                    onClick={() => setDbSubTab('content')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      dbSubTab === 'content' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                    }`}
+                  >
+                    Përmbajtja
+                  </button>
+                </div>
+                <button
+                  onClick={loadDbImages}
+                  disabled={dbLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${dbLoading ? 'animate-spin' : ''}`} />
+                  Rifresko
+                </button>
+              </div>
             </div>
 
             {/* Replace file input (hidden) */}
             <input ref={dbReplaceRef} type="file" accept="image/*" className="hidden" onChange={handleDbReplace} />
 
-            {dbLoading && (
-              <div className="text-center py-12 text-muted-foreground text-sm">Duke ngarkuar imazhet...</div>
-            )}
+            {dbSubTab === 'storage' && (
+              <div className="space-y-4">
+                {dbLoading && (
+                  <div className="text-center py-12 text-muted-foreground text-sm">Duke ngarkuar imazhet...</div>
+                )}
 
-            {!dbLoading && dbImages.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground text-sm">
-                Nuk u gjetën imazhe në bucket-in product-images
+                {!dbLoading && dbImages.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground text-sm">
+                    Nuk u gjetën imazhe në bucket-in product-images
+                  </div>
+                )}
+
+                {!dbLoading && dbImages.length > 0 && (
+                  <div className="grid gap-3">
+                    {dbImages.map((img) => {
+                      // Check if this image is being used
+                      const isUsedInProducts = items.some(i => i.image && i.image.includes(img.path));
+                      const isUsedInOffers = offers.some(o => o.image && o.image.includes(img.path));
+                      const isUsed = isUsedInProducts || isUsedInOffers;
+
+                      return (
+                        <div key={img.path} className={`bg-card rounded-2xl shadow-card p-3 flex items-center gap-3 border-2 transition-all ${isUsed ? 'border-transparent' : 'border-dashed border-amber-500/30 bg-amber-500/5'}`}>
+                          {/* Thumbnail */}
+                          <div className="w-16 h-16 rounded-xl overflow-hidden bg-secondary shrink-0">
+                            <img
+                              src={img.publicUrl}
+                              alt={img.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-bold truncate text-foreground">{img.path}</p>
+                              {!isUsed && (
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold uppercase">Pa përdorur</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {img.size > 0 ? `${(img.size / 1024 / 1024).toFixed(2)} MB` : '— MB'}
+                            </p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => { setReplacingPath(img.path); dbReplaceRef.current?.click(); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium hover:bg-secondary/80 transition-colors"
+                            >
+                              <Upload className="w-3.5 h-3.5" /> Zëvendëso
+                            </button>
+
+                            {confirmDeleteStoragePath === img.path ? (
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => handleDbDelete(img.path)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive text-white text-xs font-bold animate-pulse"
+                                >
+                                  <AlertTriangle className="w-3.5 h-3.5" /> Konfirmo
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteStoragePath(null)}
+                                  className="px-2 py-1.5 rounded-full bg-secondary text-xs"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteStoragePath(img.path)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Fshij
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
-            {!dbLoading && dbImages.length > 0 && (
-              <div className="grid gap-3">
-                {dbImages.map((img) => (
-                  <div key={img.path} className="bg-card rounded-2xl shadow-card p-3 flex items-center gap-3">
-                    {/* Thumbnail */}
-                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-secondary shrink-0">
-                      <img
-                        src={img.publicUrl}
-                        alt={img.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
-                    </div>
+            {dbSubTab === 'local' && (
+              <div className="space-y-4">
+                {/* Category summary cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {(
+                    [
+                      { cat: 'reviews' as const,  label: 'Reviews',  files: LOCAL_ASSETS.filter(a => a.category === 'reviews')  },
+                      { cat: 'menu' as const,      label: 'Menu',     files: LOCAL_ASSETS.filter(a => a.category === 'menu')     },
+                      { cat: 'branding' as const,  label: 'Branding', files: LOCAL_ASSETS.filter(a => a.category === 'branding') },
+                      { cat: 'public' as const,    label: 'Public',   files: LOCAL_ASSETS.filter(a => a.category === 'public')   },
+                    ]
+                  ).map(({ cat, label, files }) => {
+                    const total = files.reduce((s, f) => s + f.size, 0);
+                    return (
+                      <div key={cat} className={`rounded-2xl p-4 ${CAT_STYLES[cat].card}`}>
+                        <p className={`text-[10px] font-bold uppercase tracking-wide ${CAT_STYLES[cat].label}`}>{label}</p>
+                        <p className="text-xl font-display font-bold mt-1">
+                          {(total / 1024 / 1024).toFixed(2)}{' '}
+                          <span className="text-sm font-normal text-muted-foreground">MB</span>
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{files.length} foto</p>
+                      </div>
+                    );
+                  })}
+                </div>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate text-foreground">{img.path}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {img.size > 0 ? `${(img.size / 1024 / 1024).toFixed(2)} MB` : '— MB'}
-                      </p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => { setReplacingPath(img.path); dbReplaceRef.current?.click(); }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium hover:bg-secondary/80 transition-colors"
-                      >
-                        <Upload className="w-3.5 h-3.5" /> Zëvendëso
-                      </button>
-
-                      {confirmDeleteStoragePath === img.path ? (
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={() => handleDbDelete(img.path)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive text-white text-xs font-bold animate-pulse"
-                          >
-                            <AlertTriangle className="w-3.5 h-3.5" /> Konfirmo fshirjen
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteStoragePath(null)}
-                            className="px-2 py-1.5 rounded-full bg-secondary text-xs"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDeleteStoragePath(img.path)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Fshij
-                        </button>
-                      )}
-                    </div>
+                {/* Total bar */}
+                <div className="bg-card rounded-2xl p-4 shadow-card flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-foreground">Total lokale</p>
+                    <p className="text-[10px] text-muted-foreground">{LOCAL_ASSETS.length} foto · bundled me app</p>
                   </div>
-                ))}
+                  <p className="text-2xl font-display font-bold tabular-nums">
+                    {(LOCAL_ASSETS_TOTAL / 1024 / 1024).toFixed(2)}{' '}
+                    <span className="text-sm font-normal text-muted-foreground">MB</span>
+                  </p>
+                </div>
+
+                {/* Files list — sorted biggest first */}
+                <div className="grid gap-2">
+                  {[...LOCAL_ASSETS].sort((a, b) => b.size - a.size).map((asset) => {
+                    const filename = asset.path.split('/').pop() ?? asset.path;
+                    const dir = asset.path.split('/').slice(0, -1).join('/');
+                    return (
+                      <div key={asset.path} className="bg-card rounded-2xl shadow-card p-3 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                          <Image className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs font-bold text-foreground truncate max-w-[180px]">{filename}</p>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${CAT_STYLES[asset.category].badge}`}>
+                              {asset.category}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{dir}</p>
+                          <p className="text-[10px] text-muted-foreground">Perdoret: <span className="font-medium">{asset.usedIn}</span></p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-bold tabular-nums">
+                            {asset.size >= 1024 * 1024
+                              ? `${(asset.size / 1024 / 1024).toFixed(2)} MB`
+                              : `${(asset.size / 1024).toFixed(0)} KB`}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">bundled</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="text-[10px] text-muted-foreground text-center pt-2">
+                  Këto foto janë të ngulitura në bundle. Për t'i zëvendësuar, ndrysho skedarin lokal dhe bëj rebuild.
+                </p>
+              </div>
+            )}
+
+            {dbSubTab === 'content' && (
+              <div className="space-y-6">
+                {/* Products Summary */}
+                <div className="bg-card rounded-2xl p-5 shadow-card space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-display font-bold text-primary">Produkte ({items.length})</h3>
+                    <Package className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {items.map(product => (
+                      <div key={product.id} className="p-3 bg-secondary/50 rounded-xl flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-secondary overflow-hidden shrink-0">
+                          {product.image && <img src={product.image} className="w-full h-full object-cover" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate">{product.name.sq}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{product.image ? 'Me foto' : 'Pa foto'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Offers Summary */}
+                <div className="bg-card rounded-2xl p-5 shadow-card space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-display font-bold text-primary">Ofertat ({offers.length})</h3>
+                    <Plus className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {offers.map(offer => (
+                      <div key={offer.id} className="p-3 bg-secondary/50 rounded-xl flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-secondary overflow-hidden shrink-0">
+                          {offer.image && <img src={offer.image} className="w-full h-full object-cover" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate">{offer.title}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{offer.image ? 'Me foto' : 'Pa foto'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
