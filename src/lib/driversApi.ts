@@ -9,6 +9,9 @@ export interface DeliveryDriver {
   role: string;
   isActive: boolean;
   createdAt: string;
+  lat: number | null;
+  lng: number | null;
+  color: string | null;
 }
 
 type Row = {
@@ -21,9 +24,22 @@ type Row = {
   role?: string | null;
   is_active?: boolean | null;
   created_at: string;
+  lat?: number | null;
+  lng?: number | null;
+  color?: string | null;
 };
 
 const TABLE = 'delivery_drivers';
+
+// Default color palette — assigned round-robin when creating new drivers
+export const DRIVER_COLORS = [
+  '#ef4444', // Red
+  '#3b82f6', // Blue
+  '#22c55e', // Green
+  '#eab308', // Yellow
+  '#a855f7', // Purple
+  '#f97316', // Orange
+];
 
 const mapRow = (row: Row): DeliveryDriver => ({
   id: row.id,
@@ -34,6 +50,9 @@ const mapRow = (row: Row): DeliveryDriver => ({
   role: row.role || 'driver',
   isActive: row.is_active !== false,
   createdAt: row.created_at,
+  lat: row.lat !== undefined && row.lat !== null ? Number(row.lat) : null,
+  lng: row.lng !== undefined && row.lng !== null ? Number(row.lng) : null,
+  color: row.color ?? null,
 });
 
 export const fetchDrivers = async (): Promise<DeliveryDriver[]> => {
@@ -55,9 +74,16 @@ export const createDriver = async (
   phone: string,
   pin: string,
   username?: string,
-  role: string = 'driver'
+  role: string = 'driver',
+  color?: string
 ): Promise<DeliveryDriver> => {
   const client = supabase as any;
+  // Auto-assign color from palette if not provided
+  let assignedColor = color ?? null;
+  if (!assignedColor) {
+    const { data: existing } = await client.from(TABLE).select('id').limit(100);
+    assignedColor = DRIVER_COLORS[(existing?.length ?? 0) % DRIVER_COLORS.length];
+  }
   const payload: Record<string, unknown> = {
     name,
     phone,
@@ -65,6 +91,7 @@ export const createDriver = async (
     username: username || phone,
     role,
     is_active: true,
+    color: assignedColor,
   };
   const { data, error } = await client.from(TABLE).insert(payload).select('*').single();
   if (error) throw error;
@@ -84,6 +111,13 @@ export const updateDriver = async (
   if (updates.role     !== undefined) payload.role      = updates.role;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   const { error } = await client.from(TABLE).update(payload).eq('id', id);
+  if (error) throw error;
+};
+
+/** Update a driver's GPS position */
+export const updateDriverLocation = async (id: string, lat: number, lng: number) => {
+  const client = supabase as any;
+  const { error } = await client.from(TABLE).update({ lat, lng }).eq('id', id);
   if (error) throw error;
 };
 
@@ -127,18 +161,21 @@ export const fetchDriverOrders = async (driverId: string) => {
 export const seedDefaultDrivers = async (): Promise<void> => {
   const client = supabase as any;
   const defaults = [
-    { name: 'Driver 1', username: 'driver1', display_name: 'Driver 1', phone: 'driver1', pin: '123', role: 'driver', is_active: true },
-    { name: 'Driver 2', username: 'driver2', display_name: 'Driver 2', phone: 'driver2', pin: '123', role: 'driver', is_active: true },
-    { name: 'Driver 3', username: 'driver3', display_name: 'Driver 3', phone: 'driver3', pin: '123', role: 'driver', is_active: true },
-    { name: 'Driver 4', username: 'driver4', display_name: 'Driver 4', phone: 'driver4', pin: '123', role: 'driver', is_active: true },
-    { name: 'Driver 5', username: 'driver5', display_name: 'Driver 5', phone: 'driver5', pin: '123', role: 'driver', is_active: true },
-    { name: 'Driver 6', username: 'driver6', display_name: 'Driver 6', phone: 'driver6', pin: '123', role: 'driver', is_active: true },
+    { name: 'Driver 1', username: 'driver1', display_name: 'Driver 1', phone: 'driver1', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[0] },
+    { name: 'Driver 2', username: 'driver2', display_name: 'Driver 2', phone: 'driver2', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[1] },
+    { name: 'Driver 3', username: 'driver3', display_name: 'Driver 3', phone: 'driver3', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[2] },
+    { name: 'Driver 4', username: 'driver4', display_name: 'Driver 4', phone: 'driver4', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[3] },
+    { name: 'Driver 5', username: 'driver5', display_name: 'Driver 5', phone: 'driver5', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[4] },
+    { name: 'Driver 6', username: 'driver6', display_name: 'Driver 6', phone: 'driver6', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[5] },
   ];
   for (const def of defaults) {
     const { data } = await client.from(TABLE).select('id').eq('phone', def.phone).maybeSingle();
     if (!data) {
       const { error } = await client.from(TABLE).insert(def);
       if (error) console.error(`[seedDrivers] insert failed for ${def.name}:`, error.message);
+    } else {
+      // Backfill color if missing
+      await client.from(TABLE).update({ color: def.color }).eq('phone', def.phone).is('color', null);
     }
   }
 };
@@ -154,6 +191,21 @@ export const subscribeDriverOrdersRealtime = (driverId: string, onChange: () => 
         table: 'orders',
         filter: `assigned_driver_id=eq.${driverId}`,
       },
+      onChange
+    )
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+/** Subscribe to real-time updates on ALL driver rows (location changes, etc.) */
+export const subscribeAllDriverLocations = (onChange: () => void) => {
+  const channel = supabase
+    .channel(`all-drivers-loc-${Math.random().toString(36).slice(2)}`)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: TABLE },
       onChange
     )
     .subscribe();

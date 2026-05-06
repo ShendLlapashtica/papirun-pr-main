@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send, Star } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchOrder, subscribeOrderRealtime, softDeleteOrder, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -52,7 +52,11 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
   const [order, setOrder] = useState<OrderRecord | null>(null);
   const [chatCount, setChatCount] = useState<number | null>(null);
   const [driverRating, setDriverRating] = useState<number>(0);
+  const [ratingNote, setRatingNote] = useState('');
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [thankYouVisible, setThankYouVisible] = useState(false);
+  const thankYouTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { language } = useLanguage();
 
   useEffect(() => {
@@ -166,41 +170,69 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
         </div>
 
         <div className="p-4 border-t border-border/50 space-y-3 shrink-0">
-          {status === 'completed' && order?.assignedDriverId && !ratingSubmitted && (
-            <div className="bg-secondary/30 p-3 rounded-xl border border-border/50">
-              <p className="text-xs font-semibold text-center mb-2">{language === 'sq' ? 'Si ishte dërgesa?' : 'How was the delivery?'}</p>
-              <div className="flex items-center justify-center gap-3 mb-3">
-                <button
-                  onClick={async () => {
-                    setDriverRating(5);
-                    const note = prompt(language === 'sq' ? 'Mund të lini një koment (opsionale):' : 'Leave a note (optional):');
-                    await rateDriver(order!.id, 5, note || undefined);
-                    setRatingSubmitted(true);
-                    toast.success(language === 'sq' ? 'Faleminderit për vlerësimin!' : 'Thanks for rating!');
-                  }}
-                  className="text-2xl hover:scale-125 transition-transform" title="I kënaqur">😊</button>
-                <button
-                  onClick={async () => {
-                    setDriverRating(3);
-                    const note = prompt(language === 'sq' ? 'Mund të lini një koment (opsionale):' : 'Leave a note (optional):');
-                    await rateDriver(order!.id, 3, note || undefined);
-                    setRatingSubmitted(true);
-                    toast.success(language === 'sq' ? 'Faleminderit për vlerësimin!' : 'Thanks for rating!');
-                  }}
-                  className="text-2xl hover:scale-125 transition-transform" title="Neutral">😐</button>
-                <button
-                  onClick={async () => {
-                    setDriverRating(1);
-                    const note = prompt(language === 'sq' ? 'Mund të lini një koment (opsionale):' : 'Leave a note (optional):');
-                    await rateDriver(order!.id, 1, note || undefined);
-                    setRatingSubmitted(true);
-                    toast.success(language === 'sq' ? 'Faleminderit për vlerësimin!' : 'Thanks for rating!');
-                  }}
-                  className="text-2xl hover:scale-125 transition-transform" title="I pakënaqur">☹️</button>
+          {status === 'completed' && order?.assignedDriverId && !ratingSubmitted && !thankYouVisible && (
+            <div className="bg-secondary/30 p-4 rounded-xl border border-border/50">
+              <p className="text-xs font-semibold text-center mb-3">{language === 'sq' ? 'Si ishte dërgesa?' : 'How was the delivery?'}</p>
+              <div className="flex items-center justify-center gap-5 mb-3">
+                {([
+                  { emoji: '😊', value: 5, label: language === 'sq' ? 'I kënaqur' : 'Happy', glow: 'shadow-[0_0_0_3px_#22c55e]' },
+                  { emoji: '😐', value: 3, label: language === 'sq' ? 'Neutral' : 'Neutral', glow: 'shadow-[0_0_0_3px_#f59e0b]' },
+                  { emoji: '☹️', value: 1, label: language === 'sq' ? 'I pakënaqur' : 'Unhappy', glow: 'shadow-[0_0_0_3px_#ef4444]' },
+                ] as const).map(({ emoji, value, label, glow }) => (
+                  <button
+                    key={value}
+                    onClick={() => setDriverRating(driverRating === value ? 0 : value)}
+                    title={label}
+                    className={[
+                      'text-4xl leading-none rounded-full p-1 transition-all duration-200',
+                      'hover:scale-125 active:scale-95',
+                      driverRating === value
+                        ? `scale-125 animate-bounce ${glow}`
+                        : 'scale-100 opacity-70 hover:opacity-100',
+                    ].join(' ')}
+                  >
+                    {emoji}
+                  </button>
+                ))}
               </div>
+
+              {driverRating > 0 && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <textarea
+                    value={ratingNote}
+                    onChange={(e) => setRatingNote(e.target.value)}
+                    placeholder={language === 'sq' ? 'Koment opsional...' : 'Optional comment...'}
+                    rows={2}
+                    className="w-full text-xs rounded-lg border border-border/50 bg-background px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                  <button
+                    disabled={ratingSubmitting}
+                    onClick={async () => {
+                      setRatingSubmitting(true);
+                      await rateDriver(order!.id, driverRating, ratingNote.trim() || undefined);
+                      setRatingSubmitting(false);
+                      setRatingSubmitted(true);
+                      setThankYouVisible(true);
+                      if (thankYouTimer.current) clearTimeout(thankYouTimer.current);
+                      thankYouTimer.current = setTimeout(() => setThankYouVisible(false), 3500);
+                    }}
+                    className="w-full py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 transition-opacity"
+                  >
+                    {ratingSubmitting
+                      ? <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                      : (language === 'sq' ? 'Dërgo vlerësimin' : 'Submit rating')}
+                  </button>
+                </div>
+              )}
             </div>
           )}
-          {status === 'completed' && ratingSubmitted && (
+          {thankYouVisible && (
+            <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20 text-emerald-600 text-center animate-in fade-in zoom-in-95 duration-300">
+              <div className="text-4xl mb-1 animate-bounce">✅</div>
+              <p className="font-bold text-sm">{language === 'sq' ? 'Faleminderit për vlerësimin!' : 'Thanks for rating!'}</p>
+            </div>
+          )}
+          {status === 'completed' && ratingSubmitted && !thankYouVisible && (
             <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 text-emerald-600 text-center text-xs font-semibold">
               {language === 'sq' ? 'Vlerësimi u dërgua me sukses.' : 'Rating submitted successfully.'}
             </div>

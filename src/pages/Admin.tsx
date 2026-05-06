@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchDrivers, createDriver, updateDriver, deleteDriver, seedDefaultDrivers, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, createDriver, updateDriver, deleteDriver, seedDefaultDrivers, subscribeAllDriverLocations, type DeliveryDriver } from '@/lib/driversApi';
+import DriverLocationMap from '@/components/DriverLocationMap';
 import { menuItems as initialMenuItems, ofertaRamazani as initialOffers } from '@/data/menuData';
 import { defaultMenuExtras } from '@/data/menuExtras';
 import { getIngredientName } from '@/data/ingredientTranslations';
@@ -199,6 +200,9 @@ const DriversManager = () => {
 
   useEffect(() => {
     seedDefaultDrivers().catch(() => {}).finally(reload);
+    // Real-time: refresh drivers when any location update comes in
+    const unsub = subscribeAllDriverLocations(reload);
+    return unsub;
   }, []);
 
   const togglePin = (id: string) => {
@@ -247,6 +251,9 @@ const DriversManager = () => {
 
   return (
     <div className="space-y-4">
+      {/* Live colored driver map */}
+      <DriverLocationMap drivers={drivers} height="340px" allowFullscreen />
+
       <div className="flex items-center justify-between">
         <h3 className="font-display font-bold text-lg">Menaxhimi i Shoferëve</h3>
         <button
@@ -294,8 +301,11 @@ const DriversManager = () => {
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-                    <span className="text-blue-600 font-bold text-sm">{d.name.slice(0, 2)}</span>
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm text-white"
+                    style={{ background: d.color || '#3b82f6' }}
+                  >
+                    {d.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -355,34 +365,34 @@ const DriversManager = () => {
 };
 
 const LOCAL_ASSETS = [
-  // Reviews → converted to JPEG (were PNG)
-  { path: 'src/assets/reviews/review-marigona-2.jpg', size:  114317, category: 'reviews' as const, usedIn: 'ReviewsSection' },
-  { path: 'src/assets/reviews/review-marigona-1.jpg', size:   81478, category: 'reviews' as const, usedIn: 'ReviewsSection' },
-  { path: 'src/assets/reviews/review-sara.jpg',       size:  129563, category: 'reviews' as const, usedIn: 'ReviewsSection' },
-  { path: 'src/assets/reviews/review-photo-1.jpg',    size:  132915, category: 'reviews' as const, usedIn: 'ReviewsSection' },
-  // Hero → converted to JPEG
-  { path: 'src/assets/hero-bg-new.jpg',               size:   72210, category: 'branding' as const, usedIn: 'HeroSection' },
-  // Menu product PNGs (keep alpha transparency)
-  { path: 'src/assets/menu/grill-chicken-salad.png',  size:  152492, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/falafel.png',              size:  155220, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/cold-chicken-salad.png',   size:  141270, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/grill-chicken-fajita.png', size:  132184, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/falafel-fajita.png',       size:  132492, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/beef-salad.png',           size:  127464, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/crunchy-sticks.png',       size:   89837, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/super-mix-salad.png',      size:   89747, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/salad-mix.png',            size:   86687, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/chicken-pesto.png',        size:   51752, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/tuna.png',                 size:   49065, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/roast-beef.png',           size:   48695, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/veggie.png',               size:   48679, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/mozzarella.png',           size:   47619, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
-  { path: 'src/assets/menu/cold-chicken.png',         size:   47996, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  // Reviews → JPEG
+  { path: 'src/assets/reviews/review-marigona-2.jpg', size: 114317, category: 'reviews' as const, usedIn: 'ReviewsSection', thumb: new URL('../assets/reviews/review-marigona-2.jpg', import.meta.url).href },
+  { path: 'src/assets/reviews/review-marigona-1.jpg', size:  81478, category: 'reviews' as const, usedIn: 'ReviewsSection', thumb: new URL('../assets/reviews/review-marigona-1.jpg', import.meta.url).href },
+  { path: 'src/assets/reviews/review-sara.jpg',       size: 129563, category: 'reviews' as const, usedIn: 'ReviewsSection', thumb: new URL('../assets/reviews/review-sara.jpg', import.meta.url).href },
+  { path: 'src/assets/reviews/review-photo-1.jpg',    size: 132915, category: 'reviews' as const, usedIn: 'ReviewsSection', thumb: new URL('../assets/reviews/review-photo-1.jpg', import.meta.url).href },
+  // Hero → JPEG
+  { path: 'src/assets/hero-bg-new.jpg',               size:  72210, category: 'branding' as const, usedIn: 'HeroSection',   thumb: new URL('../assets/hero-bg-new.jpg', import.meta.url).href },
+  // Menu PNGs
+  { path: 'src/assets/menu/grill-chicken-salad.png',  size: 152492, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/grill-chicken-salad.png', import.meta.url).href },
+  { path: 'src/assets/menu/falafel.png',              size: 155220, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/falafel.png', import.meta.url).href },
+  { path: 'src/assets/menu/cold-chicken-salad.png',   size: 141270, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/cold-chicken-salad.png', import.meta.url).href },
+  { path: 'src/assets/menu/grill-chicken-fajita.png', size: 132184, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/grill-chicken-fajita.png', import.meta.url).href },
+  { path: 'src/assets/menu/falafel-fajita.png',       size: 132492, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/falafel-fajita.png', import.meta.url).href },
+  { path: 'src/assets/menu/beef-salad.png',           size: 127464, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/beef-salad.png', import.meta.url).href },
+  { path: 'src/assets/menu/crunchy-sticks.png',       size:  89837, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/crunchy-sticks.png', import.meta.url).href },
+  { path: 'src/assets/menu/super-mix-salad.png',      size:  89747, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/super-mix-salad.png', import.meta.url).href },
+  { path: 'src/assets/menu/salad-mix.png',            size:  86687, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/salad-mix.png', import.meta.url).href },
+  { path: 'src/assets/menu/chicken-pesto.png',        size:  51752, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/chicken-pesto.png', import.meta.url).href },
+  { path: 'src/assets/menu/tuna.png',                 size:  49065, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/tuna.png', import.meta.url).href },
+  { path: 'src/assets/menu/roast-beef.png',           size:  48695, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/roast-beef.png', import.meta.url).href },
+  { path: 'src/assets/menu/veggie.png',               size:  48679, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/veggie.png', import.meta.url).href },
+  { path: 'src/assets/menu/mozzarella.png',           size:  47619, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/mozzarella.png', import.meta.url).href },
+  { path: 'src/assets/menu/cold-chicken.png',         size:  47996, category: 'menu' as const, usedIn: 'Të gjitha', thumb: new URL('../assets/menu/cold-chicken.png', import.meta.url).href },
   // Branding
-  { path: 'src/assets/logo.png',                      size:    2767, category: 'branding' as const, usedIn: 'Header' },
-  // Public (not bundled, served directly)
-  { path: 'public/favicon.ico',                       size:   46850, category: 'public' as const, usedIn: 'Browser tab' },
-  { path: 'public/placeholder.svg',                   size:    3253, category: 'public' as const, usedIn: 'Fallback images' },
+  { path: 'src/assets/logo.png', size: 2767, category: 'branding' as const, usedIn: 'Header', thumb: new URL('../assets/logo.png', import.meta.url).href },
+  // Public (no thumb — not Vite-bundled)
+  { path: 'public/favicon.ico',    size: 46850, category: 'public' as const, usedIn: 'Browser tab',    thumb: null },
+  { path: 'public/placeholder.svg',size:  3253, category: 'public' as const, usedIn: 'Fallback images', thumb: null },
 ];
 
 const LOCAL_ASSETS_TOTAL = LOCAL_ASSETS.reduce((s, f) => s + f.size, 0);
@@ -403,7 +413,7 @@ const Admin = () => {
   const [items, setItems] = useState<MenuItem[]>(initialMenuItems);
   const [menuExtras, setMenuExtras] = useState<MenuExtra[]>(defaultMenuExtras);
   const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'databaze'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'harta' | 'databaze'>('orders');
   const [contentSubTab, setContentSubTab] = useState<'texts' | 'locations' | 'replies'>('texts');
   const [ofertaEnabled, setOfertaEnabled] = useState(true);
   const [offers, setOffers] = useState<StorefrontOffer[]>(() =>
@@ -417,6 +427,15 @@ const Admin = () => {
   const [uploadingOfferId, setUploadingOfferId] = useState<string | null>(null);
   const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(null);
   const [confirmDeleteOfferId, setConfirmDeleteOfferId] = useState<string | null>(null);
+
+  // Harta tab — live driver list
+  const [hartaDrivers, setHartaDrivers] = useState<DeliveryDriver[]>([]);
+  useEffect(() => {
+    if (activeTab !== 'harta') return;
+    fetchDrivers().then(setHartaDrivers).catch(console.error);
+    const unsub = subscribeAllDriverLocations(() => fetchDrivers().then(setHartaDrivers).catch(console.error));
+    return unsub;
+  }, [activeTab]);
 
   // Databaze tab state
   type StorageFile = { name: string; path: string; size: number; publicUrl: string };
@@ -764,7 +783,7 @@ const Admin = () => {
       <div className="container mx-auto px-4 py-6">
         {/* Main tabs (big navbar) */}
         <div className="flex gap-2 mb-4 overflow-x-auto -mx-1 px-1">
-          {(['orders', 'users', 'drivers', 'menu', 'offers', 'content', 'databaze'] as const).map((tab) => (
+          {(['orders', 'users', 'drivers', 'harta', 'menu', 'offers', 'content', 'databaze'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -777,6 +796,7 @@ const Admin = () => {
               {tab === 'orders' ? (language === 'sq' ? 'Porositë' : 'Orders')
                 : tab === 'users' ? (language === 'sq' ? 'Përdoruesit' : 'Users')
                 : tab === 'drivers' ? (language === 'sq' ? 'Shoferët' : 'Drivers')
+                : tab === 'harta' ? '🗺 Harta'
                 : tab === 'menu' ? (language === 'sq' ? 'Menuja' : 'Menu')
                 : tab === 'offers' ? (language === 'sq' ? 'Ofertat' : 'Offers')
                 : tab === 'databaze' ? 'Databaze'
@@ -812,6 +832,42 @@ const Admin = () => {
           <div className="space-y-8">
             <DriversManager />
             <DriversKPI />
+          </div>
+        )}
+        {activeTab === 'harta' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Map className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-display font-bold text-lg">Harta Live e Shoferëve</h2>
+                <p className="text-xs text-muted-foreground">
+                  {hartaDrivers.filter((d) => d.lat != null).length} / {hartaDrivers.length} shoferë me pozicion aktiv
+                </p>
+              </div>
+            </div>
+            <DriverLocationMap drivers={hartaDrivers} height="600px" allowFullscreen />
+            {/* Legend */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {hartaDrivers.map((d) => (
+                <div key={d.id} className="bg-card rounded-xl p-3 flex items-center gap-2.5 shadow-sm border border-border/40">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
+                    style={{ background: d.color || '#6b7280' }}
+                  >
+                    {d.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold truncate">{d.name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {d.lat != null ? '📍 Online' : 'Offline'}
+                      {!d.isActive && ' · Jo aktiv'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {activeTab === 'content' && contentSubTab === 'locations' && <LocationsEditor />}
@@ -1576,8 +1632,11 @@ const Admin = () => {
                     const dir = asset.path.split('/').slice(0, -1).join('/');
                     return (
                       <div key={asset.path} className="bg-card rounded-2xl shadow-card p-3 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-                          <Image className="w-5 h-5 text-muted-foreground" />
+                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-secondary shrink-0">
+                          {asset.thumb
+                            ? <img src={asset.thumb} alt={filename} className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center"><Image className="w-5 h-5 text-muted-foreground" /></div>
+                          }
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">

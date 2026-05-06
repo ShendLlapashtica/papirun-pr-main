@@ -19,7 +19,8 @@ import OrderActionDrawer from '@/components/admin/OrderActionDrawer';
 import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
 import { generateInvoice } from '@/lib/invoiceGenerator';
-import { assignDriverToOrder, fetchDrivers, type DeliveryDriver } from '@/lib/driversApi';
+import { assignDriverToOrder, fetchDrivers, subscribeAllDriverLocations, type DeliveryDriver } from '@/lib/driversApi';
+import DriverLocationMap from '@/components/DriverLocationMap';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
 
 const statusColor = (s: string) => {
@@ -194,12 +195,17 @@ const OrdersReview = () => {
   const initializedRef = useRef(false);
   const now = useNow(5000);
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
+  const [showDriverMap, setShowDriverMap] = useState(false);
 
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
 
   useEffect(() => {
-    fetchDrivers().then((d) => setDrivers(d.filter((x) => x.isActive))).catch(() => {});
+    const reload = () => fetchDrivers().then((d) => setDrivers(d.filter((x) => x.isActive))).catch(() => {});
+    reload();
+    // Refresh driver list (incl. locations) on real-time updates
+    const unsub = subscribeAllDriverLocations(reload);
+    return unsub;
   }, []);
 
   const archiveOrder = (id: string) => {
@@ -1006,6 +1012,30 @@ const OrdersReview = () => {
                       <Share2 className="w-3.5 h-3.5" /> Kaloj bisedën te shoferi
                     </button>
                   )}
+                  {/* Driver location map toggle */}
+                  {selected.assignedDriverId && (() => {
+                    const assignedDriver = drivers.find((d) => d.id === selected.assignedDriverId);
+                    return assignedDriver ? (
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => setShowDriverMap((v) => !v)}
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-emerald-500/10 text-emerald-600 text-xs font-bold hover:bg-emerald-500/20 active:scale-95 transition-all border border-emerald-500/20"
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                          {showDriverMap ? 'Fshih hartën' : 'Shiko pozicionin e shoferit'}
+                        </button>
+                        {showDriverMap && (
+                          <DriverLocationMap
+                            drivers={[assignedDriver]}
+                            deliveryLat={selected.deliveryLat}
+                            deliveryLng={selected.deliveryLng}
+                            height="220px"
+                            allowFullscreen
+                          />
+                        )}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               )}
 

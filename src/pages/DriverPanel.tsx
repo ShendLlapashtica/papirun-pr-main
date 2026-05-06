@@ -1,11 +1,21 @@
-import { useEffect, useState } from 'react';
-import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Star } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchDrivers, fetchDriverById, fetchDriverOrders, seedDefaultDrivers, subscribeDriverOrdersRealtime, type DeliveryDriver } from '@/lib/driversApi';
+import {
+  fetchDrivers,
+  fetchDriverById,
+  fetchDriverOrders,
+  seedDefaultDrivers,
+  subscribeDriverOrdersRealtime,
+  updateDriverLocation,
+  type DeliveryDriver,
+} from '@/lib/driversApi';
+import { playKrring } from '@/lib/sounds';
 
 const DRIVER_SESSION_KEY = 'papirun_driver_session';
 import { updateOrderStatus, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import OrderChat from '@/components/OrderChat';
+import DriverLocationMap from '@/components/DriverLocationMap';
 
 // --- Row mapper (duplicated from ordersApi to avoid circular) ---
 const mapOrderRow = (row: any): OrderRecord => ({
@@ -28,6 +38,8 @@ const mapOrderRow = (row: any): OrderRecord => ({
   source: (row.source ?? 'web') as any,
   prepEtaMinutes: row.prep_eta_minutes,
   isVisible: row.is_visible !== false,
+  assignedDriverId: row.assigned_driver_id ?? null,
+  driverRating: row.driver_rating ?? null,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -53,10 +65,11 @@ const DriverPanel = () => {
   const [error, setError] = useState('');
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
+  const prevOrderCountRef = useRef(0);
 
   useEffect(() => {
     seedDefaultDrivers().catch(console.error);
-    // Restore session from localStorage
     const savedId = localStorage.getItem(DRIVER_SESSION_KEY);
     if (savedId) {
       fetchDriverById(savedId)
@@ -93,17 +106,54 @@ const DriverPanel = () => {
     const sync = async () => {
       try {
         const raw = await fetchDriverOrders(driver.id);
-        if (active) setOrders(raw.map(mapOrderRow));
+        if (!active) return;
+        const mapped = (raw as any[]).map(mapOrderRow);
+        setOrders(mapped);
+
+        // Play krring when a NEW order arrives
+        const activeCount = mapped.filter((o) => !['completed', 'rejected'].includes(o.status)).length;
+        if (activeCount > prevOrderCountRef.current && prevOrderCountRef.current >= 0) {
+          playKrring();
+        }
+        prevOrderCountRef.current = activeCount;
       } catch (e) {
         console.error(e);
       }
     };
     sync();
     const unsub = subscribeDriverOrdersRealtime(driver.id, sync);
-    // Polling fallback every 8s to guarantee spot-on updates
     const poll = setInterval(sync, 4000);
     return () => { active = false; unsub(); clearInterval(poll); };
   }, [driver]);
+
+  const handleUpdateLocation = async () => {
+    if (!driver) return;
+    if (!navigator.geolocation) {
+      toast.error('Geolokacioni nuk suportohet nga ky browser');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          await updateDriverLocation(driver.id, pos.coords.latitude, pos.coords.longitude);
+          // Refresh driver object with new coords
+          const updated = await fetchDriverById(driver.id);
+          if (updated) setDriver(updated);
+          toast.success('Pozicioni u nda ✓');
+        } catch {
+          toast.error('Nuk u ruajt pozicioni');
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        toast.error('Nuk u mor pozicioni: ' + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const selected = orders.find((o) => o.id === selectedId) ?? null;
 
@@ -116,7 +166,6 @@ const DriverPanel = () => {
     }
   };
 
-  // Active orders = not completed, not rejected
   const activeOrders = orders.filter((o) => !['completed', 'rejected'].includes(o.status) && o.isVisible);
   const completedOrders = orders.filter((o) => o.status === 'completed');
 
@@ -159,24 +208,48 @@ const DriverPanel = () => {
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-lg border-b border-border/50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
-              <Bike className="w-5 h-5 text-white" />
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-sm"
+              style={{ background: driver.color || '#3b82f6' }}
+            >
+              {driver.name.slice(0, 2).toUpperCase()}
             </div>
             <div>
               <h1 className="font-display font-bold text-lg">{driver.name}</h1>
-              <p className="text-xs text-muted-foreground">Driver · Papirun</p>
+              <p className="text-xs text-muted-foreground">
+                Driver · {driver.lat != null ? '📍 Online' : 'Pozicioni jo i ndarë'}
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => { setDriver(null); localStorage.removeItem(DRIVER_SESSION_KEY); }}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
-          >
-            <LogOut className="w-4 h-4" /> Dil
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleUpdateLocation}
+              disabled={locating}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold hover:bg-emerald-500/20 transition-colors disabled:opacity-60"
+            >
+              <Navigation className={`w-3.5 h-3.5 ${locating ? 'animate-pulse' : ''}`} />
+              {locating ? 'Kërkon...' : 'Aktualize Pozicionin'}
+            </button>
+            <button
+              onClick={() => { setDriver(null); localStorage.removeItem(DRIVER_SESSION_KEY); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
+            >
+              <LogOut className="w-4 h-4" /> Dil
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 space-y-4">
+        {/* Driver location map — always visible */}
+        <DriverLocationMap
+          drivers={[driver]}
+          deliveryLat={selected?.deliveryLat}
+          deliveryLng={selected?.deliveryLng}
+          height="280px"
+          allowFullscreen
+        />
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-4">
           {/* Orders list */}
           <div className="space-y-3">
@@ -215,9 +288,7 @@ const DriverPanel = () => {
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
-                  <span className="text-xs text-muted-foreground">
-                    {o.items.length} artikuj
-                  </span>
+                  <span className="text-xs text-muted-foreground">{o.items.length} artikuj</span>
                   <span className="text-primary font-semibold text-sm">€{o.total.toFixed(2)}</span>
                 </div>
               </button>

@@ -47,6 +47,7 @@ const App = () => (
                   <Route path="/app/product/:id" element={<RequireAuth><AppProductPage /></RequireAuth>} />
                   <Route path="/offer/:id" element={<OfferViewWrapper />} />
                   <Route path="/driver" element={<DriverPanel />} />
+                  <Route path="/driver-dashboard" element={<Navigate to="/driver" replace />} />
                   <Route path="/Driverpanel" element={<Navigate to="/driver" replace />} />
                   <Route path="/driverpanel" element={<Navigate to="/driver" replace />} />
                   <Route path="/driver-panel" element={<Navigate to="/driver" replace />} />
