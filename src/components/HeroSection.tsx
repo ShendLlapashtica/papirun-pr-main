@@ -1,5 +1,5 @@
 import { useLanguage } from '@/contexts/LanguageContext';
-import heroBg from '@/assets/hero-bg-new.png';
+import heroBg from '@/assets/hero-bg-new.jpg';
 
 interface HeroSectionProps {
   onViewMenu: () => void;

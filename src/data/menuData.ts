@@ -14,10 +14,10 @@ import roastBeef from '@/assets/menu/roast-beef.png';
 import coldChicken from '@/assets/menu/cold-chicken.png';
 import veggie from '@/assets/menu/veggie.png';
 
-import reviewPhoto1 from '@/assets/reviews/review-photo-1.png';
-import reviewMarigona1 from '@/assets/reviews/review-marigona-1.png';
-import reviewMarigona2 from '@/assets/reviews/review-marigona-2.png';
-import reviewSara from '@/assets/reviews/review-sara.png';
+import reviewPhoto1 from '@/assets/reviews/review-photo-1.jpg';
+import reviewMarigona1 from '@/assets/reviews/review-marigona-1.jpg';
+import reviewMarigona2 from '@/assets/reviews/review-marigona-2.jpg';
+import reviewSara from '@/assets/reviews/review-sara.jpg';
 
 const oferta4x4 = '';
 const oferta4x3 = '';

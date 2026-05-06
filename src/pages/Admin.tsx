@@ -190,6 +190,7 @@ const DriversManager = () => {
   const [editForm, setEditForm] = useState<{ name: string; phone: string; pin: string }>({ name: '', phone: '', pin: '' });
   const [addMode, setAddMode] = useState(false);
   const [newForm, setNewForm] = useState({ name: '', phone: '', pin: 'Pass123.' });
+  const [confirmDeleteDriverId, setConfirmDeleteDriverId] = useState<string | null>(null);
 
   const reload = () => {
     setLoading(true);
@@ -226,8 +227,8 @@ const DriversManager = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Fshij këtë shofer?')) return;
     try { await deleteDriver(id); reload(); } catch {}
+    setConfirmDeleteDriverId(null);
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -325,9 +326,23 @@ const DriversManager = () => {
                     <button onClick={() => startEdit(d)} className="p-2 rounded-full hover:bg-secondary transition-colors text-muted-foreground" title="Ndrysho">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => handleDelete(d.id)} className="p-2 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground/60" title="Fshij">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {confirmDeleteDriverId === d.id ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleDelete(d.id)}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-destructive text-white text-[10px] font-bold animate-pulse"
+                        >
+                          <AlertTriangle className="w-3 h-3" /> Konfirmo fshirjen
+                        </button>
+                        <button onClick={() => setConfirmDeleteDriverId(null)} className="p-1.5 rounded-full bg-secondary">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setConfirmDeleteDriverId(d.id)} className="p-2 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground/60" title="Fshij">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -340,27 +355,32 @@ const DriversManager = () => {
 };
 
 const LOCAL_ASSETS = [
-  { path: 'src/assets/reviews/review-marigona-2.png', size: 1660692, category: 'reviews' as const, usedIn: 'ReviewsSection' },
-  { path: 'src/assets/reviews/review-marigona-1.png', size: 1520680, category: 'reviews' as const, usedIn: 'ReviewsSection' },
-  { path: 'src/assets/reviews/review-sara.png',       size: 1245942, category: 'reviews' as const, usedIn: 'ReviewsSection' },
-  { path: 'src/assets/reviews/review-photo-1.png',    size: 1166581, category: 'reviews' as const, usedIn: 'ReviewsSection' },
-  { path: 'src/assets/hero-bg-new.png',               size:  354254, category: 'branding' as const, usedIn: 'HeroSection' },
-  { path: 'src/assets/menu/grill-chicken-salad.png',  size:  212730, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/falafel.png',              size:  210462, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/cold-chicken-salad.png',   size:  188436, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/grill-chicken-fajita.png', size:  183963, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/falafel-fajita.png',       size:  177927, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/beef-salad.png',           size:  147098, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/crunchy-sticks.png',       size:  123968, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/super-mix-salad.png',      size:  117063, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/salad-mix.png',            size:  115480, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/chicken-pesto.png',        size:   58563, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/tuna.png',                 size:   56520, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/roast-beef.png',           size:   55801, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/veggie.png',               size:   55597, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/mozzarella.png',           size:   55388, category: 'menu' as const, usedIn: 'menuData.ts' },
-  { path: 'src/assets/menu/cold-chicken.png',         size:   54596, category: 'menu' as const, usedIn: 'menuData.ts' },
+  // Reviews → converted to JPEG (were PNG)
+  { path: 'src/assets/reviews/review-marigona-2.jpg', size:  114317, category: 'reviews' as const, usedIn: 'ReviewsSection' },
+  { path: 'src/assets/reviews/review-marigona-1.jpg', size:   81478, category: 'reviews' as const, usedIn: 'ReviewsSection' },
+  { path: 'src/assets/reviews/review-sara.jpg',       size:  129563, category: 'reviews' as const, usedIn: 'ReviewsSection' },
+  { path: 'src/assets/reviews/review-photo-1.jpg',    size:  132915, category: 'reviews' as const, usedIn: 'ReviewsSection' },
+  // Hero → converted to JPEG
+  { path: 'src/assets/hero-bg-new.jpg',               size:   72210, category: 'branding' as const, usedIn: 'HeroSection' },
+  // Menu product PNGs (keep alpha transparency)
+  { path: 'src/assets/menu/grill-chicken-salad.png',  size:  152492, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/falafel.png',              size:  155220, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/cold-chicken-salad.png',   size:  141270, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/grill-chicken-fajita.png', size:  132184, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/falafel-fajita.png',       size:  132492, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/beef-salad.png',           size:  127464, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/crunchy-sticks.png',       size:   89837, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/super-mix-salad.png',      size:   89747, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/salad-mix.png',            size:   86687, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/chicken-pesto.png',        size:   51752, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/tuna.png',                 size:   49065, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/roast-beef.png',           size:   48695, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/veggie.png',               size:   48679, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/mozzarella.png',           size:   47619, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  { path: 'src/assets/menu/cold-chicken.png',         size:   47996, category: 'menu' as const, usedIn: 'Të gjitha produkte' },
+  // Branding
   { path: 'src/assets/logo.png',                      size:    2767, category: 'branding' as const, usedIn: 'Header' },
+  // Public (not bundled, served directly)
   { path: 'public/favicon.ico',                       size:   46850, category: 'public' as const, usedIn: 'Browser tab' },
   { path: 'public/placeholder.svg',                   size:    3253, category: 'public' as const, usedIn: 'Fallback images' },
 ];
@@ -1485,7 +1505,7 @@ const Admin = () => {
                                   onClick={() => handleDbDelete(img.path)}
                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-destructive text-white text-xs font-bold animate-pulse"
                                 >
-                                  <AlertTriangle className="w-3.5 h-3.5" /> Konfirmo
+                                  <AlertTriangle className="w-3.5 h-3.5" /> Konfirmo fshirjen
                                 </button>
                                 <button
                                   onClick={() => setConfirmDeleteStoragePath(null)}
