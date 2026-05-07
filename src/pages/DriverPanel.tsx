@@ -217,7 +217,7 @@ const DriverPanel = () => {
             <div>
               <h1 className="font-display font-bold text-lg">{driver.name}</h1>
               <p className="text-xs text-muted-foreground">
-                Driver · {driver.lat != null ? '📍 Online' : 'Pozicioni jo i ndarë'}
+                Driver · {driver.lat != null ? '📍 Online' : 'Vendndodhja joaktive'}
               </p>
             </div>
           </div>
@@ -228,7 +228,7 @@ const DriverPanel = () => {
               className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold hover:bg-emerald-500/20 transition-colors disabled:opacity-60"
             >
               <Navigation className={`w-3.5 h-3.5 ${locating ? 'animate-pulse' : ''}`} />
-              {locating ? 'Kërkon...' : 'Aktualize Pozicionin'}
+              {locating ? 'Kërkon...' : 'Përditëso vendndodhjen!'}
             </button>
             <button
               onClick={() => { setDriver(null); localStorage.removeItem(DRIVER_SESSION_KEY); }}

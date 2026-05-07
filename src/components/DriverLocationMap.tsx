@@ -160,7 +160,7 @@ export default function DriverLocationMap({
           <div className="text-center text-sm text-muted-foreground">
             <div className="text-2xl mb-2">📍</div>
             <p className="font-medium">Asnjë shofer nuk ka ndarë pozicionin</p>
-            <p className="text-xs mt-1">Shoferi duhet të shtypë "Aktualize Pozicionin"</p>
+            <p className="text-xs mt-1">Shoferi duhet të shtypë "Përditëso vendndodhjen!"</p>
           </div>
         </div>
       )}
