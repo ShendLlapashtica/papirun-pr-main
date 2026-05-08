@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchDrivers, createDriver, updateDriver, deleteDriver, seedDefaultDrivers, subscribeAllDriverLocations, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, createDriver, updateDriver, deleteDriver, seedDefaultDrivers, subscribeAllDriverLocations, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import { menuItems as initialMenuItems, ofertaRamazani as initialOffers } from '@/data/menuData';
 import { defaultMenuExtras } from '@/data/menuExtras';
@@ -432,9 +432,11 @@ const Admin = () => {
   const [hartaDrivers, setHartaDrivers] = useState<DeliveryDriver[]>([]);
   useEffect(() => {
     if (activeTab !== 'harta') return;
-    fetchDrivers().then(setHartaDrivers).catch(console.error);
-    const unsub = subscribeAllDriverLocations(() => fetchDrivers().then(setHartaDrivers).catch(console.error));
-    return unsub;
+    const refresh = () => fetchDrivers().then(setHartaDrivers).catch(console.error);
+    refresh();
+    const unsub = subscribeAllDriverLocations(refresh);
+    const poll = setInterval(refresh, 5000);
+    return () => { unsub(); clearInterval(poll); };
   }, [activeTab]);
 
   // Databaze tab state
@@ -836,37 +838,55 @@ const Admin = () => {
         )}
         {activeTab === 'harta' && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Map className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h2 className="font-display font-bold text-lg">Harta Live e Shoferëve</h2>
-                <p className="text-xs text-muted-foreground">
-                  {hartaDrivers.filter((d) => d.lat != null).length} / {hartaDrivers.length} shoferë me pozicion aktiv
-                </p>
-              </div>
-            </div>
-            <DriverLocationMap drivers={hartaDrivers} height="600px" allowFullscreen />
-            {/* Legend */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {hartaDrivers.map((d) => (
-                <div key={d.id} className="bg-card rounded-xl p-3 flex items-center gap-2.5 shadow-sm border border-border/40">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
-                    style={{ background: d.color || '#6b7280' }}
-                  >
-                    {d.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold truncate">{d.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {d.lat != null ? '📍 Online' : 'Offline'}
-                      {!d.isActive && ' · Jo aktiv'}
-                    </p>
-                  </div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Map className="w-5 h-5 text-primary" />
                 </div>
-              ))}
+                <div>
+                  <h2 className="font-display font-bold text-lg">Harta Live e Shoferëve</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {hartaDrivers.filter((d) => d.lat != null).length} / {hartaDrivers.length} shoferë aktiv · rifresohet çdo 5s
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => fetchDrivers().then(setHartaDrivers).catch(console.error)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-secondary hover:bg-secondary/80 text-xs font-medium transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Rifresko
+              </button>
+            </div>
+            <DriverLocationMap drivers={hartaDrivers} height="600px" allowFullscreen showRestaurant />
+            {/* Driver legend with distances */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {hartaDrivers.map((d) => {
+                const dist = d.lat != null && d.lng != null
+                  ? haversineKm(RESTAURANT_COORDS.lat, RESTAURANT_COORDS.lng, d.lat, d.lng)
+                  : null;
+                return (
+                  <div key={d.id} className="bg-card rounded-xl p-3 flex items-center gap-2.5 shadow-sm border border-border/40">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 relative"
+                      style={{ background: d.color || '#6b7280' }}
+                    >
+                      {d.name.slice(0, 2).toUpperCase()}
+                      {d.lat != null && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-background" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate">{d.name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {dist != null
+                          ? `📍 ${dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`} larg`
+                          : 'Offline · pa GPS'}
+                        {!d.isActive && ' · Jo aktiv'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

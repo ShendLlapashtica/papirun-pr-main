@@ -24,12 +24,14 @@ type Row = {
   role?: string | null;
   is_active?: boolean | null;
   created_at: string;
+  // lat/lng/color may not exist yet in production — treat as optional
   lat?: number | null;
   lng?: number | null;
   color?: string | null;
 };
 
 const TABLE = 'delivery_drivers';
+const LOC_PREFIX = 'driver_loc_';
 
 // Default color palette — assigned round-robin when creating new drivers
 export const DRIVER_COLORS = [
@@ -41,32 +43,98 @@ export const DRIVER_COLORS = [
   '#f97316', // Orange
 ];
 
-const mapRow = (row: Row): DeliveryDriver => ({
-  id: row.id,
-  name: row.name || row.display_name || row.username || 'Driver',
-  username: row.username || row.phone || '',
-  phone: row.phone || row.username || '',
-  pin: row.pin || '',
-  role: row.role || 'driver',
-  isActive: row.is_active !== false,
-  createdAt: row.created_at,
-  lat: row.lat !== undefined && row.lat !== null ? Number(row.lat) : null,
-  lng: row.lng !== undefined && row.lng !== null ? Number(row.lng) : null,
-  color: row.color ?? null,
-});
+/** Restaurant / base location used for distance calculations and as map center */
+export const RESTAURANT_COORDS = { lat: 42.6629, lng: 21.1655 };
+
+/** Haversine great-circle distance in kilometres */
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Phone → color lookup so colors work even without the color DB column
+const PHONE_COLORS: Record<string, string> = {
+  delivery1: DRIVER_COLORS[0],
+  delivery2: DRIVER_COLORS[1],
+  delivery3: DRIVER_COLORS[2],
+  driver1: DRIVER_COLORS[0],
+  driver2: DRIVER_COLORS[1],
+  driver3: DRIVER_COLORS[2],
+  driver4: DRIVER_COLORS[3],
+  driver5: DRIVER_COLORS[4],
+  driver6: DRIVER_COLORS[5],
+};
+
+function getDriverColor(row: Row, index = 0): string {
+  if (row.color) return row.color;
+  const phone = (row.phone || row.username || '').toLowerCase();
+  return PHONE_COLORS[phone] ?? DRIVER_COLORS[index % DRIVER_COLORS.length];
+}
+
+// ── Location storage via storefront_settings ──────────────────────────────────
+// We store each driver's GPS in the existing storefront_settings table
+// (key = 'driver_loc_{id}', value_json = {lat, lng, t}) so we need no schema changes.
+
+type LocMap = Record<string, { lat: number; lng: number }>;
+
+async function fetchLocMap(): Promise<LocMap> {
+  const client = supabase as any;
+  const { data, error } = await client
+    .from('storefront_settings')
+    .select('key, value_json')
+    .like('key', `${LOC_PREFIX}%`);
+  if (error || !data) return {};
+  const map: LocMap = {};
+  for (const row of data as { key: string; value_json: any }[]) {
+    const id = row.key.replace(LOC_PREFIX, '');
+    if (row.value_json?.lat != null) {
+      map[id] = { lat: Number(row.value_json.lat), lng: Number(row.value_json.lng) };
+    }
+  }
+  return map;
+}
+
+// ── Row mapper ────────────────────────────────────────────────────────────────
+const mapRow = (row: Row, locMap: LocMap = {}, index = 0): DeliveryDriver => {
+  const loc = locMap[row.id];
+  return {
+    id: row.id,
+    name: row.name || row.display_name || row.username || 'Driver',
+    username: row.username || row.phone || '',
+    phone: row.phone || row.username || '',
+    pin: row.pin || '',
+    role: row.role || 'driver',
+    isActive: row.is_active !== false,
+    createdAt: row.created_at,
+    lat: loc?.lat ?? (row.lat !== undefined && row.lat !== null ? Number(row.lat) : null),
+    lng: loc?.lng ?? (row.lng !== undefined && row.lng !== null ? Number(row.lng) : null),
+    color: getDriverColor(row, index),
+  };
+};
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
 
 export const fetchDrivers = async (): Promise<DeliveryDriver[]> => {
   const client = supabase as any;
-  const { data, error } = await client.from(TABLE).select('*').order('name');
+  const [{ data, error }, locMap] = await Promise.all([
+    client.from(TABLE).select('*').order('name'),
+    fetchLocMap(),
+  ]);
   if (error) throw error;
-  return (data as Row[]).map(mapRow);
+  return (data as Row[]).map((row, i) => mapRow(row, locMap, i));
 };
 
 export const fetchDriverById = async (id: string): Promise<DeliveryDriver | null> => {
   const client = supabase as any;
-  const { data, error } = await client.from(TABLE).select('*').eq('id', id).maybeSingle();
+  const [{ data, error }, locMap] = await Promise.all([
+    client.from(TABLE).select('*').eq('id', id).maybeSingle(),
+    fetchLocMap(),
+  ]);
   if (error) throw error;
-  return data ? mapRow(data as Row) : null;
+  return data ? mapRow(data as Row, locMap) : null;
 };
 
 export const createDriver = async (
@@ -78,12 +146,6 @@ export const createDriver = async (
   color?: string
 ): Promise<DeliveryDriver> => {
   const client = supabase as any;
-  // Auto-assign color from palette if not provided
-  let assignedColor = color ?? null;
-  if (!assignedColor) {
-    const { data: existing } = await client.from(TABLE).select('id').limit(100);
-    assignedColor = DRIVER_COLORS[(existing?.length ?? 0) % DRIVER_COLORS.length];
-  }
   const payload: Record<string, unknown> = {
     name,
     phone,
@@ -91,8 +153,9 @@ export const createDriver = async (
     username: username || phone,
     role,
     is_active: true,
-    color: assignedColor,
+    password_hash: pin, // required NOT NULL in current schema
   };
+  if (color) payload.color = color;
   const { data, error } = await client.from(TABLE).insert(payload).select('*').single();
   if (error) throw error;
   return mapRow(data as Row);
@@ -104,25 +167,36 @@ export const updateDriver = async (
 ) => {
   const client = supabase as any;
   const payload: Record<string, unknown> = {};
-  if (updates.name     !== undefined) payload.name      = updates.name;
-  if (updates.username !== undefined) payload.username  = updates.username;
-  if (updates.phone    !== undefined) payload.phone     = updates.phone;
-  if (updates.pin      !== undefined) payload.pin       = updates.pin;
-  if (updates.role     !== undefined) payload.role      = updates.role;
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.username !== undefined) payload.username = updates.username;
+  if (updates.phone !== undefined) payload.phone = updates.phone;
+  if (updates.pin !== undefined) payload.pin = updates.pin;
+  if (updates.role !== undefined) payload.role = updates.role;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   const { error } = await client.from(TABLE).update(payload).eq('id', id);
   if (error) throw error;
 };
 
-/** Update a driver's GPS position */
+/**
+ * Update a driver's GPS position.
+ * Location is stored in storefront_settings (key = driver_loc_{id}) so no
+ * schema migration is required for the delivery_drivers table.
+ */
 export const updateDriverLocation = async (id: string, lat: number, lng: number) => {
   const client = supabase as any;
-  const { error } = await client.from(TABLE).update({ lat, lng }).eq('id', id);
+  const { error } = await client
+    .from('storefront_settings')
+    .upsert(
+      { key: `${LOC_PREFIX}${id}`, value_json: { lat, lng, t: Date.now() } },
+      { onConflict: 'key' }
+    );
   if (error) throw error;
 };
 
 export const deleteDriver = async (id: string) => {
   const client = supabase as any;
+  // Also remove their location entry
+  await (client as any).from('storefront_settings').delete().eq('key', `${LOC_PREFIX}${id}`).catch(() => {});
   const { error } = await client.from(TABLE).delete().eq('id', id);
   if (error) throw error;
 };
@@ -157,25 +231,22 @@ export const fetchDriverOrders = async (driverId: string) => {
   return data;
 };
 
-/** Ensure default drivers (Driver 1-6) exist — idempotent upsert via phone. */
+/** Ensure all 6 default drivers exist — idempotent. */
 export const seedDefaultDrivers = async (): Promise<void> => {
   const client = supabase as any;
   const defaults = [
-    { name: 'Driver 1', username: 'driver1', display_name: 'Driver 1', phone: 'driver1', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[0] },
-    { name: 'Driver 2', username: 'driver2', display_name: 'Driver 2', phone: 'driver2', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[1] },
-    { name: 'Driver 3', username: 'driver3', display_name: 'Driver 3', phone: 'driver3', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[2] },
-    { name: 'Driver 4', username: 'driver4', display_name: 'Driver 4', phone: 'driver4', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[3] },
-    { name: 'Driver 5', username: 'driver5', display_name: 'Driver 5', phone: 'driver5', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[4] },
-    { name: 'Driver 6', username: 'driver6', display_name: 'Driver 6', phone: 'driver6', pin: '123', role: 'driver', is_active: true, color: DRIVER_COLORS[5] },
+    { name: 'Driver 1', username: 'driver1', display_name: 'Driver 1', phone: 'driver1', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
+    { name: 'Driver 2', username: 'driver2', display_name: 'Driver 2', phone: 'driver2', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
+    { name: 'Driver 3', username: 'driver3', display_name: 'Driver 3', phone: 'driver3', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
+    { name: 'Driver 4', username: 'driver4', display_name: 'Driver 4', phone: 'driver4', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
+    { name: 'Driver 5', username: 'driver5', display_name: 'Driver 5', phone: 'driver5', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
+    { name: 'Driver 6', username: 'driver6', display_name: 'Driver 6', phone: 'driver6', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
   ];
   for (const def of defaults) {
     const { data } = await client.from(TABLE).select('id').eq('phone', def.phone).maybeSingle();
     if (!data) {
       const { error } = await client.from(TABLE).insert(def);
       if (error) console.error(`[seedDrivers] insert failed for ${def.name}:`, error.message);
-    } else {
-      // Backfill color if missing
-      await client.from(TABLE).update({ color: def.color }).eq('phone', def.phone).is('color', null);
     }
   }
 };
@@ -194,22 +265,24 @@ export const subscribeDriverOrdersRealtime = (driverId: string, onChange: () => 
       onChange
     )
     .subscribe();
-  return () => {
-    supabase.removeChannel(channel);
-  };
+  return () => { supabase.removeChannel(channel); };
 };
 
-/** Subscribe to real-time updates on ALL driver rows (location changes, etc.) */
+/**
+ * Subscribe to real-time driver location updates.
+ * Watches storefront_settings for driver_loc_* key changes.
+ */
 export const subscribeAllDriverLocations = (onChange: () => void) => {
   const channel = supabase
-    .channel(`all-drivers-loc-${Math.random().toString(36).slice(2)}`)
+    .channel(`driver-locs-${Math.random().toString(36).slice(2)}`)
     .on(
       'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: TABLE },
-      onChange
+      { event: '*', schema: 'public', table: 'storefront_settings' },
+      (payload: any) => {
+        const key: string = payload?.new?.key || payload?.old?.key || '';
+        if (key.startsWith(LOC_PREFIX)) onChange();
+      }
     )
     .subscribe();
-  return () => {
-    supabase.removeChannel(channel);
-  };
+  return () => { supabase.removeChannel(channel); };
 };

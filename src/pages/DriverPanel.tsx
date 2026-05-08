@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -65,8 +65,10 @@ const DriverPanel = () => {
   const [error, setError] = useState('');
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
   const prevOrderCountRef = useRef(0);
+  const watchIdRef = useRef<number | null>(null);
+  const driverRef = useRef<DeliveryDriver | null>(null);
 
   useEffect(() => {
     seedDefaultDrivers().catch(console.error);
@@ -126,34 +128,50 @@ const DriverPanel = () => {
     return () => { active = false; unsub(); clearInterval(poll); };
   }, [driver]);
 
-  const handleUpdateLocation = async () => {
-    if (!driver) return;
+  // Keep driverRef in sync so watchPosition callbacks always see the latest driver
+  useEffect(() => { driverRef.current = driver; }, [driver]);
+
+  const stopTracking = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsTracking(false);
+  }, []);
+
+  const startTracking = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error('Geolokacioni nuk suportohet nga ky browser');
       return;
     }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
+    if (watchIdRef.current !== null) return; // already watching
+    const id = navigator.geolocation.watchPosition(
       async (pos) => {
+        const d = driverRef.current;
+        if (!d) return;
         try {
-          await updateDriverLocation(driver.id, pos.coords.latitude, pos.coords.longitude);
-          // Refresh driver object with new coords
-          const updated = await fetchDriverById(driver.id);
+          await updateDriverLocation(d.id, pos.coords.latitude, pos.coords.longitude);
+          const updated = await fetchDriverById(d.id);
           if (updated) setDriver(updated);
-          toast.success('Pozicioni u nda ✓');
         } catch {
-          toast.error('Nuk u ruajt pozicioni');
-        } finally {
-          setLocating(false);
+          // silent — will retry on next GPS tick
         }
       },
       (err) => {
-        setLocating(false);
-        toast.error('Nuk u mor pozicioni: ' + err.message);
+        if (err.code !== 3) toast.error('GPS: ' + err.message);
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 8000 }
     );
-  };
+    watchIdRef.current = id;
+    setIsTracking(true);
+  }, []);
+
+  // Auto-start live GPS tracking the moment a driver logs in
+  useEffect(() => {
+    if (!driver) return;
+    startTracking();
+    return stopTracking;
+  }, [driver?.id, startTracking, stopTracking]);
 
   const selected = orders.find((o) => o.id === selectedId) ?? null;
 
@@ -223,12 +241,15 @@ const DriverPanel = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleUpdateLocation}
-              disabled={locating}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold hover:bg-emerald-500/20 transition-colors disabled:opacity-60"
+              onClick={() => isTracking ? stopTracking() : startTracking()}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${
+                isTracking
+                  ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                  : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+              }`}
             >
-              <Navigation className={`w-3.5 h-3.5 ${locating ? 'animate-pulse' : ''}`} />
-              {locating ? 'Kërkon...' : 'Përditëso vendndodhjen!'}
+              <Navigation className={`w-3.5 h-3.5 ${isTracking ? 'animate-pulse' : ''}`} />
+              {isTracking ? '● GPS Live' : 'Aktivizo GPS'}
             </button>
             <button
               onClick={() => { setDriver(null); localStorage.removeItem(DRIVER_SESSION_KEY); }}
