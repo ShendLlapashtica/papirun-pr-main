@@ -1280,7 +1280,6 @@ const Admin = () => {
               ref={offerFileRef}
               type="file"
               accept="image/*"
-              capture="environment"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -1355,105 +1354,118 @@ const Admin = () => {
             <div className="space-y-3">
               {offers.map((offer) => {
                 const isOn = offer.isActive;
+                const isUploading = uploadingOfferId === offer.id;
                 return (
-                  <div key={offer.id} className={`bg-card rounded-2xl p-4 shadow-card transition-all ${!isOn ? 'opacity-60' : ''}`}>
-                    <div className="flex items-start gap-3">
-                      <div className="relative shrink-0">
-                        {offer.image ? (
-                          <img src={getOptimizedImage(offer.image)} alt={offer.title} className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain" />
-                        ) : (
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-secondary flex items-center justify-center">
-                            <Image className="w-6 h-6 text-muted-foreground" />
-                          </div>
-                        )}
-                        {editingOffer === offer.id && (
-                          <button
-                            onClick={() => { setUploadingOfferId(offer.id); offerFileRef.current?.click(); }}
-                            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm"
-                          >
-                            <Upload className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                  <div key={offer.id} className={`bg-card rounded-2xl shadow-card transition-all overflow-hidden ${!isOn ? 'opacity-60' : ''}`}>
+                    {/* Image area — always tappable to upload */}
+                    <button
+                      type="button"
+                      onClick={() => { setUploadingOfferId(offer.id); offerFileRef.current?.click(); }}
+                      className="relative w-full block group"
+                      title="Kliko për të ngarkuar foto"
+                    >
+                      {offer.image ? (
+                        <img
+                          src={getOptimizedImage(offer.image)}
+                          alt={offer.title}
+                          className="w-full max-h-64 object-contain bg-secondary"
+                        />
+                      ) : (
+                        <div className="w-full h-40 bg-secondary flex flex-col items-center justify-center gap-2">
+                          <Upload className="w-8 h-8 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground font-medium">Ngarko foto</span>
+                        </div>
+                      )}
+                      {/* Overlay on hover/tap */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 group-active:bg-black/40 transition-all flex items-center justify-center">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full px-4 py-2 flex items-center gap-2 text-sm font-semibold text-gray-800 shadow-lg">
+                          {isUploading ? (
+                            <span className="animate-pulse">Duke ngarkuar...</span>
+                          ) : (
+                            <><Upload className="w-4 h-4" /> {offer.image ? 'Ndrysho foton' : 'Ngarko foton'}</>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        {editingOffer === offer.id ? (
-                          <div className="space-y-3">
-                            <input
-                              value={offer.title}
-                              onChange={(e) => setOffers(prev => prev.map(o => o.id === offer.id ? { ...o, title: e.target.value } : o))}
-                              placeholder="Title"
-                              className="w-full px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
-                            />
-                            <textarea
-                              value={offer.description}
-                              onChange={(e) => setOffers(prev => prev.map(o => o.id === offer.id ? { ...o, description: e.target.value } : o))}
-                              rows={2}
-                              className="w-full px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 resize-none"
-                            />
-                            <input
-                              type="number"
-                              step="0.10"
-                              value={offer.price}
-                              onChange={(e) => setOffers(prev => prev.map(o => o.id === offer.id ? { ...o, price: parseFloat(e.target.value) || 0 } : o))}
-                              className="w-32 px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
-                            />
-                            <div className="flex gap-2">
-                              <button onClick={() => handleSaveOffer(offer)} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium">
-                                <Save className="w-4 h-4" /> {language === 'sq' ? 'Ruaj' : 'Save'}
-                              </button>
-                              {confirmDeleteOfferId === offer.id ? (
-                                <div className="flex gap-1.5">
-                                  <button
-                                    onClick={() => { handleDeleteOffer(offer.id); setConfirmDeleteOfferId(null); }}
-                                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive text-white text-sm font-bold animate-pulse"
-                                  >
-                                    <AlertTriangle className="w-4 h-4" /> Konfirmo fshirjen
-                                  </button>
-                                  <button onClick={() => setConfirmDeleteOfferId(null)} className="px-3 py-2 rounded-full bg-secondary text-sm">
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <button onClick={() => setConfirmDeleteOfferId(offer.id)} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors">
-                                  <Trash2 className="w-4 h-4" /> {language === 'sq' ? 'Fshij' : 'Delete'}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="flex items-center justify-between gap-2">
-                              <h3 className="font-semibold text-sm sm:text-base">{offer.title}</h3>
-                              <span className="text-primary font-bold text-sm shrink-0">€{offer.price.toFixed(2)}</span>
-                            </div>
-                            <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{offer.description}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <button onClick={() => setEditingOffer(offer.id)} className="px-3 py-1.5 rounded-full bg-secondary text-xs font-medium hover:bg-secondary/80 transition-colors">
-                                {language === 'sq' ? 'Ndrysho' : 'Edit'}
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  const nextValue = !isOn;
-                                  setOffers((prev) => prev.map((item) => (item.id === offer.id ? { ...item, isActive: nextValue } : item)));
+                    </button>
 
-                                  try {
-                                    await handleUpdateStorefrontOffer(offer.id, { isActive: nextValue });
-                                  } catch (error) {
-                                    console.error('Failed to toggle offer visibility:', error);
-                                    setOffers((prev) => prev.map((item) => (item.id === offer.id ? { ...item, isActive: isOn } : item)));
-                                  }
-                                }}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                                  isOn ? 'bg-accent text-accent-foreground' : 'bg-destructive/10 text-destructive'
-                                }`}
-                              >
-                                {isOn ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                {isOn ? 'ON' : 'OFF'}
+                    {/* Card body */}
+                    <div className="p-4">
+                      {editingOffer === offer.id ? (
+                        <div className="space-y-3">
+                          <input
+                            value={offer.title}
+                            onChange={(e) => setOffers(prev => prev.map(o => o.id === offer.id ? { ...o, title: e.target.value } : o))}
+                            placeholder="Title"
+                            className="w-full px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
+                          />
+                          <textarea
+                            value={offer.description}
+                            onChange={(e) => setOffers(prev => prev.map(o => o.id === offer.id ? { ...o, description: e.target.value } : o))}
+                            rows={2}
+                            className="w-full px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 resize-none"
+                          />
+                          <input
+                            type="number"
+                            step="0.10"
+                            value={offer.price}
+                            onChange={(e) => setOffers(prev => prev.map(o => o.id === offer.id ? { ...o, price: parseFloat(e.target.value) || 0 } : o))}
+                            className="w-32 px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={() => handleSaveOffer(offer)} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium">
+                              <Save className="w-4 h-4" /> {language === 'sq' ? 'Ruaj' : 'Save'}
+                            </button>
+                            {confirmDeleteOfferId === offer.id ? (
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => { handleDeleteOffer(offer.id); setConfirmDeleteOfferId(null); }}
+                                  className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive text-white text-sm font-bold animate-pulse"
+                                >
+                                  <AlertTriangle className="w-4 h-4" /> Konfirmo fshirjen
+                                </button>
+                                <button onClick={() => setConfirmDeleteOfferId(null)} className="px-3 py-2 rounded-full bg-secondary text-sm">
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setConfirmDeleteOfferId(offer.id)} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors">
+                                <Trash2 className="w-4 h-4" /> {language === 'sq' ? 'Fshij' : 'Delete'}
                               </button>
-                            </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-semibold text-sm sm:text-base">{offer.title}</h3>
+                            <span className="text-primary font-bold text-sm shrink-0">€{offer.price.toFixed(2)}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{offer.description}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <button onClick={() => setEditingOffer(offer.id)} className="px-3 py-1.5 rounded-full bg-secondary text-xs font-medium hover:bg-secondary/80 transition-colors">
+                              {language === 'sq' ? 'Ndrysho' : 'Edit'}
+                            </button>
+                            <button
+                              onClick={async () => {
+                                const nextValue = !isOn;
+                                setOffers((prev) => prev.map((item) => (item.id === offer.id ? { ...item, isActive: nextValue } : item)));
+                                try {
+                                  await handleUpdateStorefrontOffer(offer.id, { isActive: nextValue });
+                                } catch (error) {
+                                  console.error('Failed to toggle offer visibility:', error);
+                                  setOffers((prev) => prev.map((item) => (item.id === offer.id ? { ...item, isActive: isOn } : item)));
+                                }
+                              }}
+                              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                isOn ? 'bg-accent text-accent-foreground' : 'bg-destructive/10 text-destructive'
+                              }`}
+                            >
+                              {isOn ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                              {isOn ? 'ON' : 'OFF'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
