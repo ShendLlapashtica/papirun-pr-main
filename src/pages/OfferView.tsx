@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { ArrowLeft, Check, Clock, MapPin } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useLiveVisibleOffers } from '@/hooks/useLiveStorefrontData';
+import { useLiveVisibleOffers, useOfferBadgeText } from '@/hooks/useLiveStorefrontData';
 import Header from '@/components/Header';
 import { getOptimizedImage } from '@/lib/utils';
 
@@ -21,6 +21,7 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { offers } = useLiveVisibleOffers();
+  const badgeText = useOfferBadgeText();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -134,7 +135,7 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
               <div className="flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-600 text-white text-xs font-bold shadow-sm">
                   <MapPin className="w-3 h-3" />
-                  Vetëm në pikën Papirun Çagllavicë
+                  {badgeText}
                 </span>
                 {time && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-xs font-semibold text-muted-foreground">

@@ -18,7 +18,7 @@ import {
   subscribeStorefrontOffersRealtime,
   subscribeStorefrontSettingsRealtime,
 } from '@/lib/productsApi';
-import { OFFERS_SECTION_ENABLED_KEY } from '@/lib/storefrontApi';
+import { OFFERS_SECTION_ENABLED_KEY, OFFER_BADGE_TEXT_KEY, DEFAULT_OFFER_BADGE_TEXT } from '@/lib/storefrontApi';
 
 // Build a lookup of local bundled images by product id
 const localImageMap = new Map<string, string>();
@@ -252,4 +252,23 @@ export const useLiveVisibleOffers = () => {
   }, []);
 
   return { offers, isLoading };
+};
+
+export const useOfferBadgeText = () => {
+  const [badgeText, setBadgeText] = useState(DEFAULT_OFFER_BADGE_TEXT);
+
+  useEffect(() => {
+    let isMounted = true;
+    const sync = async () => {
+      try {
+        const val = await fetchStorefrontSetting<string>(OFFER_BADGE_TEXT_KEY, DEFAULT_OFFER_BADGE_TEXT);
+        if (isMounted) setBadgeText(val || DEFAULT_OFFER_BADGE_TEXT);
+      } catch { /* keep default */ }
+    };
+    sync();
+    const unsubscribe = subscribeStorefrontSettingsRealtime(sync);
+    return () => { isMounted = false; unsubscribe(); };
+  }, []);
+
+  return badgeText;
 };

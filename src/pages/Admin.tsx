@@ -11,6 +11,8 @@ import type { MenuItem } from '@/types/menu';
 import type { MenuExtra } from '@/types/menuExtra';
 import {
   OFFERS_SECTION_ENABLED_KEY,
+  OFFER_BADGE_TEXT_KEY,
+  DEFAULT_OFFER_BADGE_TEXT,
   SITE_TEXTS_SETTING_KEY,
   type StorefrontOffer,
   deleteStorefrontOffer,
@@ -416,6 +418,8 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'harta' | 'databaze'>('orders');
   const [contentSubTab, setContentSubTab] = useState<'texts' | 'locations' | 'replies'>('texts');
   const [ofertaEnabled, setOfertaEnabled] = useState(true);
+  const [offerBadgeText, setOfferBadgeText] = useState(DEFAULT_OFFER_BADGE_TEXT);
+  const [offerBadgeSaving, setOfferBadgeSaving] = useState(false);
   const [offers, setOffers] = useState<StorefrontOffer[]>(() =>
     initialOffers.map((offer, index) => ({ ...offer, isActive: true, sortOrder: index }))
   );
@@ -481,8 +485,18 @@ const Admin = () => {
       }
     };
 
+    const syncOfferBadgeText = async () => {
+      try {
+        const val = await fetchStorefrontSetting<string>(OFFER_BADGE_TEXT_KEY, DEFAULT_OFFER_BADGE_TEXT);
+        if (isMounted) setOfferBadgeText(val);
+      } catch (error) {
+        console.error('Failed to sync offer badge text:', error);
+      }
+    };
+
     syncOffers();
     syncOfertaEnabled();
+    syncOfferBadgeText();
     // Seed all 6 default drivers on every admin mount so they exist before the Shoferët tab is opened
     seedDefaultDrivers().catch(() => {});
 
@@ -573,15 +587,16 @@ const Admin = () => {
   };
 
   const handlePasteImage = async (e: React.ClipboardEvent, itemId: string) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of Array.from(items)) {
+    const clipItems = e.clipboardData?.items;
+    if (!clipItems) return;
+    for (const item of Array.from(clipItems)) {
       if (item.type.startsWith('image/')) {
         e.preventDefault();
         const file = item.getAsFile();
         if (file) {
           try {
-            const publicUrl = await uploadProductImage(file, itemId);
+            const oldUrl = items.find((i) => i.id === itemId)?.image || '';
+            const publicUrl = await uploadProductImage(file, itemId, oldUrl);
             updateItem(itemId, { image: publicUrl });
             await handleUpdate(itemId, { image: publicUrl });
           } catch (uploadError) {
@@ -597,7 +612,8 @@ const Admin = () => {
     const file = e.target.files?.[0];
     if (file && uploadingItemId) {
       try {
-        const publicUrl = await uploadProductImage(file, uploadingItemId);
+        const oldUrl = items.find((i) => i.id === uploadingItemId)?.image || '';
+        const publicUrl = await uploadProductImage(file, uploadingItemId, oldUrl);
         updateItem(uploadingItemId, { image: publicUrl });
         await handleUpdate(uploadingItemId, { image: publicUrl });
       } catch (uploadError) {
@@ -1322,6 +1338,40 @@ const Admin = () => {
                   {ofertaEnabled ? <><ToggleRight className="w-5 h-5" /> ON</> : <><ToggleLeft className="w-5 h-5" /> OFF</>}
                 </button>
               </div>
+            </div>
+
+            {/* Location badge text editor */}
+            <div className="bg-card rounded-2xl p-5 shadow-card">
+              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                <span className="text-lg">📍</span>
+                Teksti i Badgit të Lokacionit
+              </h3>
+              <div className="flex gap-2">
+                <input
+                  value={offerBadgeText}
+                  onChange={(e) => setOfferBadgeText(e.target.value)}
+                  placeholder={DEFAULT_OFFER_BADGE_TEXT}
+                  className="flex-1 px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                />
+                <button
+                  disabled={offerBadgeSaving}
+                  onClick={async () => {
+                    setOfferBadgeSaving(true);
+                    try {
+                      await upsertStorefrontSetting(OFFER_BADGE_TEXT_KEY, offerBadgeText);
+                      toast.success('Teksti u ruajt');
+                    } catch {
+                      toast.error('Dështoi ruajtja');
+                    } finally {
+                      setOfferBadgeSaving(false);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Shfaqet si badge i kuq në seksionin e ofertave dhe në faqen e detajeve.</p>
             </div>
 
             {/* Add New Offer */}

@@ -4,6 +4,8 @@ import type { MenuItem } from '@/types/menu';
 import type { MenuExtra } from '@/types/menuExtra';
 export {
   OFFERS_SECTION_ENABLED_KEY,
+  OFFER_BADGE_TEXT_KEY,
+  DEFAULT_OFFER_BADGE_TEXT,
   SITE_TEXTS_SETTING_KEY,
   type StorefrontOffer,
   deleteStorefrontOffer,
@@ -271,13 +273,24 @@ export const subscribeMenuExtrasRealtime = (onChange: () => void) => {
   };
 };
 
-export const uploadProductImage = async (file: File, productId: string) => {
+const deleteProductImageByUrl = async (imageUrl: string): Promise<void> => {
+  if (!imageUrl) return;
+  const marker = `/${PRODUCT_IMAGE_BUCKET}/`;
+  const idx = imageUrl.indexOf(marker);
+  if (idx === -1) return;
+  const path = decodeURIComponent(imageUrl.slice(idx + marker.length).split('?')[0]);
+  await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([path]);
+};
+
+export const uploadProductImage = async (file: File, productId: string, oldImageUrl?: string) => {
+  if (oldImageUrl) await deleteProductImageByUrl(oldImageUrl);
+
   const ext = file.name.split('.').pop() || 'jpg';
   const path = `${productId}/${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGE_BUCKET)
-    .upload(path, file, { upsert: true, contentType: file.type });
+    .upload(path, file, { upsert: false, contentType: file.type });
 
   if (error) throw error;
 

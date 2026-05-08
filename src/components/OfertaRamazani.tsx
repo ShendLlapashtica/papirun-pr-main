@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useLiveVisibleOffers } from '@/hooks/useLiveStorefrontData';
+import { useLiveVisibleOffers, useOfferBadgeText } from '@/hooks/useLiveStorefrontData';
 import { getOptimizedImage } from '@/lib/utils';
 import type { StorefrontOffer } from '@/lib/productsApi';
 
@@ -66,6 +66,7 @@ function StyledOfferCard({ offer }: { offer: StorefrontOffer }) {
 const OfertaRamazani = () => {
   const navigate = useNavigate();
   const { offers, isLoading } = useLiveVisibleOffers();
+  const badgeText = useOfferBadgeText();
 
   if (isLoading || offers.length === 0) return null;
 
@@ -81,7 +82,7 @@ const OfertaRamazani = () => {
           {/* Outstanding location badge */}
           <div className="inline-flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm sm:text-base shadow-lg shadow-red-600/30 ring-2 ring-red-500/40">
             <span className="text-lg">📍</span>
-            <span className="tracking-wide">Vetëm në pikën Papirun Çagllavicë</span>
+            <span className="tracking-wide">{badgeText}</span>
           </div>
         </div>
 
