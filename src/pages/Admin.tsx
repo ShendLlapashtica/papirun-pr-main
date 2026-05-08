@@ -425,6 +425,7 @@ const Admin = () => {
   const [editingExtraId, setEditingExtraId] = useState<string | null>(null);
   const offerFileRef = useRef<HTMLInputElement>(null);
   const [uploadingOfferId, setUploadingOfferId] = useState<string | null>(null);
+  const [dragOverOfferId, setDragOverOfferId] = useState<string | null>(null);
   const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(null);
   const [confirmDeleteOfferId, setConfirmDeleteOfferId] = useState<string | null>(null);
 
@@ -1284,7 +1285,8 @@ const Admin = () => {
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file && uploadingOfferId) {
-                  uploadStorefrontOfferImage(file, uploadingOfferId)
+                  const oldUrl = offers.find((o) => o.id === uploadingOfferId)?.image || '';
+                  uploadStorefrontOfferImage(file, uploadingOfferId, oldUrl)
                     .then(async (publicUrl) => {
                       setOffers((prev) => prev.map((o) => (o.id === uploadingOfferId ? { ...o, image: publicUrl } : o)));
                       await handleUpdateStorefrontOffer(uploadingOfferId, { image: publicUrl });
@@ -1355,14 +1357,56 @@ const Admin = () => {
               {offers.map((offer) => {
                 const isOn = offer.isActive;
                 const isUploading = uploadingOfferId === offer.id;
+                const isDragOver = dragOverOfferId === offer.id;
+
+                const applyOfferFile = async (file: File) => {
+                  if (!file.type.startsWith('image/')) return;
+                  setUploadingOfferId(offer.id);
+                  try {
+                    const oldUrl = offer.image || '';
+                    const publicUrl = await uploadStorefrontOfferImage(file, offer.id, oldUrl);
+                    setOffers((prev) => prev.map((o) => (o.id === offer.id ? { ...o, image: publicUrl } : o)));
+                    await handleUpdateStorefrontOffer(offer.id, { image: publicUrl });
+                  } catch (err) {
+                    console.error('Offer image upload failed:', err);
+                  } finally {
+                    setUploadingOfferId(null);
+                  }
+                };
+
                 return (
-                  <div key={offer.id} className={`bg-card rounded-2xl shadow-card transition-all overflow-hidden ${!isOn ? 'opacity-60' : ''}`}>
-                    {/* Image area — always tappable to upload */}
+                  <div
+                    key={offer.id}
+                    tabIndex={0}
+                    className={`bg-card rounded-2xl shadow-card transition-all overflow-hidden outline-none ${!isOn ? 'opacity-60' : ''}`}
+                    onPaste={(e) => {
+                      const items = e.clipboardData?.items;
+                      if (!items) return;
+                      for (const item of Array.from(items)) {
+                        if (item.type.startsWith('image/')) {
+                          e.preventDefault();
+                          const file = item.getAsFile();
+                          if (file) applyOfferFile(file);
+                          break;
+                        }
+                      }
+                    }}
+                  >
+                    {/* Image area — click / drag-drop */}
                     <button
                       type="button"
                       onClick={() => { setUploadingOfferId(offer.id); offerFileRef.current?.click(); }}
-                      className="relative w-full block group"
-                      title="Kliko për të ngarkuar foto"
+                      onDragOver={(e) => { e.preventDefault(); setDragOverOfferId(offer.id); }}
+                      onDragEnter={(e) => { e.preventDefault(); setDragOverOfferId(offer.id); }}
+                      onDragLeave={() => setDragOverOfferId(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOverOfferId(null);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) applyOfferFile(file);
+                      }}
+                      className={`relative w-full block group transition-all ${isDragOver ? 'ring-4 ring-primary ring-inset' : ''}`}
+                      title="Kliko, drag-drop ose Ctrl+V për të ngarkuar foto"
                     >
                       {offer.image ? (
                         <img
@@ -1371,16 +1415,20 @@ const Admin = () => {
                           className="w-full max-h-64 object-contain bg-secondary"
                         />
                       ) : (
-                        <div className="w-full h-40 bg-secondary flex flex-col items-center justify-center gap-2">
-                          <Upload className="w-8 h-8 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground font-medium">Ngarko foto</span>
+                        <div className={`w-full h-40 flex flex-col items-center justify-center gap-2 transition-colors ${isDragOver ? 'bg-primary/10' : 'bg-secondary'}`}>
+                          <Upload className={`w-8 h-8 ${isDragOver ? 'text-primary' : 'text-muted-foreground'}`} />
+                          <span className={`text-xs font-medium ${isDragOver ? 'text-primary' : 'text-muted-foreground'}`}>
+                            {isDragOver ? 'Lësho për të ngarkuar' : 'Kliko · Drag & Drop · Ctrl+V'}
+                          </span>
                         </div>
                       )}
-                      {/* Overlay on hover/tap */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 group-active:bg-black/40 transition-all flex items-center justify-center">
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full px-4 py-2 flex items-center gap-2 text-sm font-semibold text-gray-800 shadow-lg">
+                      {/* Hover/drag overlay */}
+                      <div className={`absolute inset-0 flex items-center justify-center transition-all ${isDragOver ? 'bg-primary/20' : 'bg-black/0 group-hover:bg-black/30'}`}>
+                        <div className={`bg-white/90 rounded-full px-4 py-2 flex items-center gap-2 text-sm font-semibold text-gray-800 shadow-lg transition-opacity ${isDragOver ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                           {isUploading ? (
                             <span className="animate-pulse">Duke ngarkuar...</span>
+                          ) : isDragOver ? (
+                            <><Upload className="w-4 h-4" /> Lësho foton</>
                           ) : (
                             <><Upload className="w-4 h-4" /> {offer.image ? 'Ndrysho foton' : 'Ngarko foton'}</>
                           )}

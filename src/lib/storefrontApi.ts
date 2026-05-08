@@ -251,13 +251,25 @@ export const subscribeStorefrontSettingsRealtime = (onChange: () => void) => {
   };
 };
 
-export const uploadStorefrontOfferImage = async (file: File, offerId: string) => {
+const deleteImageByUrl = async (imageUrl: string): Promise<void> => {
+  if (!imageUrl) return;
+  const marker = `/${PRODUCT_IMAGE_BUCKET}/`;
+  const idx = imageUrl.indexOf(marker);
+  if (idx === -1) return;
+  const path = decodeURIComponent(imageUrl.slice(idx + marker.length).split('?')[0]);
+  await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([path]);
+};
+
+export const uploadStorefrontOfferImage = async (file: File, offerId: string, oldImageUrl?: string) => {
+  // Hard-delete the old image immediately before uploading the new one
+  if (oldImageUrl) await deleteImageByUrl(oldImageUrl);
+
   const ext = file.name.split('.').pop() || 'jpg';
   const path = `offers/${offerId}/${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGE_BUCKET)
-    .upload(path, file, { upsert: true, contentType: file.type });
+    .upload(path, file, { upsert: false, contentType: file.type });
 
   if (error) throw error;
 
