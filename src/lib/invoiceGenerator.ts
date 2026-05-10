@@ -37,6 +37,38 @@ export const generateInvoice = (order: OrderRecord) => {
     })
     .join('');
 
+  const emailTextLines = [
+    `FATURË ${invoiceNum} · Papirun`,
+    `────────────────────────────────`,
+    `Klienti : ${order.customerName || 'Anonim'}`,
+    `Telefoni: ${order.customerPhone || '—'}`,
+    `Data    : ${dateStr}, ${timeStr}`,
+    `Adresa  : ${order.deliveryAddress || '—'}`,
+    ``,
+    `ARTIKUJT:`,
+    ...order.items.map((it: any) => {
+      const name = it.name?.sq || it.name?.en || it.id;
+      const unitPrice = Number(it.price || 0);
+      const extrasTotal = (it.addedExtras || []).reduce((s: number, e: any) => s + Number(e.price || 0), 0);
+      const lineTotal = (it.quantity * (unitPrice + extrasTotal)).toFixed(2);
+      const mods: string[] = [];
+      if (it.removedIngredients?.length) mods.push(...it.removedIngredients.map((ing: string) => `Pa ${ing}`));
+      if (it.addedExtras?.length) mods.push(...it.addedExtras.map((e: any) => `+${e.name?.sq || e.id}`));
+      const modStr = mods.length ? ` (${mods.join(', ')})` : '';
+      return `  ${it.quantity}× ${name}${modStr}  →  €${lineTotal}`;
+    }),
+    ``,
+    `Nëntotali : €${order.subtotal.toFixed(2)}`,
+    `Dërgesa   : ${order.deliveryFee > 0 ? `€${order.deliveryFee.toFixed(2)}` : 'Falas'}`,
+    `────────────────────────────────`,
+    `TOTALI    : €${order.total.toFixed(2)}`,
+    ...(order.notes ? [``, `Shënim: ${order.notes}`] : []),
+    ``,
+    `Papirun · papirun.net`,
+    `📞 +383 45 262 323`,
+  ];
+  const emailText = emailTextLines.join('\n');
+
   const html = `<!DOCTYPE html>
 <html lang="sq">
 <head>
@@ -99,10 +131,13 @@ export const generateInvoice = (order: OrderRecord) => {
     .footer p{font-size:11px;color:#aaa;line-height:1.7}
     .footer .thank{font-size:13px;font-weight:700;color:#5a7a5f;margin-bottom:4px}
 
-    /* Print button */
-    .print-row{text-align:center;margin-top:20px}
-    .print-btn{background:linear-gradient(135deg,#5a7a5f,#749d79);color:#fff;border:none;padding:12px 32px;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(90,122,95,0.4);font-family:inherit}
+    /* Action buttons */
+    .print-row{text-align:center;margin-top:20px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+    .print-btn{background:linear-gradient(135deg,#5a7a5f,#749d79);color:#fff;border:none;padding:12px 28px;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(90,122,95,0.4);font-family:inherit}
     .print-btn:hover{opacity:0.92}
+    .copy-btn{background:#fff;color:#1a1a1a;border:2px solid #e0e0e0;padding:12px 28px;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+    .copy-btn:hover{border-color:#5a7a5f;color:#5a7a5f}
+    .copy-btn.copied{background:#5a7a5f;color:#fff;border-color:#5a7a5f}
 
     @media print{
       body{background:#fff;padding:0}
@@ -212,6 +247,26 @@ export const generateInvoice = (order: OrderRecord) => {
 
   <div class="print-row">
     <button class="print-btn" onclick="window.print()">🖨 Printo Faturën</button>
+    <button class="copy-btn" id="copyBtn" onclick="
+      const text = ${JSON.stringify(emailText)};
+      navigator.clipboard.writeText(text).then(function(){
+        var btn = document.getElementById('copyBtn');
+        btn.textContent = '✓ U kopjua!';
+        btn.classList.add('copied');
+        setTimeout(function(){ btn.textContent = '📋 Kopjo për Email'; btn.classList.remove('copied'); }, 2500);
+      }).catch(function(){
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        var btn = document.getElementById('copyBtn');
+        btn.textContent = '✓ U kopjua!';
+        btn.classList.add('copied');
+        setTimeout(function(){ btn.textContent = '📋 Kopjo për Email'; btn.classList.remove('copied'); }, 2500);
+      });
+    ">📋 Kopjo për Email</button>
   </div>
 </div>
 </body>
