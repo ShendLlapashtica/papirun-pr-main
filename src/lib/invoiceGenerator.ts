@@ -1,20 +1,7 @@
 import type { OrderRecord } from '@/lib/ordersApi';
 import logo from '@/assets/logo.png';
 
-const toDataUrl = (url: string): Promise<string> =>
-  fetch(url)
-    .then((r) => r.blob())
-    .then(
-      (b) =>
-        new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(b);
-        }),
-    );
-
-export const generateInvoice = async (order: OrderRecord) => {
+export const generateInvoice = (order: OrderRecord) => {
   const w = window.open('', '_blank');
   if (!w) return;
 
@@ -23,9 +10,8 @@ export const generateInvoice = async (order: OrderRecord) => {
   const timeStr = createdAt.toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' });
   const invoiceNum = `PAP-${order.id.slice(0, 8).toUpperCase()}`;
 
-  const logoUrl = `${window.location.origin}${logo}`;
-  let logoSrc = logoUrl;
-  try { logoSrc = await toDataUrl(logoUrl); } catch { /* fallback to URL */ }
+  // Vite may inline small assets as data: URLs or emit them as /assets/[hash].png
+  const logoSrc = logo.startsWith('data:') ? logo : `${window.location.origin}${logo}`;
 
   const etaText = order.prepEtaMinutes ? `~${order.prepEtaMinutes} min` : '—';
   const hasCoords = order.deliveryLat !== null && order.deliveryLng !== null;
