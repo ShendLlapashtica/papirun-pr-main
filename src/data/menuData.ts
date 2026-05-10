@@ -7,12 +7,12 @@ import superMixSalad from '@/assets/menu/super-mix-salad.png';
 import falafel from '@/assets/menu/falafel.png';
 import coldChickenSalad from '@/assets/menu/cold-chicken-salad.png';
 import grillChickenSalad from '@/assets/menu/grill-chicken-salad.png';
-import mozzarella from '@/assets/menu/mozzarella.png';
+const mozzarella = '';
 import chickenPesto from '@/assets/menu/chicken-pesto.png';
-import tuna from '@/assets/menu/tuna.png';
-import roastBeef from '@/assets/menu/roast-beef.png';
+const tuna = '';
+const roastBeef = '';
 import coldChicken from '@/assets/menu/cold-chicken.png';
-import veggie from '@/assets/menu/veggie.png';
+const veggie = '';
 
 import reviewPhoto1 from '@/assets/reviews/review-photo-1.jpg';
 import reviewMarigona1 from '@/assets/reviews/review-marigona-1.jpg';
