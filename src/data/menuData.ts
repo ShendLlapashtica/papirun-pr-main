@@ -31,6 +31,7 @@ export interface OfferItem {
   description: string;
   price: number;
   image: string;
+  images?: string[];
   includes: string[];
 }
 

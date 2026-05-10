@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
-import { ArrowLeft, Check, Clock, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Check, Clock, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveVisibleOffers, useOfferBadgeText } from '@/hooks/useLiveStorefrontData';
 import Header from '@/components/Header';
@@ -22,9 +22,11 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
   const { language } = useLanguage();
   const { offers } = useLiveVisibleOffers();
   const badgeText = useOfferBadgeText();
+  const [imgIdx, setImgIdx] = useState(0);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    setImgIdx(0);
   }, [id]);
 
   const offer = offers.find((o) => o.id === id);
@@ -42,8 +44,10 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
     );
   }
 
+  const images = offer.images?.length ? offer.images : (offer.image ? [offer.image] : []);
+  const hasImages = images.length > 0;
   const time = extractTime(offer.description);
-  const hasImage = !!offer.image;
+  const safeIdx = Math.min(imgIdx, images.length - 1);
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,14 +64,57 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
           </button>
 
           <div className="grid lg:grid-cols-2 gap-6 sm:gap-10 lg:gap-16 items-start max-w-5xl mx-auto">
-            {/* Offer Image or styled card */}
+            {/* Offer Image carousel or styled card */}
             <div className="rounded-3xl overflow-hidden shadow-card">
-              {hasImage ? (
-                <img
-                  src={getOptimizedImage(offer.image)}
-                  alt={offer.title}
-                  className="w-full h-auto object-contain bg-white"
-                />
+              {hasImages ? (
+                <div className="relative">
+                  <img
+                    src={getOptimizedImage(images[safeIdx])}
+                    alt={`${offer.title} — foto ${safeIdx + 1}`}
+                    className="w-full h-auto object-contain bg-white"
+                  />
+                  {images.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setImgIdx((i) => (i - 1 + images.length) % images.length)}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                        aria-label="Foto e mëparshme"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => setImgIdx((i) => (i + 1) % images.length)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                        aria-label="Foto tjetër"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                      {/* Dot indicators */}
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        {images.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setImgIdx(i)}
+                            className={`w-2 h-2 rounded-full transition-all ${i === safeIdx ? 'bg-white scale-125' : 'bg-white/50'}`}
+                            aria-label={`Foto ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                      {/* Thumbnail strip */}
+                      <div className="flex gap-1.5 p-2 bg-black/10 overflow-x-auto">
+                        {images.map((url, i) => (
+                          <button
+                            key={url}
+                            onClick={() => setImgIdx(i)}
+                            className={`shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${i === safeIdx ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                          >
+                            <img src={getOptimizedImage(url)} alt="" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : (
                 <div
                   className={`aspect-[9/16] flex flex-col justify-between p-8 ${

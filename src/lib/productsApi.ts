@@ -19,6 +19,8 @@ export {
   upsertStorefrontOffer,
   upsertStorefrontSetting,
   uploadStorefrontOfferImage,
+  addStorefrontOfferImage,
+  removeStorefrontOfferImage,
 } from '@/lib/storefrontApi';
 
 const PRODUCTS_TABLE = 'products';

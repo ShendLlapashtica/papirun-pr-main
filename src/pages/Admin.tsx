@@ -34,7 +34,8 @@ import {
   upsertStorefrontOffer,
   upsertStorefrontSetting,
   uploadProductImage,
-  uploadStorefrontOfferImage,
+  addStorefrontOfferImage,
+  removeStorefrontOfferImage,
   updateProductSortOrder,
 } from '@/lib/productsApi';
 import { getOptimizedImage } from '@/lib/utils';
@@ -430,6 +431,7 @@ const Admin = () => {
   const offerFileRef = useRef<HTMLInputElement>(null);
   const [uploadingOfferId, setUploadingOfferId] = useState<string | null>(null);
   const [dragOverOfferId, setDragOverOfferId] = useState<string | null>(null);
+  const [deletingOfferImageKey, setDeletingOfferImageKey] = useState<string | null>(null);
   const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(null);
   const [confirmDeleteOfferId, setConfirmDeleteOfferId] = useState<string | null>(null);
 
@@ -726,6 +728,49 @@ const Admin = () => {
     } catch (error) {
       console.error('Failed to delete offer:', error);
       setOffers(previousOffers);
+    }
+  };
+
+  const handleAddOfferImages = async (targetOfferId: string, files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (!fileArray.length) return;
+    setUploadingOfferId(targetOfferId);
+    try {
+      for (const file of fileArray) {
+        const url = await addStorefrontOfferImage(file, targetOfferId);
+        setOffers((prev) => {
+          const target = prev.find((o) => o.id === targetOfferId);
+          if (!target) return prev;
+          const imgs = [...(target.images?.length ? target.images : target.image ? [target.image] : []), url];
+          handleUpdateStorefrontOffer(targetOfferId, { image: imgs[0], images: imgs }).catch(console.error);
+          return prev.map((o) => (o.id === targetOfferId ? { ...o, image: imgs[0], images: imgs } : o));
+        });
+      }
+    } catch (err) {
+      console.error('Image upload failed:', err);
+      toast.error('Ngarkimi i fotos dështoi');
+    } finally {
+      setUploadingOfferId(null);
+    }
+  };
+
+  const handleDeleteOfferImage = async (targetOfferId: string, imgUrl: string) => {
+    setDeletingOfferImageKey(`${targetOfferId}:${imgUrl}`);
+    try {
+      await removeStorefrontOfferImage(imgUrl);
+      setOffers((prev) => {
+        const target = prev.find((o) => o.id === targetOfferId);
+        if (!target) return prev;
+        const imgs = (target.images?.length ? target.images : target.image ? [target.image] : []).filter((u) => u !== imgUrl);
+        handleUpdateStorefrontOffer(targetOfferId, { image: imgs[0] ?? '', images: imgs }).catch(console.error);
+        return prev.map((o) => (o.id === targetOfferId ? { ...o, image: imgs[0] ?? '', images: imgs } : o));
+      });
+      toast.success('Foto u fshi');
+    } catch (err) {
+      console.error('Image delete failed:', err);
+      toast.error('Fshirja dështoi');
+    } finally {
+      setDeletingOfferImageKey(null);
     }
   };
 
@@ -1297,22 +1342,12 @@ const Admin = () => {
               ref={offerFileRef}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file && uploadingOfferId) {
-                  const oldUrl = offers.find((o) => o.id === uploadingOfferId)?.image || '';
-                  uploadStorefrontOfferImage(file, uploadingOfferId, oldUrl)
-                    .then(async (publicUrl) => {
-                      setOffers((prev) => prev.map((o) => (o.id === uploadingOfferId ? { ...o, image: publicUrl } : o)));
-                      await handleUpdateStorefrontOffer(uploadingOfferId, { image: publicUrl });
-                    })
-                    .catch((error) => {
-                      console.error('Offer image upload failed:', error);
-                    })
-                    .finally(() => {
-                      setUploadingOfferId(null);
-                    });
+                const files = e.target.files;
+                if (files?.length && uploadingOfferId) {
+                  handleAddOfferImages(uploadingOfferId, files);
                 }
                 e.target.value = '';
               }}
@@ -1409,20 +1444,7 @@ const Admin = () => {
                 const isUploading = uploadingOfferId === offer.id;
                 const isDragOver = dragOverOfferId === offer.id;
 
-                const applyOfferFile = async (file: File) => {
-                  if (!file.type.startsWith('image/')) return;
-                  setUploadingOfferId(offer.id);
-                  try {
-                    const oldUrl = offer.image || '';
-                    const publicUrl = await uploadStorefrontOfferImage(file, offer.id, oldUrl);
-                    setOffers((prev) => prev.map((o) => (o.id === offer.id ? { ...o, image: publicUrl } : o)));
-                    await handleUpdateStorefrontOffer(offer.id, { image: publicUrl });
-                  } catch (err) {
-                    console.error('Offer image upload failed:', err);
-                  } finally {
-                    setUploadingOfferId(null);
-                  }
-                };
+                const currentImages = offer.images?.length ? offer.images : (offer.image ? [offer.image] : []);
 
                 return (
                   <div
@@ -1436,55 +1458,76 @@ const Admin = () => {
                         if (item.type.startsWith('image/')) {
                           e.preventDefault();
                           const file = item.getAsFile();
-                          if (file) applyOfferFile(file);
+                          if (file) handleAddOfferImages(offer.id, [file]);
                           break;
                         }
                       }
                     }}
                   >
-                    {/* Image area — click / drag-drop */}
-                    <button
-                      type="button"
-                      onClick={() => { setUploadingOfferId(offer.id); offerFileRef.current?.click(); }}
-                      onDragOver={(e) => { e.preventDefault(); setDragOverOfferId(offer.id); }}
-                      onDragEnter={(e) => { e.preventDefault(); setDragOverOfferId(offer.id); }}
-                      onDragLeave={() => setDragOverOfferId(null)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setDragOverOfferId(null);
-                        const file = e.dataTransfer.files?.[0];
-                        if (file) applyOfferFile(file);
-                      }}
-                      className={`relative w-full block group transition-all ${isDragOver ? 'ring-4 ring-primary ring-inset' : ''}`}
-                      title="Kliko, drag-drop ose Ctrl+V për të ngarkuar foto"
-                    >
-                      {offer.image ? (
-                        <img
-                          src={getOptimizedImage(offer.image)}
-                          alt={offer.title}
-                          className="w-full max-h-64 object-contain bg-secondary"
-                        />
-                      ) : (
-                        <div className={`w-full h-40 flex flex-col items-center justify-center gap-2 transition-colors ${isDragOver ? 'bg-primary/10' : 'bg-secondary'}`}>
-                          <Upload className={`w-8 h-8 ${isDragOver ? 'text-primary' : 'text-muted-foreground'}`} />
-                          <span className={`text-xs font-medium ${isDragOver ? 'text-primary' : 'text-muted-foreground'}`}>
-                            {isDragOver ? 'Lësho për të ngarkuar' : 'Kliko · Drag & Drop · Ctrl+V'}
-                          </span>
-                        </div>
-                      )}
-                      {/* Hover/drag overlay */}
-                      <div className={`absolute inset-0 flex items-center justify-center transition-all ${isDragOver ? 'bg-primary/20' : 'bg-black/0 group-hover:bg-black/30'}`}>
-                        <div className={`bg-white/90 rounded-full px-4 py-2 flex items-center gap-2 text-sm font-semibold text-gray-800 shadow-lg transition-opacity ${isDragOver ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                          {isUploading ? (
-                            <span className="animate-pulse">Duke ngarkuar...</span>
-                          ) : isDragOver ? (
-                            <><Upload className="w-4 h-4" /> Lësho foton</>
-                          ) : (
-                            <><Upload className="w-4 h-4" /> {offer.image ? 'Ndrysho foton' : 'Ngarko foton'}</>
-                          )}
-                        </div>
-                      </div>
-                    </button>
+                    {/* Multi-image gallery strip */}
+                    <div className="flex gap-2 overflow-x-auto p-3 bg-secondary/40 scrollbar-thin">
+                      {currentImages.map((imgUrl, idx) => {
+                        const isDeleting = deletingOfferImageKey === `${offer.id}:${imgUrl}`;
+                        return (
+                          <div key={imgUrl} className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden group border border-border">
+                            <img
+                              src={getOptimizedImage(imgUrl)}
+                              alt={`${offer.title} foto ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteOfferImage(offer.id, imgUrl)}
+                              disabled={isDeleting}
+                              className="absolute top-1 right-1 bg-black/70 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                              title="Fshi foton"
+                            >
+                              {isDeleting
+                                ? <span className="w-3.5 h-3.5 block border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                : <X className="w-3.5 h-3.5" />
+                              }
+                            </button>
+                            {idx === 0 && currentImages.length > 1 && (
+                              <span className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] font-bold px-1 rounded">kryesore</span>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* Add photo button */}
+                      <button
+                        type="button"
+                        onClick={() => { setUploadingOfferId(offer.id); offerFileRef.current?.click(); }}
+                        onDragOver={(e) => { e.preventDefault(); setDragOverOfferId(offer.id); }}
+                        onDragEnter={(e) => { e.preventDefault(); setDragOverOfferId(offer.id); }}
+                        onDragLeave={() => setDragOverOfferId(null)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragOverOfferId(null);
+                          if (e.dataTransfer.files?.length) handleAddOfferImages(offer.id, e.dataTransfer.files);
+                        }}
+                        className={`shrink-0 w-24 h-24 rounded-xl flex flex-col items-center justify-center gap-1 transition-all border-2 border-dashed ${
+                          isDragOver
+                            ? 'border-primary bg-primary/10'
+                            : 'border-muted-foreground/30 bg-secondary hover:border-primary hover:bg-primary/5'
+                        }`}
+                        title="Shto foto — kliko, drag-drop ose Ctrl+V"
+                      >
+                        {isUploading ? (
+                          <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        ) : isDragOver ? (
+                          <>
+                            <Upload className="w-5 h-5 text-primary" />
+                            <span className="text-[10px] text-primary font-medium">Lësho</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-5 h-5 text-muted-foreground" />
+                            <span className="text-[10px] text-muted-foreground">Shto foto</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
 
                     {/* Card body */}
                     <div className="p-4">

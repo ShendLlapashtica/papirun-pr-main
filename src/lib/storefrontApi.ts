@@ -26,6 +26,7 @@ type StorefrontOfferRow = {
   description: string;
   price: number;
   image_url: string;
+  image_urls: string[];
   includes: string[];
   is_active: boolean;
   sort_order: number;
@@ -68,27 +69,35 @@ const normalizeOffer = (offer: OfferItem, index = 0): StorefrontOffer => ({
   sortOrder: index,
 });
 
-const mapRowToOffer = (row: StorefrontOfferRow): StorefrontOffer => ({
-  id: row.id,
-  title: row.title,
-  description: row.description,
-  price: Number(row.price),
-  image: row.image_url,
-  includes: row.includes ?? [],
-  isActive: row.is_active,
-  sortOrder: row.sort_order,
-});
+const mapRowToOffer = (row: StorefrontOfferRow): StorefrontOffer => {
+  const images = row.image_urls?.length ? row.image_urls : (row.image_url ? [row.image_url] : []);
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    price: Number(row.price),
+    image: images[0] ?? '',
+    images,
+    includes: row.includes ?? [],
+    isActive: row.is_active,
+    sortOrder: row.sort_order,
+  };
+};
 
-const mapOfferToRow = (offer: OfferItem | StorefrontOffer, fallbackSortOrder = 0) => ({
-  id: offer.id,
-  title: offer.title,
-  description: offer.description,
-  price: offer.price,
-  image_url: offer.image,
-  includes: offer.includes ?? [],
-  is_active: 'isActive' in offer ? offer.isActive : true,
-  sort_order: 'sortOrder' in offer ? offer.sortOrder : fallbackSortOrder,
-});
+const mapOfferToRow = (offer: OfferItem | StorefrontOffer, fallbackSortOrder = 0) => {
+  const images = offer.images?.length ? offer.images : (offer.image ? [offer.image] : []);
+  return {
+    id: offer.id,
+    title: offer.title,
+    description: offer.description,
+    price: offer.price,
+    image_url: images[0] ?? offer.image ?? '',
+    image_urls: images,
+    includes: offer.includes ?? [],
+    is_active: 'isActive' in offer ? offer.isActive : true,
+    sort_order: 'sortOrder' in offer ? offer.sortOrder : fallbackSortOrder,
+  };
+};
 
 export const fetchStorefrontOffers = async (): Promise<StorefrontOffer[]> => {
   const client = supabase as any;
@@ -129,11 +138,16 @@ export const upsertStorefrontOffer = async (
 ) => {
   const client = supabase as any;
   const payload = mapOfferToRow(offer, fallbackSortOrder);
-  const { data, error } = await client
-    .from(STOREFRONT_OFFERS_TABLE)
-    .upsert(payload, { onConflict: 'id' })
-    .select('*')
-    .single();
+
+  const run = (p: typeof payload) =>
+    client.from(STOREFRONT_OFFERS_TABLE).upsert(p, { onConflict: 'id' }).select('*').single();
+
+  let { data, error } = await run(payload);
+
+  if (error?.code === '42703' && 'image_urls' in payload) {
+    const { image_urls: _removed, ...payloadWithout } = payload;
+    ({ data, error } = await run(payloadWithout as typeof payload));
+  }
 
   if (error) throw error;
   return mapRowToOffer(data as StorefrontOfferRow);
@@ -150,16 +164,24 @@ export const handleUpdateStorefrontOffer = async (
   if (typeof updates.description === 'string') payload.description = updates.description;
   if (typeof updates.price === 'number') payload.price = updates.price;
   if (typeof updates.image === 'string') payload.image_url = updates.image;
+  if (Array.isArray(updates.images)) {
+    payload.image_urls = updates.images;
+    if (!('image' in updates)) payload.image_url = updates.images[0] ?? '';
+  }
   if (Array.isArray(updates.includes)) payload.includes = updates.includes;
   if (typeof updates.isActive === 'boolean') payload.is_active = updates.isActive;
   if (typeof updates.sortOrder === 'number') payload.sort_order = updates.sortOrder;
 
-  const { data, error } = await client
-    .from(STOREFRONT_OFFERS_TABLE)
-    .update(payload)
-    .eq('id', id)
-    .select('*')
-    .single();
+  const run = (p: Record<string, unknown>) =>
+    client.from(STOREFRONT_OFFERS_TABLE).update(p).eq('id', id).select('*').single();
+
+  let { data, error } = await run(payload);
+
+  // If image_urls column doesn't exist yet (migration pending), retry without it
+  if (error?.code === '42703' && 'image_urls' in payload) {
+    const { image_urls: _removed, ...payloadWithout } = payload;
+    ({ data, error } = await run(payloadWithout));
+  }
 
   if (error) throw error;
   return mapRowToOffer(data as StorefrontOfferRow);
@@ -277,4 +299,22 @@ export const uploadStorefrontOfferImage = async (file: File, offerId: string, ol
 
   const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
   return data.publicUrl;
+};
+
+export const addStorefrontOfferImage = async (file: File, offerId: string): Promise<string> => {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `offers/${offerId}/${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(PRODUCT_IMAGE_BUCKET)
+    .upload(path, file, { upsert: false, contentType: file.type });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+};
+
+export const removeStorefrontOfferImage = async (imageUrl: string): Promise<void> => {
+  await deleteImageByUrl(imageUrl);
 };
