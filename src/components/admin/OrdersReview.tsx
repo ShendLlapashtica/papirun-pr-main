@@ -407,7 +407,7 @@ const OrdersReview = () => {
     catch { toast.error('Gabim'); }
   };
 
-  const handlePrint = (o: OrderRecord) => { generateInvoice(o); };
+  const handlePrint = (o: OrderRecord) => { void generateInvoice(o); };
 
   const openDrawer = (o: OrderRecord, mode: 'approve' | 'reject') => {
     setDrawerOrder(o);

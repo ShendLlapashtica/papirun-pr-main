@@ -1,7 +1,20 @@
 import type { OrderRecord } from '@/lib/ordersApi';
 import logo from '@/assets/logo.png';
 
-export const generateInvoice = (order: OrderRecord) => {
+const toDataUrl = (url: string): Promise<string> =>
+  fetch(url)
+    .then((r) => r.blob())
+    .then(
+      (b) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(b);
+        }),
+    );
+
+export const generateInvoice = async (order: OrderRecord) => {
   const w = window.open('', '_blank');
   if (!w) return;
 
@@ -11,6 +24,9 @@ export const generateInvoice = (order: OrderRecord) => {
   const invoiceNum = `PAP-${order.id.slice(0, 8).toUpperCase()}`;
 
   const logoUrl = `${window.location.origin}${logo}`;
+  let logoSrc = logoUrl;
+  try { logoSrc = await toDataUrl(logoUrl); } catch { /* fallback to URL */ }
+
   const etaText = order.prepEtaMinutes ? `~${order.prepEtaMinutes} min` : '—';
   const hasCoords = order.deliveryLat !== null && order.deliveryLng !== null;
   const mapLink = hasCoords ? `https://www.google.com/maps?q=${order.deliveryLat},${order.deliveryLng}` : null;
@@ -37,44 +53,13 @@ export const generateInvoice = (order: OrderRecord) => {
     })
     .join('');
 
-  const emailTextLines = [
-    `FATURË ${invoiceNum} · Papirun`,
-    `────────────────────────────────`,
-    `Klienti : ${order.customerName || 'Anonim'}`,
-    `Telefoni: ${order.customerPhone || '—'}`,
-    `Data    : ${dateStr}, ${timeStr}`,
-    `Adresa  : ${order.deliveryAddress || '—'}`,
-    ``,
-    `ARTIKUJT:`,
-    ...order.items.map((it: any) => {
-      const name = it.name?.sq || it.name?.en || it.id;
-      const unitPrice = Number(it.price || 0);
-      const extrasTotal = (it.addedExtras || []).reduce((s: number, e: any) => s + Number(e.price || 0), 0);
-      const lineTotal = (it.quantity * (unitPrice + extrasTotal)).toFixed(2);
-      const mods: string[] = [];
-      if (it.removedIngredients?.length) mods.push(...it.removedIngredients.map((ing: string) => `Pa ${ing}`));
-      if (it.addedExtras?.length) mods.push(...it.addedExtras.map((e: any) => `+${e.name?.sq || e.id}`));
-      const modStr = mods.length ? ` (${mods.join(', ')})` : '';
-      return `  ${it.quantity}× ${name}${modStr}  →  €${lineTotal}`;
-    }),
-    ``,
-    `Nëntotali : €${order.subtotal.toFixed(2)}`,
-    `Dërgesa   : ${order.deliveryFee > 0 ? `€${order.deliveryFee.toFixed(2)}` : 'Falas'}`,
-    `────────────────────────────────`,
-    `TOTALI    : €${order.total.toFixed(2)}`,
-    ...(order.notes ? [``, `Shënim: ${order.notes}`] : []),
-    ``,
-    `Papirun · papirun.net`,
-    `📞 +383 45 262 323`,
-  ];
-  const emailText = emailTextLines.join('\n');
-
   const html = `<!DOCTYPE html>
 <html lang="sq">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Faturë ${invoiceNum} · Papirun</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     *{margin:0;padding:0;box-sizing:border-box}
@@ -133,11 +118,13 @@ export const generateInvoice = (order: OrderRecord) => {
 
     /* Action buttons */
     .print-row{text-align:center;margin-top:20px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
-    .print-btn{background:linear-gradient(135deg,#5a7a5f,#749d79);color:#fff;border:none;padding:12px 28px;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(90,122,95,0.4);font-family:inherit}
+    .btn{padding:12px 28px;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;border:none;transition:all .2s}
+    .print-btn{background:linear-gradient(135deg,#5a7a5f,#749d79);color:#fff;box-shadow:0 4px 14px rgba(90,122,95,0.4)}
     .print-btn:hover{opacity:0.92}
-    .copy-btn{background:#fff;color:#1a1a1a;border:2px solid #e0e0e0;padding:12px 28px;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
-    .copy-btn:hover{border-color:#5a7a5f;color:#5a7a5f}
+    .copy-btn{background:#fff;color:#1a1a1a;border:2px solid #e0e0e0}
+    .copy-btn:hover:not(:disabled){border-color:#5a7a5f;color:#5a7a5f}
     .copy-btn.copied{background:#5a7a5f;color:#fff;border-color:#5a7a5f}
+    .copy-btn:disabled{opacity:0.6;cursor:wait}
 
     @media print{
       body{background:#fff;padding:0}
@@ -149,10 +136,10 @@ export const generateInvoice = (order: OrderRecord) => {
 </head>
 <body>
 <div class="page">
-  <div class="card">
+  <div class="card" id="invoiceCard">
     <div class="header">
       <div class="logo-row">
-        <img src="${logoUrl}" alt="Papirun" class="logo-img">
+        <img src="${logoSrc}" alt="Papirun" class="logo-img">
         <div>
           <div class="brand-name">Papirun</div>
           <div class="brand-sub">Fresh · Healthy · Prishtinë</div>
@@ -246,29 +233,59 @@ export const generateInvoice = (order: OrderRecord) => {
   </div>
 
   <div class="print-row">
-    <button class="print-btn" onclick="window.print()">🖨 Printo Faturën</button>
-    <button class="copy-btn" id="copyBtn" onclick="
-      const text = ${JSON.stringify(emailText)};
-      navigator.clipboard.writeText(text).then(function(){
-        var btn = document.getElementById('copyBtn');
-        btn.textContent = '✓ U kopjua!';
-        btn.classList.add('copied');
-        setTimeout(function(){ btn.textContent = '📋 Kopjo për Email'; btn.classList.remove('copied'); }, 2500);
-      }).catch(function(){
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        var btn = document.getElementById('copyBtn');
-        btn.textContent = '✓ U kopjua!';
-        btn.classList.add('copied');
-        setTimeout(function(){ btn.textContent = '📋 Kopjo për Email'; btn.classList.remove('copied'); }, 2500);
-      });
-    ">📋 Kopjo për Email</button>
+    <button class="btn print-btn" onclick="window.print()">🖨 Printo Faturën</button>
+    <button class="btn copy-btn" id="copyBtn" onclick="copyInvoiceImage()">📷 Kopjo si Foto</button>
   </div>
 </div>
+
+<script>
+function copyInvoiceImage() {
+  var btn = document.getElementById('copyBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Duke procesuar...';
+
+  html2canvas(document.getElementById('invoiceCard'), {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false
+  }).then(function(canvas) {
+    canvas.toBlob(function(blob) {
+      if (!blob) { fallbackDownload(canvas, btn); return; }
+      var item = new ClipboardItem({ 'image/png': blob });
+      navigator.clipboard.write([item]).then(function() {
+        btn.textContent = '✓ Foto u kopjua!';
+        btn.classList.add('copied');
+        btn.disabled = false;
+        setTimeout(function() {
+          btn.textContent = '📷 Kopjo si Foto';
+          btn.classList.remove('copied');
+        }, 3000);
+      }).catch(function() {
+        fallbackDownload(canvas, btn);
+      });
+    }, 'image/png');
+  }).catch(function(err) {
+    console.error(err);
+    btn.textContent = '📷 Kopjo si Foto';
+    btn.disabled = false;
+  });
+}
+
+function fallbackDownload(canvas, btn) {
+  var link = document.createElement('a');
+  link.download = 'fature-papirun-${invoiceNum}.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  btn.textContent = '✓ Foto u shkarkua!';
+  btn.classList.add('copied');
+  btn.disabled = false;
+  setTimeout(function() {
+    btn.textContent = '📷 Kopjo si Foto';
+    btn.classList.remove('copied');
+  }, 3000);
+}
+<\/script>
 </body>
 </html>`;
 
