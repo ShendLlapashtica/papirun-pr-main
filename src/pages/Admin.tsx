@@ -736,16 +736,17 @@ const Admin = () => {
     if (!fileArray.length) return;
     setUploadingOfferId(targetOfferId);
     try {
+      const newUrls: string[] = [];
       for (const file of fileArray) {
         const url = await addStorefrontOfferImage(file, targetOfferId);
-        setOffers((prev) => {
-          const target = prev.find((o) => o.id === targetOfferId);
-          if (!target) return prev;
-          const imgs = [...(target.images?.length ? target.images : target.image ? [target.image] : []), url];
-          handleUpdateStorefrontOffer(targetOfferId, { image: imgs[0], images: imgs }).catch(console.error);
-          return prev.map((o) => (o.id === targetOfferId ? { ...o, image: imgs[0], images: imgs } : o));
-        });
+        newUrls.push(url);
       }
+      const currentOffer = offers.find((o) => o.id === targetOfferId);
+      if (!currentOffer) return;
+      const existing = currentOffer.images?.length ? currentOffer.images : (currentOffer.image ? [currentOffer.image] : []);
+      const imgs = [...existing, ...newUrls];
+      await handleUpdateStorefrontOffer(targetOfferId, { image: imgs[0], images: imgs });
+      setOffers((prev) => prev.map((o) => (o.id === targetOfferId ? { ...o, image: imgs[0], images: imgs } : o)));
     } catch (err) {
       console.error('Image upload failed:', err);
       toast.error('Ngarkimi i fotos dështoi');
@@ -758,13 +759,12 @@ const Admin = () => {
     setDeletingOfferImageKey(`${targetOfferId}:${imgUrl}`);
     try {
       await removeStorefrontOfferImage(imgUrl);
-      setOffers((prev) => {
-        const target = prev.find((o) => o.id === targetOfferId);
-        if (!target) return prev;
-        const imgs = (target.images?.length ? target.images : target.image ? [target.image] : []).filter((u) => u !== imgUrl);
-        handleUpdateStorefrontOffer(targetOfferId, { image: imgs[0] ?? '', images: imgs }).catch(console.error);
-        return prev.map((o) => (o.id === targetOfferId ? { ...o, image: imgs[0] ?? '', images: imgs } : o));
-      });
+      const currentOffer = offers.find((o) => o.id === targetOfferId);
+      if (!currentOffer) return;
+      const existing = currentOffer.images?.length ? currentOffer.images : (currentOffer.image ? [currentOffer.image] : []);
+      const imgs = existing.filter((u) => u !== imgUrl);
+      await handleUpdateStorefrontOffer(targetOfferId, { image: imgs[0] ?? '', images: imgs });
+      setOffers((prev) => prev.map((o) => (o.id === targetOfferId ? { ...o, image: imgs[0] ?? '', images: imgs } : o)));
       toast.success('Foto u fshi');
     } catch (err) {
       console.error('Image delete failed:', err);

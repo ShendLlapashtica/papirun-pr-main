@@ -285,11 +285,10 @@ const deleteImageByUrl = async (imageUrl: string): Promise<void> => {
 };
 
 export const uploadStorefrontOfferImage = async (file: File, offerId: string, oldImageUrl?: string) => {
-  // Hard-delete the old image immediately before uploading the new one
   if (oldImageUrl) await deleteImageByUrl(oldImageUrl);
 
   const ext = file.name.split('.').pop() || 'jpg';
-  const path = `offers/${offerId}/${Date.now()}.${ext}`;
+  const path = `${offerId}/${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGE_BUCKET)
@@ -303,7 +302,7 @@ export const uploadStorefrontOfferImage = async (file: File, offerId: string, ol
 
 export const addStorefrontOfferImage = async (file: File, offerId: string): Promise<string> => {
   const ext = file.name.split('.').pop() || 'jpg';
-  const path = `offers/${offerId}/${Date.now()}.${ext}`;
+  const path = `${offerId}/${Date.now()}.${ext}`;
 
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGE_BUCKET)
