@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useLiveVisibleOffers, useOfferBadgeText } from '@/hooks/useLiveStorefrontData';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { getOptimizedImage } from '@/lib/utils';
 import type { StorefrontOffer } from '@/lib/productsApi';
 
@@ -65,6 +66,7 @@ function StyledOfferCard({ offer }: { offer: StorefrontOffer }) {
 
 const OfertaRamazani = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { offers, isLoading } = useLiveVisibleOffers();
   const badgeText = useOfferBadgeText();
 
@@ -77,7 +79,7 @@ const OfertaRamazani = () => {
         {/* Section header */}
         <div className="text-center mb-5 sm:mb-8 space-y-3">
           <h2 className="font-display font-bold text-2xl sm:text-3xl lg:text-4xl">
-            Oferta
+            {t.offers.title}
           </h2>
           {/* Outstanding location badge */}
           <div className="inline-flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm sm:text-base shadow-lg shadow-red-600/30 ring-2 ring-red-500/40">

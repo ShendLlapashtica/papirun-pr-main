@@ -84,6 +84,7 @@ export const textLabels: Record<string, string> = {
   'tray.emptySubtext': 'Shporta — Nenteksti bosh',
   'tray.total': 'Shporta — Totali',
   'tray.checkout': 'Shporta — Porosit',
+  'offers.title': 'Ofertat — Titulli i seksionit',
   'reviews.title': 'Recensione — Titulli',
   'reviews.subtitle': 'Recensione — Nentitulli',
   'location.title': 'Lokacioni — Titulli',

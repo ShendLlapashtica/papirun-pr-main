@@ -48,6 +48,9 @@ interface Translations {
     total: string;
     checkout: string;
   };
+  offers: {
+    title: string;
+  };
   reviews: {
     title: string;
     subtitle: string;
@@ -122,6 +125,9 @@ const translations: Record<Language, Translations> = {
       total: 'Totali',
       checkout: 'Porosit',
     },
+    offers: {
+      title: 'Oferta',
+    },
     reviews: {
       title: 'Çfare thonë klientet tanë',
       subtitle: 'Recensione nga dashamirësit e Papirun',
@@ -193,6 +199,9 @@ const translations: Record<Language, Translations> = {
       emptySubtext: 'Add some crunchy goodness!',
       total: 'Total',
       checkout: 'Checkout',
+    },
+    offers: {
+      title: 'Offers',
     },
     reviews: {
       title: 'What Our Customers Say',
