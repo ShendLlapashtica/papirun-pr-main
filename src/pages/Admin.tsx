@@ -182,39 +182,8 @@ const SiteTextsEditor = ({ language }: { language: Language }) => {
   );
 };
 
-const ADMIN_AUTH_KEY = 'papirun_admin_session';
-const LOCKOUT_KEY = 'papirun_admin_lockout';
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000; // 15 min
-
-interface LockoutState { attempts: number; lockedUntil: number | null }
-
-function getLockout(): LockoutState {
-  try { return JSON.parse(sessionStorage.getItem(LOCKOUT_KEY) || '{}'); } catch { return { attempts: 0, lockedUntil: null }; }
-}
-function setLockout(s: LockoutState) {
-  try { sessionStorage.setItem(LOCKOUT_KEY, JSON.stringify(s)); } catch {}
-}
-function clearLockout() {
-  try { sessionStorage.removeItem(LOCKOUT_KEY); } catch {}
-}
-
-async function pbkdf2Hash(password: string, saltHex: string, iterations: number): Promise<string> {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const saltBytes = new Uint8Array(saltHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: saltBytes, iterations, hash: 'SHA-256' }, keyMaterial, 256);
-  return Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function verifyAdminPassword(password: string): Promise<boolean> {
-  const client = supabase as any;
-  const { data } = await client.from('storefront_settings').select('value_json').eq('key', 'admin_credential').maybeSingle();
-  if (!data?.value_json) return false;
-  const { salt, hash, iterations } = data.value_json as { salt: string; hash: string; iterations: number };
-  const derived = await pbkdf2Hash(password, salt, iterations || 100000);
-  return derived === hash;
-}
+const ADMIN_PASSWORD = 'Pass123.';
+const ADMIN_AUTH_KEY = 'papirun_admin_authed';
 
 // ---- Drivers Manager ----
 const DriversManager = () => {
@@ -440,7 +409,7 @@ const CAT_STYLES = {
 
 const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    try { return !!sessionStorage.getItem(ADMIN_AUTH_KEY); } catch { return false; }
+    try { return localStorage.getItem(ADMIN_AUTH_KEY) === '1'; } catch { return false; }
   });
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -543,35 +512,14 @@ const Admin = () => {
     };
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const lockout = getLockout();
-    if (lockout.lockedUntil && Date.now() < lockout.lockedUntil) {
-      const mins = Math.ceil((lockout.lockedUntil - Date.now()) / 60000);
-      setError(`Shumë përpjekje. Provo sërish pas ${mins} min.`);
-      return;
-    }
-    setError('');
-    try {
-      const ok = await verifyAdminPassword(password);
-      if (ok) {
-        clearLockout();
-        const token = crypto.randomUUID();
-        try { sessionStorage.setItem(ADMIN_AUTH_KEY, token); } catch {}
-        setIsAuthenticated(true);
-      } else {
-        const attempts = (lockout.attempts || 0) + 1;
-        const lockedUntil = attempts >= MAX_ATTEMPTS ? Date.now() + LOCKOUT_MS : null;
-        setLockout({ attempts, lockedUntil });
-        const remaining = MAX_ATTEMPTS - attempts;
-        if (lockedUntil) {
-          setError('Llogaria u bllokua 15 min pas shumë përpjekjeve.');
-        } else {
-          setError(`Fjalëkalim i gabuar. ${remaining} përpjekje të mbetura.`);
-        }
-      }
-    } catch {
-      setError('Gabim në lidhje. Provo sërish.');
+    if (password === ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+      try { localStorage.setItem(ADMIN_AUTH_KEY, '1'); } catch {}
+      setError('');
+    } else {
+      setError(language === 'sq' ? 'Fjalekalimi i gabuar' : 'Wrong password');
     }
   };
 
@@ -886,7 +834,7 @@ const Admin = () => {
           <button
             onClick={() => {
               setIsAuthenticated(false);
-              try { sessionStorage.removeItem(ADMIN_AUTH_KEY); } catch {}
+              try { localStorage.removeItem(ADMIN_AUTH_KEY); } catch {}
             }}
             className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
           >

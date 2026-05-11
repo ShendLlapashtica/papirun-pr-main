@@ -34,8 +34,6 @@ const SENDER_LABEL: Record<MessageSender, string> = {
 
 // Temp ID prefix for optimistic messages — deduplication checks for this
 const OPTIMISTIC_PREFIX = 'opt-';
-const MAX_MSG_LENGTH = 500;
-const MIN_SEND_INTERVAL_MS = 1000; // 1 message per second max
 
 const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64', allowDelete, onMessagesCountChange }: Props) => {
   const { language } = useLanguage();
@@ -46,7 +44,6 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const [showReplies, setShowReplies] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const lastSentAt = useRef<number>(0);
 
   useEffect(() => {
     let active = true;
@@ -111,11 +108,8 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
   };
 
   const handleSend = async (override?: string) => {
-    const body = (override ?? text).trim().slice(0, MAX_MSG_LENGTH);
+    const body = (override ?? text).trim();
     if (!body || sending || disabled) return;
-    const now = Date.now();
-    if (now - lastSentAt.current < MIN_SEND_INTERVAL_MS) return;
-    lastSentAt.current = now;
 
     // Optimistic insert — sender sees message immediately, no waiting for server
     const tempId = `${OPTIMISTIC_PREFIX}${Date.now()}`;
@@ -270,7 +264,7 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
             <input
               type="text"
               value={text}
-              onChange={(e) => setText(e.target.value.slice(0, MAX_MSG_LENGTH))}
+              onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               placeholder={placeholder}
               className="flex-1 bg-secondary rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
