@@ -112,7 +112,6 @@ const DriverPanel = () => {
         const mapped = (raw as any[]).map(mapOrderRow);
         setOrders(mapped);
 
-        // Play krring when a NEW order arrives
         const activeCount = mapped.filter((o) => !['completed', 'rejected'].includes(o.status)).length;
         if (activeCount > prevOrderCountRef.current && prevOrderCountRef.current >= 0) {
           playKrring();
@@ -123,9 +122,9 @@ const DriverPanel = () => {
       }
     };
     sync();
+    // Realtime handles live updates — no polling needed
     const unsub = subscribeDriverOrdersRealtime(driver.id, sync);
-    const poll = setInterval(sync, 4000);
-    return () => { active = false; unsub(); clearInterval(poll); };
+    return () => { active = false; unsub(); };
   }, [driver]);
 
   // Keep driverRef in sync so watchPosition callbacks always see the latest driver
@@ -144,23 +143,30 @@ const DriverPanel = () => {
       toast.error('Geolokacioni nuk suportohet nga ky browser');
       return;
     }
-    if (watchIdRef.current !== null) return; // already watching
+    if (watchIdRef.current !== null) return;
+
+    // Throttle location writes to Supabase — at most once every 30 seconds
+    let lastWriteAt = 0;
+
     const id = navigator.geolocation.watchPosition(
       async (pos) => {
         const d = driverRef.current;
         if (!d) return;
+        const now = Date.now();
+        if (now - lastWriteAt < 30_000) return; // skip if < 30s since last write
+        lastWriteAt = now;
         try {
           await updateDriverLocation(d.id, pos.coords.latitude, pos.coords.longitude);
           const updated = await fetchDriverById(d.id);
           if (updated) setDriver(updated);
         } catch {
-          // silent — will retry on next GPS tick
+          // silent — retries on next tick after 30s
         }
       },
       (err) => {
         if (err.code !== 3) toast.error('GPS: ' + err.message);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 8000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
     );
     watchIdRef.current = id;
     setIsTracking(true);

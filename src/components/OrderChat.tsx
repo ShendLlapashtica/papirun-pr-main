@@ -14,15 +14,10 @@ import { fetchQuickReplies, type QuickReply } from '@/lib/quickRepliesApi';
 
 interface Props {
   orderId: string;
-  /** 'user' = customer view, 'admin' = staff view, 'driver' = delivery driver view */
   viewerSide: MessageSender;
-  /** Disable input (e.g. when order is rejected/completed) */
   disabled?: boolean;
-  /** Compact height for embedding inside modals */
   maxHeightClass?: string;
-  /** When true (admin/driver), show a "delete chat" button */
   allowDelete?: boolean;
-  /** Notify parent when message count changes (used to hide chat for users) */
   onMessagesCountChange?: (count: number) => void;
 }
 
@@ -37,6 +32,9 @@ const SENDER_LABEL: Record<MessageSender, string> = {
   driver: 'Shofer',
 };
 
+// Temp ID prefix for optimistic messages — deduplication checks for this
+const OPTIMISTIC_PREFIX = 'opt-';
+
 const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64', allowDelete, onMessagesCountChange }: Props) => {
   const { language } = useLanguage();
   const [messages, setMessages] = useState<OrderMessage[]>([]);
@@ -50,46 +48,47 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
   useEffect(() => {
     let active = true;
     setLoading(true);
+
     fetchOrderMessages(orderId)
-      .then((rows) => { if (active) { setMessages(rows); setLoading(false); onMessagesCountChange?.(rows.length); } })
+      .then((rows) => {
+        if (!active) return;
+        setMessages(rows);
+        setLoading(false);
+        onMessagesCountChange?.(rows.length);
+      })
       .catch(() => { if (active) setLoading(false); });
 
     const unsub = subscribeOrderMessages(
       orderId,
+      // onInsert — deduplicate against optimistic messages by body+sender match
       (m) => {
         setMessages((prev) => {
+          // Already confirmed (same real id)
           if (prev.some((x) => x.id === m.id)) return prev;
-          const next = [...prev, m];
+          // Replace matching optimistic message (same body + sender) — avoids duplicate bubble
+          const optIdx = prev.findIndex(
+            (x) => x.id.startsWith(OPTIMISTIC_PREFIX) && x.sender === m.sender && x.message === m.message
+          );
+          const next = optIdx !== -1
+            ? prev.map((x, i) => (i === optIdx ? m : x))
+            : [...prev, m];
           onMessagesCountChange?.(next.length);
           return next;
         });
       },
+      // onDeleteAll — clear state directly, no refetch needed
       () => {
-        fetchOrderMessages(orderId).then((rows) => {
-          if (!active) return;
-          setMessages(rows);
-          onMessagesCountChange?.(rows.length);
-        }).catch(() => {});
+        if (!active) return;
+        setMessages([]);
+        onMessagesCountChange?.(0);
       },
     );
-
-    const syncMessages = () => {
-      fetchOrderMessages(orderId).then((rows) => {
-        if (!active) return;
-        setMessages((prev) => {
-          if (prev.length === rows.length && prev.every((m, i) => m.id === rows[i].id)) return prev;
-          onMessagesCountChange?.(rows.length);
-          return rows;
-        });
-      }).catch(() => {});
-    };
-    const poll = setInterval(syncMessages, 4000);
 
     if (viewerSide === 'admin') {
       fetchQuickReplies('chat').then((rows) => { if (active) setQuickReplies(rows); }).catch(() => {});
     }
 
-    return () => { active = false; unsub(); clearInterval(poll); };
+    return () => { active = false; unsub(); };
   }, [orderId]);
 
   useEffect(() => {
@@ -100,8 +99,7 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
     if (!window.confirm(language === 'sq' ? 'Fshi gjithë bisedën?' : 'Delete entire chat?')) return;
     try {
       await deleteOrderMessages(orderId);
-      setMessages([]);
-      onMessagesCountChange?.(0);
+      // State cleared by realtime onDeleteAll
       toast.success(language === 'sq' ? 'Biseda u fshi' : 'Chat deleted');
     } catch (e) {
       console.error(e);
@@ -112,13 +110,37 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
   const handleSend = async (override?: string) => {
     const body = (override ?? text).trim();
     if (!body || sending || disabled) return;
+
+    // Optimistic insert — sender sees message immediately, no waiting for server
+    const tempId = `${OPTIMISTIC_PREFIX}${Date.now()}`;
+    const optimistic: OrderMessage = {
+      id: tempId,
+      orderId,
+      sender: viewerSide,
+      message: body,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => {
+      const next = [...prev, optimistic];
+      onMessagesCountChange?.(next.length);
+      return next;
+    });
+    setText('');
+    setShowReplies(false);
     setSending(true);
+
     try {
       await sendOrderMessage(orderId, viewerSide, body);
-      setText('');
-      setShowReplies(false);
+      // Realtime INSERT will fire and replace the optimistic bubble via deduplication above
     } catch (e) {
       console.error(e);
+      // Roll back optimistic message on failure
+      setMessages((prev) => {
+        const next = prev.filter((m) => m.id !== tempId);
+        onMessagesCountChange?.(next.length);
+        return next;
+      });
+      setText(body);
       toast.error(language === 'sq' ? 'Mesazhi nuk u dërgua' : 'Message failed');
     } finally {
       setSending(false);
@@ -161,15 +183,15 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
           </div>
         )}
         {messages.map((m) => {
+          const isOptimistic = m.id.startsWith(OPTIMISTIC_PREFIX);
           const mine = m.sender === viewerSide;
           const isStockNote = m.sender === 'admin' && /pa\s*stok|nuk\s*ka(më)?|jasht[eë]\s*stok|out\s*of\s*stock|unavailable|s'ka|sosur/i.test(m.message);
 
-          // Determine bubble style
           let bubbleClass = '';
           let labelEl: JSX.Element | null = null;
 
           if (mine) {
-            bubbleClass = 'px-3 py-1.5 bg-primary text-primary-foreground rounded-br-sm';
+            bubbleClass = `px-3 py-1.5 bg-primary text-primary-foreground rounded-br-sm${isOptimistic ? ' opacity-70' : ''}`;
           } else if (m.sender === 'admin') {
             if (isStockNote) {
               bubbleClass = 'px-4 py-3 bg-amber-50 dark:bg-amber-500/10 text-foreground border border-amber-300/50 dark:border-amber-500/30 rounded-bl-sm shadow-sm';
@@ -193,7 +215,6 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
               );
             }
           } else {
-            // user message viewed by admin/driver
             bubbleClass = 'px-3 py-1.5 bg-background text-foreground rounded-bl-sm border border-border/40';
           }
 
@@ -202,7 +223,11 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
               <div className={`max-w-[80%] rounded-2xl text-sm ${bubbleClass}`}>
                 {labelEl}
                 <div className="whitespace-pre-wrap leading-snug">{m.message}</div>
-                <div className={`text-[9px] mt-0.5 ${mine ? 'opacity-80' : 'opacity-60'}`}>{formatTime(m.createdAt)}</div>
+                <div className={`text-[9px] mt-0.5 ${mine ? 'opacity-80' : 'opacity-60'}`}>
+                  {isOptimistic
+                    ? (language === 'sq' ? 'Duke dërguar…' : 'Sending…')
+                    : formatTime(m.createdAt)}
+                </div>
               </div>
             </div>
           );

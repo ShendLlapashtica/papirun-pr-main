@@ -92,13 +92,12 @@ const OrderTrackingPill = () => {
     };
 
     fetchIt();
-    const pollInterval = setInterval(fetchIt, 4000); // Polling fallback every 4s to guarantee spot-on updates
 
     const unsub = subscribeOrderRealtime(orderId, (updated) => {
       if (!active) return;
       setOrder(updated);
     });
-    return () => { active = false; clearInterval(pollInterval); unsub(); };
+    return () => { active = false; unsub(); };
   }, [orderId]);
 
   // Trigger rating form when order completes and has a driver

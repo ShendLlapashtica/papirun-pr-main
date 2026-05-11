@@ -118,8 +118,9 @@ export const subscribeOrderMessages = (
   onInsert: (m: OrderMessage) => void,
   onDeleteAll?: () => void,
 ) => {
+  // Stable channel name per orderId — no Math.random() to avoid duplicate channels on re-render
   const channel = supabase
-    .channel(`order-messages-${orderId}-${Math.random().toString(36).slice(2)}`)
+    .channel(`order-messages-${orderId}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: TABLE, filter: `order_id=eq.${orderId}` },
@@ -127,7 +128,8 @@ export const subscribeOrderMessages = (
     )
     .on(
       'postgres_changes',
-      { event: 'DELETE', schema: 'public', table: TABLE },
+      // Filter DELETE to this order — avoids firing on other orders' deletes
+      { event: 'DELETE', schema: 'public', table: TABLE, filter: `order_id=eq.${orderId}` },
       () => { onDeleteAll?.(); },
     )
     .subscribe();
