@@ -62,6 +62,9 @@ const STATUS_LABEL: Record<string, string> = {
 const DriverPanel = () => {
   const [driver, setDriver] = useState<DeliveryDriver | null>(null);
   const [username, setUsername] = useState('');
+  const [pin, setPin] = useState('');
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -85,20 +88,37 @@ const DriverPanel = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockedUntil && Date.now() < lockedUntil) {
+      const mins = Math.ceil((lockedUntil - Date.now()) / 60000);
+      setError(`Shumë përpjekje. Provo sërish pas ${mins} min.`);
+      return;
+    }
     setError('');
     try {
       const drivers = await fetchDrivers();
       const found = drivers.find(
-        (d) => d.phone.toLowerCase() === username.trim().toLowerCase() && d.isActive
+        (d) =>
+          d.phone.toLowerCase() === username.trim().toLowerCase() &&
+          d.pin === pin.trim() &&
+          d.isActive
       );
       if (found) {
+        setLoginAttempts(0);
+        setLockedUntil(null);
         setDriver(found);
         localStorage.setItem(DRIVER_SESSION_KEY, found.id);
       } else {
-        setError('Username i gabuar. Provo: driver1, driver2...');
+        const next = loginAttempts + 1;
+        setLoginAttempts(next);
+        if (next >= 5) {
+          setLockedUntil(Date.now() + 15 * 60 * 1000);
+          setError('Llogaria u bllokua 15 min pas shumë përpjekjeve.');
+        } else {
+          setError('Kredencialet janë të gabuara.');
+        }
       }
     } catch {
-      setError('Gabim në lidhje me bazën e të dhënave');
+      setError('Gabim në lidhje me bazën e të dhënave.');
     }
   };
 
@@ -207,17 +227,35 @@ const DriverPanel = () => {
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium mb-1.5">Username (p.sh. driver1)</label>
+              <label className="block text-xs font-medium mb-1.5">Username</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="driver1"
+                placeholder="emri juaj"
+                autoComplete="username"
+                className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5">PIN</label>
+              <input
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="••••"
+                autoComplete="current-password"
+                inputMode="numeric"
+                maxLength={10}
                 className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
             {error && <p className="text-destructive text-xs">{error}</p>}
-            <button type="submit" className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors">
+            <button
+              type="submit"
+              disabled={!!(lockedUntil && Date.now() < lockedUntil)}
+              className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Hyr
             </button>
           </form>

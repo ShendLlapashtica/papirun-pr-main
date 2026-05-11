@@ -98,11 +98,32 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
     }
     if (!isFormValid) return;
 
+    // Rate limit: max 3 orders per 10 minutes per session
+    const RL_KEY = 'papirun_order_rl';
+    const now = Date.now();
+    const WINDOW = 10 * 60 * 1000;
+    try {
+      const stored: number[] = JSON.parse(sessionStorage.getItem(RL_KEY) || '[]');
+      const recent = stored.filter((t) => now - t < WINDOW);
+      if (recent.length >= 3) {
+        toast.error(language === 'sq' ? 'Shumë porosi. Provo sërish pas disa minutash.' : 'Too many orders. Please wait a few minutes.', { duration: 5000 });
+        return;
+      }
+      recent.push(now);
+      sessionStorage.setItem(RL_KEY, JSON.stringify(recent));
+    } catch { /* sessionStorage unavailable — allow through */ }
+
+    // Sanitise inputs
+    const cleanName = formData.name.trim().slice(0, 100).replace(/[<>]/g, '');
+    const cleanPhone = formData.phone.trim().slice(0, 30).replace(/[^0-9+\-\s()]/g, '');
+    const cleanAddress = formData.address.trim().slice(0, 300).replace(/[<>]/g, '');
+    const cleanNotes = formData.notes.trim().slice(0, 500).replace(/[<>]/g, '');
+    if (!cleanName || !cleanPhone) return;
+
     // --- Optimistic UI: close modal & show pending overlay INSTANTLY ---
     const optimisticId = `optimistic-${Date.now()}`;
     setActiveOrderId(optimisticId);
     onSuccess();
-    const savedFormData = { ...formData };
     const savedPosition = selectedPosition;
     const savedItems = [...items];
     const savedTotal = total;
@@ -113,16 +134,16 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
     try {
       const order = await createOrder({
         userId: user?.id ?? null,
-        customerName: savedFormData.name.trim(),
-        customerPhone: savedFormData.phone.trim(),
-        deliveryAddress: savedFormData.address.trim(),
+        customerName: cleanName,
+        customerPhone: cleanPhone,
+        deliveryAddress: cleanAddress,
         deliveryLat: savedPosition?.[0] ?? null,
         deliveryLng: savedPosition?.[1] ?? null,
         items: savedItems,
         subtotal: savedTotal,
         deliveryFee: 0,
         total: savedTotal,
-        notes: savedFormData.notes.trim(),
+        notes: cleanNotes,
         source: detectOrderSource(),
       });
       // Replace optimistic ID with real server ID
@@ -131,12 +152,12 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
 
       // Save address for logged-in users if requested
       if (user && saveAddrFlag && savedPosition && saveAddrLabel.trim()) {
-        const exists = savedAddresses.some((a) => a.address.trim() === savedFormData.address.trim());
+        const exists = savedAddresses.some((a) => a.address.trim() === cleanAddress);
         if (!exists) {
           saveAddress({
             userId: user.id,
             label: saveAddrLabel.trim(),
-            address: savedFormData.address.trim(),
+            address: cleanAddress,
             lat: savedPosition[0],
             lng: savedPosition[1],
             isDefault: savedAddresses.length === 0,
