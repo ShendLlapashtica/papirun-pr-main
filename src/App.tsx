@@ -18,6 +18,7 @@ import OfferViewWrapper from "./pages/OfferViewWrapper";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import DriverPanel from "./pages/DriverPanel";
+import InvoicePage from "./pages/InvoicePage";
 import OrderTrackingPill from "@/components/OrderTrackingPill";
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ const App = () => (
                   <Route path="/Driverpanel" element={<Navigate to="/driver" replace />} />
                   <Route path="/driverpanel" element={<Navigate to="/driver" replace />} />
                   <Route path="/driver-panel" element={<Navigate to="/driver" replace />} />
+                  <Route path="/invoice/:id" element={<InvoicePage />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 {/* Global pending overlay + status pill — visible on every route */}

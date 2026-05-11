@@ -101,6 +101,9 @@ export const generateInvoice = (order: OrderRecord) => {
     .footer{background:#fafafa;border-top:1px solid #f0f0f0;padding:18px 28px;text-align:center}
     .footer p{font-size:11px;color:#aaa;line-height:1.7}
     .footer .thank{font-size:13px;font-weight:700;color:#5a7a5f;margin-bottom:4px}
+    .qr-block{margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:6px}
+    .qr-block img{width:100px;height:100px;border-radius:8px;border:1px solid #e8e8e8}
+    .qr-block span{font-size:10px;color:#aaa;letter-spacing:0.3px}
 
     /* Action buttons */
     .print-row{text-align:center;margin-top:20px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
@@ -128,7 +131,7 @@ export const generateInvoice = (order: OrderRecord) => {
         <img src="${logoSrc}" alt="Papirun" class="logo-img">
         <div>
           <div class="brand-name">Papirun</div>
-          <div class="brand-sub">Fresh · Healthy · Prishtinë</div>
+          <div class="brand-sub">Prishtinë · papirun.net</div>
         </div>
       </div>
       <div class="invoice-meta">
@@ -215,6 +218,10 @@ export const generateInvoice = (order: OrderRecord) => {
       <div class="thank">Faleminderit që zgjedhët Papirun!</div>
       <p>📞 +383 45 262 323</p>
       <p>📍 Prishtinë, Kosovë · papirun.net</p>
+      <div class="qr-block">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fpapirun.net%2Finvoice%2F${order.id}" alt="QR Fatura" crossorigin="anonymous">
+        <span>Skanoni për të parë faturën</span>
+      </div>
     </div>
   </div>
 
