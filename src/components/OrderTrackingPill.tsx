@@ -85,10 +85,7 @@ const OrderTrackingPill = () => {
       } as OrderRecord);
       return;
     }
-    const wasFresh = fromFreshPlacementRef.current;
     fromFreshPlacementRef.current = false;
-    // Open modal immediately on fresh placement — don't wait for admin approval
-    if (wasFresh) setOpen(true);
 
     let active = true;
     const fetchIt = async () => {
@@ -98,7 +95,7 @@ const OrderTrackingPill = () => {
         if (!o) { clearActiveId(); setOrderId(null); return; }
         setOrder(o);
         // Admin approved before our subscription connected — open chat immediately
-        if (wasFresh && (o.status === 'approved' || o.status === 'preparing' || o.status === 'out_for_delivery')) {
+        if (o.status === 'approved' || o.status === 'preparing' || o.status === 'out_for_delivery') {
           haptic('success');
           setOpen(true);
         }
@@ -306,10 +303,6 @@ const OrderTrackingPill = () => {
   }
 
   // ===== UNSKIPPABLE FULLSCREEN OVERLAY for PENDING — light glassmorphism, sage spinner =====
-  // When the modal is already open (opened immediately on fresh placement), show it instead
-  if (isPending && open && orderId) {
-    return <OrderStatusModal orderId={orderId} isOpen={true} onClose={() => setOpen(false)} />;
-  }
   if (isPending) {
     return (
       <AnimatePresence>
