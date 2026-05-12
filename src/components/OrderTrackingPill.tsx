@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star }
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import { rateDriver } from '@/lib/driversApi';
 import OrderStatusModal from '@/components/OrderStatusModal';
+import OrderChat from '@/components/OrderChat';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
 
@@ -514,7 +515,25 @@ const OrderTrackingPill = () => {
       </AnimatePresence>
 
       {orderId && showModal && (
-        <OrderStatusModal orderId={orderId} isOpen={true} onClose={() => { setOpen(false); setAutoShowEnabled(false); }} />
+        <div className="fixed bottom-0 left-0 right-0 z-[60] p-3 pointer-events-none">
+          <div className="max-w-md mx-auto bg-background rounded-2xl shadow-2xl border border-border/50 overflow-hidden pointer-events-auto">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40">
+              <span className="text-sm font-semibold flex items-center gap-1.5">
+                <MessageCircle className="w-3.5 h-3.5 text-primary" />
+                PapirunChat
+              </span>
+              <button onClick={() => { setOpen(false); setAutoShowEnabled(false); }} className="p-1 rounded-full hover:bg-secondary">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <OrderChat
+              orderId={orderId}
+              viewerSide="user"
+              disabled={order?.status === 'pending' || order?.status === 'rejected' || order?.status === 'completed'}
+              maxHeightClass="max-h-64"
+            />
+          </div>
+        </div>
       )}
     </>
   );
