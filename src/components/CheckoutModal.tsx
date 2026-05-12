@@ -22,10 +22,13 @@ interface CheckoutModalProps {
 
 const WHATSAPP_FALLBACK = '38345262323';
 const ORDER_STORAGE_KEY = 'papirun_last_order_id';
+const GUEST_INFO_KEY = 'papirun_guest_info';
 
 const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutModalProps) => {
   const { language, t } = useLanguage();
   const { user } = useAuth();
+  const deliveryFee = total < 10 ? 2 : 0;
+  const finalTotal = total + deliveryFee;
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', notes: '' });
   const [selectedPosition, setSelectedPosition] = useState<[number, number] | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -35,6 +38,21 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   // Empty label by default so the user types a meaningful name (no auto-"Shtëpia").
   const [saveAddrFlag, setSaveAddrFlag] = useState(false);
   const [saveAddrLabel, setSaveAddrLabel] = useState('');
+
+  // Autofill name+phone from last order (guests and logged-in users)
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(GUEST_INFO_KEY) || '{}');
+      if (saved.name || saved.phone) {
+        setFormData(prev => ({
+          ...prev,
+          name: prev.name || saved.name || '',
+          phone: prev.phone || saved.phone || '',
+        }));
+      }
+    } catch {}
+  }, [isOpen]);
 
   // Load saved addresses for logged-in users; auto-prefill default
   useEffect(() => {
@@ -120,11 +138,13 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
         deliveryLng: savedPosition?.[1] ?? null,
         items: savedItems,
         subtotal: savedTotal,
-        deliveryFee: 0,
-        total: savedTotal,
+        deliveryFee,
+        total: finalTotal,
         notes: savedFormData.notes.trim(),
         source: detectOrderSource(),
       });
+      // Persist guest info for autofill next time
+      try { localStorage.setItem(GUEST_INFO_KEY, JSON.stringify({ name: savedFormData.name.trim(), phone: savedFormData.phone.trim() })); } catch {}
       // Replace optimistic ID with real server ID
       try { localStorage.setItem(ORDER_STORAGE_KEY, order.id); } catch {}
       setActiveOrderId(order.id);
@@ -214,9 +234,24 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
                       )}
                     </div>
                   ))}
-                  <div className="border-t border-border pt-2 mt-2 flex justify-between font-semibold text-sm sm:text-base">
-                    <span>{t.checkout.total}</span>
-                    <span className="text-primary">€{total.toFixed(2)}</span>
+                  <div className="border-t border-border pt-2 mt-2 space-y-1.5">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{language === 'sq' ? 'Nëntotali' : 'Subtotal'}</span>
+                      <span>€{total.toFixed(2)}</span>
+                    </div>
+                    <div className={`flex justify-between text-xs font-medium ${deliveryFee === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
+                      <span>{language === 'sq' ? 'Tarifa e transportit' : 'Delivery fee'}</span>
+                      <span>{deliveryFee === 0 ? (language === 'sq' ? 'Falas 🎉' : 'Free 🎉') : `€${deliveryFee.toFixed(2)}`}</span>
+                    </div>
+                    {deliveryFee > 0 && (
+                      <p className="text-[10px] text-muted-foreground/70">
+                        {language === 'sq' ? 'Porosi mbi €10 — dërgesa falas' : 'Orders over €10 get free delivery'}
+                      </p>
+                    )}
+                    <div className="flex justify-between font-semibold text-sm sm:text-base border-t border-border pt-1.5">
+                      <span>{t.checkout.total}</span>
+                      <span className="text-primary">€{finalTotal.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               </div>

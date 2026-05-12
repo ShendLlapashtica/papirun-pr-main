@@ -52,6 +52,16 @@ const STATUS_LABEL: Record<string, string> = {
 type FilterKey = 'hour' | 'today' | 'week' | 'month' | 'custom' | 'all';
 type StatusFilter = 'active' | 'pending' | 'approved' | 'rejected' | 'history';
 
+// Çagllavicë detection — address text or coordinate bounding box
+const isCagllavice = (o: OrderRecord): boolean => {
+  const addr = (o.deliveryAddress || '').toLowerCase();
+  if (addr.includes('çagllavic') || addr.includes('cagllavic')) return true;
+  if (o.deliveryLat !== null && o.deliveryLng !== null) {
+    return o.deliveryLat >= 42.585 && o.deliveryLat <= 42.650 && o.deliveryLng >= 21.040 && o.deliveryLng <= 21.115;
+  }
+  return false;
+};
+
 const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const startOfWeek = (d: Date) => {
   const x = startOfDay(d);
@@ -663,6 +673,7 @@ const OrdersReview = () => {
             const isDeleting = deletingIds.has(o.id);
             const ageMs = now - new Date(o.createdAt).getTime();
             const isOverdue = isPending && ageMs > 60_000;
+            const isCagl = isCagllavice(o);
             return (
               <motion.div
                 key={o.id}
@@ -680,10 +691,13 @@ const OrdersReview = () => {
                     else archiveOrder(o.id);
                   }
                 }}
-                className={`relative bg-card rounded-3xl p-4 shadow-card transition-all touch-pan-y ${
+                className={`relative rounded-3xl p-4 shadow-card transition-all touch-pan-y ${
+                  isCagl ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-400/30' : 'bg-card'
+                } ${
                   isSelected ? 'ring-2 ring-primary' :
                   isOverdue ? 'ring-2 ring-red-500/60 shadow-[0_0_24px_-4px_hsl(0_70%_50%/0.5)]' :
                   isGlowing ? 'ring-2 ring-primary/60 shadow-[0_0_24px_-4px_hsl(var(--primary)/0.5)]' :
+                  isCagl ? 'ring-1 ring-blue-400/40 shadow-[0_0_16px_-4px_rgba(59,130,246,0.25)]' :
                   'hover:shadow-md'
                 } ${!isPending && !isDeleting ? 'cursor-grab active:cursor-grabbing' : ''} ${isDeleting ? 'pointer-events-none grayscale' : ''}`}
               >
@@ -756,6 +770,11 @@ const OrdersReview = () => {
                         <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
                           {o.source === 'app' ? <><Smartphone className="w-2.5 h-2.5" /> App</> : <><Globe className="w-2.5 h-2.5" /> Web</>}
                         </span>
+                        {isCagl && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold border border-blue-400/30">
+                            📍 Çagllavicë
+                          </span>
+                        )}
                         {isArchived && (
                           <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-foreground/10 text-muted-foreground font-semibold uppercase tracking-wider">
                             E fshirë
