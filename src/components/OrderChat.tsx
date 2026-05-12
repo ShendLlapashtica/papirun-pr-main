@@ -102,6 +102,27 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
     return () => { active = false; unsub(); };
   }, [orderId]);
 
+  // Poll every 3s — fallback for when realtime subscription misses events
+  useEffect(() => {
+    let active = true;
+    const poll = setInterval(async () => {
+      if (!active) return;
+      try {
+        const rows = await fetchOrderMessages(orderId);
+        setMessages((prev) => {
+          const optimistic = prev.filter((m) => m.id.startsWith(OPTIMISTIC_PREFIX));
+          const pendingOptimistic = optimistic.filter(
+            (o) => !rows.some((r) => r.sender === o.sender && r.message === o.message),
+          );
+          const next = [...rows, ...pendingOptimistic];
+          if (next.length !== prev.length) onMessagesCountChange?.(next.length);
+          return next;
+        });
+      } catch {}
+    }, 3000);
+    return () => { active = false; clearInterval(poll); };
+  }, [orderId]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages.length]);
