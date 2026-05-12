@@ -68,10 +68,11 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
     try {
       const trimmed = note.trim();
       if (isApprove) {
-        await updateOrderStatus(order.id, 'approved', trimmed);
-        if (eta) await setOrderEta(order.id, eta);
+        // Send message FIRST so it's in DB before the status update triggers realtime on customer side
         const msg = trimmed || (eta ? `Po e përgatisim — gati për ~${eta} min ✓` : 'Porosia u aprovua ✓');
         await sendOrderMessage(order.id, 'admin', msg);
+        await updateOrderStatus(order.id, 'approved', trimmed);
+        if (eta) await setOrderEta(order.id, eta);
 
         // Assign driver via ECT or manual selection
         if (drivers.length > 0) {
