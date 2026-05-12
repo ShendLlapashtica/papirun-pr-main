@@ -44,6 +44,10 @@ const OrderTrackingPill = () => {
   // Set true when the user just placed a fresh order (optimistic→real transition)
   const fromFreshPlacementRef = useRef(false);
   const [pendingElapsed, setPendingElapsed] = useState(0);
+  // Auto-show chat when approved; set false when user explicitly closes so pill re-appears
+  const [autoShowEnabled, setAutoShowEnabled] = useState(true);
+
+  useEffect(() => { setAutoShowEnabled(true); }, [orderId]);
 
   useEffect(() => {
     const onChange = () => { setOrderId(getActiveId()); setHidden(false); };
@@ -445,10 +449,13 @@ const OrderTrackingPill = () => {
     setOrderId(null);
   };
 
+  // Auto-open chat when approved; pill shows when modal is dismissed
+  const showModal = open || (isApproved && autoShowEnabled);
+
   return (
     <>
       <AnimatePresence>
-        <motion.div
+        {!showModal && <motion.div
           key="order-pill"
           initial={{ y: -16, opacity: 0, scale: 0.92 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -503,11 +510,11 @@ const OrderTrackingPill = () => {
           >
             <XIcon className="w-3.5 h-3.5 opacity-70" strokeWidth={2.4} />
           </button>
-        </motion.div>
+        </motion.div>}
       </AnimatePresence>
 
-      {orderId && open && (
-        <OrderStatusModal orderId={orderId} isOpen={open} onClose={() => setOpen(false)} />
+      {orderId && showModal && (
+        <OrderStatusModal orderId={orderId} isOpen={true} onClose={() => { setOpen(false); setAutoShowEnabled(false); }} />
       )}
     </>
   );
