@@ -41,6 +41,7 @@ const STATUS_ICON: Record<OrderStatus, { Icon: typeof CheckCircle2; color: strin
   // pastel red — soft, not alarming
   rejected:         { Icon: XCircle,      color: 'hsl(0 55% 62%)',      bg: 'hsl(0 70% 94%)' },
   completed:        { Icon: PartyPopper,  color: 'hsl(var(--primary))', bg: 'hsl(var(--primary) / 0.14)' },
+  histori:          { Icon: CheckCircle2, color: 'hsl(var(--primary))', bg: 'hsl(var(--primary) / 0.10)' },
 };
 
 const formatTime = (iso: string) => {
@@ -63,9 +64,21 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
     if (!isOpen || !orderId) return;
     let active = true;
     fetchOrder(orderId).then((o) => { if (active) setOrder(o); });
-    const unsub = subscribeOrderRealtime(orderId, (updated) => setOrder(updated));
+    const unsub = subscribeOrderRealtime(orderId, (updated) => { if (active) setOrder(updated); });
     return () => { active = false; unsub(); };
   }, [orderId, isOpen]);
+
+  // Poll every 2s while pending — backup for realtime in case subscription misses the approval
+  useEffect(() => {
+    if (!isOpen || !orderId || order?.status !== 'pending') return;
+    const poll = setInterval(async () => {
+      try {
+        const o = await fetchOrder(orderId);
+        if (o && o.status !== 'pending') setOrder(o);
+      } catch {}
+    }, 2000);
+    return () => clearInterval(poll);
+  }, [isOpen, orderId, order?.status]);
 
   if (!isOpen) return null;
 

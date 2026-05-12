@@ -87,6 +87,8 @@ const OrderTrackingPill = () => {
     }
     const wasFresh = fromFreshPlacementRef.current;
     fromFreshPlacementRef.current = false;
+    // Open modal immediately on fresh placement — don't wait for admin approval
+    if (wasFresh) setOpen(true);
 
     let active = true;
     const fetchIt = async () => {
@@ -304,6 +306,10 @@ const OrderTrackingPill = () => {
   }
 
   // ===== UNSKIPPABLE FULLSCREEN OVERLAY for PENDING — light glassmorphism, sage spinner =====
+  // When the modal is already open (opened immediately on fresh placement), show it instead
+  if (isPending && open && orderId) {
+    return <OrderStatusModal orderId={orderId} isOpen={true} onClose={() => setOpen(false)} />;
+  }
   if (isPending) {
     return (
       <AnimatePresence>
