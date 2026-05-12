@@ -640,7 +640,11 @@ const Admin = () => {
 
   const handleSaveOffer = async (offer: StorefrontOffer) => {
     try {
-      await upsertStorefrontOffer(offer, offer.sortOrder);
+      const cleaned = {
+        ...offer,
+        includes: (offer.includes ?? []).map(s => s.trim()).filter(s => s.length > 0),
+      };
+      await upsertStorefrontOffer(cleaned, cleaned.sortOrder);
       setEditingOffer(null);
     } catch (error) {
       console.error('Failed to save offer:', error);
@@ -1539,12 +1543,29 @@ const Admin = () => {
                             placeholder="Title"
                             className="w-full px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
                           />
-                          <textarea
-                            value={offer.description}
-                            onChange={(e) => setOffers(prev => prev.map(o => o.id === offer.id ? { ...o, description: e.target.value } : o))}
-                            rows={2}
-                            className="w-full px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 resize-none"
-                          />
+                          <div>
+                            <p className="text-[10px] text-muted-foreground mb-1">Përshkrimi</p>
+                            <textarea
+                              value={offer.description}
+                              onChange={(e) => setOffers(prev => prev.map(o => o.id === offer.id ? { ...o, description: e.target.value } : o))}
+                              rows={2}
+                              placeholder="p.sh. Crunch Sandwich - Coca Cola - Tart"
+                              className="w-full px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 resize-none"
+                            />
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground mb-1">Artikujt në kombo (çdo rresht = 1 artikull)</p>
+                            <textarea
+                              value={(offer.includes ?? []).join('\n')}
+                              onChange={(e) => {
+                                const lines = e.target.value.split('\n').map(l => l.trimStart()).filter(l => l.length > 0);
+                                setOffers(prev => prev.map(o => o.id === offer.id ? { ...o, includes: e.target.value.split('\n').map(l => l.trimStart()) } : o));
+                              }}
+                              rows={3}
+                              placeholder={"1x Crunch Sandwich\n1x Coca Cola\n1x Tart"}
+                              className="w-full px-3 py-2 rounded-lg bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 resize-none font-mono"
+                            />
+                          </div>
                           <input
                             type="number"
                             step="0.10"
