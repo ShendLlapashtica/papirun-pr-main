@@ -6,6 +6,7 @@ import { fetchQuickReplies, type QuickReply } from '@/lib/quickRepliesApi';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
 import { updateOrderStatus, setOrderEta, fetchAllOrders, type OrderRecord } from '@/lib/ordersApi';
 import { fetchDrivers, assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
+import { pickBestDriver } from '@/components/admin/DriversKPI';
 
 interface Props {
   order: OrderRecord | null;
@@ -14,29 +15,6 @@ interface Props {
 }
 
 const ETA_OPTIONS = [15, 20, 30, 45];
-
-/** ECT: sum remaining prep/delivery time for each active order assigned to a driver */
-const calcDriverECT = (driverId: string, activeOrders: OrderRecord[]): number => {
-  const driverOrders = activeOrders.filter(
-    (o) =>
-      o.assignedDriverId === driverId &&
-      ['approved', 'preparing', 'out_for_delivery'].includes(o.status),
-  );
-  if (driverOrders.length === 0) return 0;
-  const now = Date.now();
-  return driverOrders.reduce((sum, o) => {
-    const elapsedMins = (now - new Date(o.createdAt).getTime()) / 60_000;
-    const etaMins = o.prepEtaMinutes ?? 20;
-    return sum + Math.max(0, etaMins - elapsedMins);
-  }, 0);
-};
-
-const getBestDriverECT = (drivers: DeliveryDriver[], activeOrders: OrderRecord[]): DeliveryDriver | null => {
-  if (drivers.length === 0) return null;
-  return drivers.reduce((best, d) => {
-    return calcDriverECT(d.id, activeOrders) < calcDriverECT(best.id, activeOrders) ? d : best;
-  }, drivers[0]);
-};
 
 const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
   const [replies, setReplies] = useState<QuickReply[]>([]);
@@ -74,18 +52,19 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
         await updateOrderStatus(order.id, 'approved', trimmed);
         if (eta) await setOrderEta(order.id, eta);
 
-        // Assign driver via ECT or manual selection
+        // Assign driver — longest-idle auto or manual selection
         if (drivers.length > 0) {
           let targetDriver: DeliveryDriver | null = null;
           if (selectedDriverId === 'auto') {
-            targetDriver = getBestDriverECT(drivers, allOrders);
+            const bestId = pickBestDriver(drivers, allOrders);
+            targetDriver = bestId ? (drivers.find((d) => d.id === bestId) ?? null) : null;
           } else {
             targetDriver = drivers.find((d) => d.id === selectedDriverId) ?? null;
           }
           if (targetDriver) {
             await assignDriverToOrder(order.id, targetDriver.id);
-            const mode = selectedDriverId === 'auto' ? 'ECT Auto' : 'Manual';
-            toast.success(`Shoferi: ${targetDriver.name} (${mode})`);
+            const label = selectedDriverId === 'auto' ? 'Auto (idle)' : 'Manual';
+            toast.success(`Shoferi: ${targetDriver.name} (${label})`);
           }
         }
         toast.success('Aprovuar');
@@ -176,10 +155,11 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
                         : 'bg-secondary hover:bg-primary/10'
                     }`}
                   >
-                    <Zap className="w-3 h-3" /> Auto (ECT)
+                    <Zap className="w-3 h-3" /> Auto (idle)
                   </button>
                   {drivers.map((d) => {
-                    const ect = calcDriverECT(d.id, allOrders);
+                    const bestId = pickBestDriver(drivers, allOrders);
+                    const isNext = d.id === bestId;
                     return (
                       <button
                         key={d.id}
@@ -187,21 +167,20 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
                         className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
                           selectedDriverId === d.id
                             ? 'bg-blue-600 text-white shadow'
-                            : 'bg-secondary hover:bg-blue-500/10'
+                            : isNext
+                              ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                              : 'bg-secondary hover:bg-blue-500/10'
                         }`}
-                        title={`ECT: ${ect.toFixed(0)} min`}
                       >
                         {d.name}
-                        {ect > 0 && (
-                          <span className="ml-1 text-[9px] opacity-70">~{ect.toFixed(0)}m</span>
-                        )}
+                        {isNext && <span className="ml-1 text-[9px] opacity-80">★</span>}
                       </button>
                     );
                   })}
                 </div>
                 {selectedDriverId === 'auto' && (
                   <p className="text-[10px] text-muted-foreground mt-1.5">
-                    Sistemi zgjedh shoferin me kohën më të shkurtër të pritjes (ECT).
+                    Sistemi zgjedh shoferin që ka pritur më gjatë pa porosi.
                   </p>
                 )}
               </div>
