@@ -43,6 +43,7 @@ const OrderTrackingPill = () => {
   const ratingTriggeredRef = useRef(false);
   // Set true when the user just placed a fresh order (optimistic→real transition)
   const fromFreshPlacementRef = useRef(false);
+  const [pendingElapsed, setPendingElapsed] = useState(0);
 
   useEffect(() => {
     const onChange = () => { setOrderId(getActiveId()); setHidden(false); };
@@ -117,7 +118,13 @@ const OrderTrackingPill = () => {
     const poll = setInterval(async () => {
       try {
         const o = await fetchOrder(orderId);
-        if (o && o.status !== 'pending') {
+        if (!o) {
+          // Order was deleted from DB — clear the stuck overlay
+          clearActiveId();
+          setOrderId(null);
+          return;
+        }
+        if (o.status !== 'pending') {
           setOrder(o);
           if (o.status === 'approved' || o.status === 'preparing' || o.status === 'out_for_delivery') {
             haptic('success');
@@ -128,6 +135,13 @@ const OrderTrackingPill = () => {
     }, 2000);
     return () => clearInterval(poll);
   }, [orderId, order?.status]);
+
+  // Tick elapsed seconds while pending — enables emergency escape after 8 min
+  useEffect(() => {
+    if (order?.status !== 'pending') { setPendingElapsed(0); return; }
+    const tick = setInterval(() => setPendingElapsed((e) => e + 1), 1000);
+    return () => clearInterval(tick);
+  }, [order?.status]);
 
   // Trigger rating form when order completes and has a driver
   useEffect(() => {
@@ -372,6 +386,15 @@ const OrderTrackingPill = () => {
             <p className="text-[11px] text-muted-foreground/70 font-mono tracking-[0.2em] uppercase">
               {language === 'sq' ? 'Porosia' : 'Order'} · #{order.id.slice(0, 8).toUpperCase()}
             </p>
+            {pendingElapsed > 480 && (
+              <button
+                type="button"
+                onClick={() => { clearActiveId(); setHidden(true); setOrderId(null); }}
+                className="mt-2 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors underline"
+              >
+                {language === 'sq' ? 'Anulo porosinë' : 'Cancel order'}
+              </button>
+            )}
           </div>
         </motion.div>
       </AnimatePresence>
