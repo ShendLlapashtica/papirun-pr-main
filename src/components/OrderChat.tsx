@@ -130,8 +130,15 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
     setSending(true);
 
     try {
-      await sendOrderMessage(orderId, viewerSide, body);
-      // Realtime INSERT will fire and replace the optimistic bubble via deduplication above
+      const confirmed = await sendOrderMessage(orderId, viewerSide, body);
+      // Replace optimistic bubble immediately with the real server message.
+      // Realtime may also fire — deduplication in onInsert will no-op if id already present.
+      setMessages((prev) => {
+        if (prev.some((x) => x.id === confirmed.id)) return prev;
+        const next = prev.map((x) => x.id === tempId ? confirmed : x);
+        onMessagesCountChange?.(next.length);
+        return next;
+      });
     } catch (e) {
       console.error(e);
       // Roll back optimistic message on failure

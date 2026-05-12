@@ -41,6 +41,8 @@ const OrderTrackingPill = () => {
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingNote, setRatingNote] = useState('');
   const ratingTriggeredRef = useRef(false);
+  // Set true when the user just placed a fresh order (optimistic→real transition)
+  const fromFreshPlacementRef = useRef(false);
 
   useEffect(() => {
     const onChange = () => { setOrderId(getActiveId()); setHidden(false); };
@@ -56,6 +58,7 @@ const OrderTrackingPill = () => {
     if (!orderId) { setOrder(null); return; }
     // Optimistic ID — show pending overlay immediately, no server fetch
     if (orderId.startsWith('optimistic-')) {
+      fromFreshPlacementRef.current = true; // next real ID is a freshly placed order
       setOrder({
         id: orderId,
         userId: null,
@@ -81,6 +84,9 @@ const OrderTrackingPill = () => {
       } as OrderRecord);
       return;
     }
+    const wasFresh = fromFreshPlacementRef.current;
+    fromFreshPlacementRef.current = false;
+
     let active = true;
     const fetchIt = async () => {
       try {
@@ -88,6 +94,11 @@ const OrderTrackingPill = () => {
         if (!active) return;
         if (!o) { clearActiveId(); setOrderId(null); return; }
         setOrder(o);
+        // Admin approved before our subscription connected — open chat immediately
+        if (wasFresh && (o.status === 'approved' || o.status === 'preparing' || o.status === 'out_for_delivery')) {
+          haptic('success');
+          setOpen(true);
+        }
       } catch {}
     };
 
@@ -99,6 +110,24 @@ const OrderTrackingPill = () => {
     });
     return () => { active = false; unsub(); };
   }, [orderId]);
+
+  // Poll every 2s while pending — guarantees transition even if realtime lags or misses
+  useEffect(() => {
+    if (!orderId || orderId.startsWith('optimistic-') || order?.status !== 'pending') return;
+    const poll = setInterval(async () => {
+      try {
+        const o = await fetchOrder(orderId);
+        if (o && o.status !== 'pending') {
+          setOrder(o);
+          if (o.status === 'approved' || o.status === 'preparing' || o.status === 'out_for_delivery') {
+            haptic('success');
+            setOpen(true);
+          }
+        }
+      } catch {}
+    }, 2000);
+    return () => clearInterval(poll);
+  }, [orderId, order?.status]);
 
   // Trigger rating form when order completes and has a driver
   useEffect(() => {
