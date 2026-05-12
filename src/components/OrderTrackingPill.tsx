@@ -85,6 +85,7 @@ const OrderTrackingPill = () => {
       } as OrderRecord);
       return;
     }
+    const wasFresh = fromFreshPlacementRef.current;
     fromFreshPlacementRef.current = false;
 
     let active = true;
@@ -95,7 +96,7 @@ const OrderTrackingPill = () => {
         if (!o) { clearActiveId(); setOrderId(null); return; }
         setOrder(o);
         // Admin approved before our subscription connected — open chat immediately
-        if (o.status === 'approved' || o.status === 'preparing' || o.status === 'out_for_delivery') {
+        if (wasFresh && (o.status === 'approved' || o.status === 'preparing' || o.status === 'out_for_delivery')) {
           haptic('success');
           setOpen(true);
         }
