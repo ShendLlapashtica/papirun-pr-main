@@ -76,7 +76,8 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
   // Chat input is enabled ONLY after admin has approved (or further). Prevents spamming during review.
   const chatDisabled = status === 'pending' || status === 'rejected' || status === 'completed';
   // Hide chat section entirely if it's locked AND empty (e.g. admin wiped it, or never started)
-  const hideChat = chatDisabled && chatCount === 0;
+  // Require !!order so we never hide chat while order is still loading (status defaults to 'pending')
+  const hideChat = !!order && chatDisabled && chatCount === 0;
 
   const handleDelete = async () => {
     if (!order) return;

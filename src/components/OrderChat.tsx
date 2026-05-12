@@ -55,6 +55,17 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
         setMessages(rows);
         setLoading(false);
         onMessagesCountChange?.(rows.length);
+        // Single retry if empty — covers residual race with admin approval message not yet committed
+        if (rows.length === 0) {
+          setTimeout(() => {
+            if (!active) return;
+            fetchOrderMessages(orderId).then((retry) => {
+              if (!active || retry.length === 0) return;
+              setMessages(retry);
+              onMessagesCountChange?.(retry.length);
+            }).catch(() => {});
+          }, 1500);
+        }
       })
       .catch(() => { if (active) setLoading(false); });
 
