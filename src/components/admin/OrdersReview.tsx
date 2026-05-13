@@ -19,7 +19,7 @@ import OrderActionDrawer from '@/components/admin/OrderActionDrawer';
 import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
 import { generateInvoice } from '@/lib/invoiceGenerator';
-import { assignDriverToOrder, fetchDrivers, subscribeAllDriverLocations, type DeliveryDriver } from '@/lib/driversApi';
+import { assignDriverToOrder, fetchDrivers, subscribeAllDriverLocations, driverShortCode, type DeliveryDriver } from '@/lib/driversApi';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
 
@@ -772,7 +772,7 @@ const OrdersReview = () => {
                         </span>
                         {isCagl && (
                           <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold border border-blue-400/30">
-                            📍 Çagllavicë
+                            📍 Porosi për Çagllavicë!
                           </span>
                         )}
                         {isArchived && (
@@ -798,6 +798,20 @@ const OrdersReview = () => {
                     </span>
                     <span className="text-primary font-semibold shrink-0">€{o.total.toFixed(2)}</span>
                   </div>
+
+                  {(() => {
+                    const drv = o.assignedDriverId ? drivers.find((d) => d.id === o.assignedDriverId) : null;
+                    if (!drv) return null;
+                    return (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: drv.color || '#6b7280' }} />
+                        <span className="text-[10px] font-bold text-muted-foreground" style={{ color: drv.color || undefined }}>
+                          {driverShortCode(drv)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground truncate">{drv.name}</span>
+                      </div>
+                    );
+                  })()}
                 </button>
 
                 {isPending && (

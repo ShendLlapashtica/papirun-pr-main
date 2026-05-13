@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation } from 'lucide-react';
+import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation, Coffee } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchDrivers,
@@ -8,6 +8,7 @@ import {
   seedDefaultDrivers,
   subscribeDriverOrdersRealtime,
   updateDriverLocation,
+  setDriverPause,
   type DeliveryDriver,
 } from '@/lib/driversApi';
 import { playKrring } from '@/lib/sounds';
@@ -190,6 +191,19 @@ const DriverPanel = () => {
     }
   };
 
+  const handleTogglePause = async () => {
+    if (!driver) return;
+    const next = !driver.isPaused;
+    setDriver((d) => d ? { ...d, isPaused: next } : d);
+    try {
+      await setDriverPause(driver.id, next);
+      toast.success(next ? 'Je në pauzë' : 'Je i disponueshëm');
+    } catch {
+      setDriver((d) => d ? { ...d, isPaused: !next } : d);
+      toast.error('Gabim');
+    }
+  };
+
   const activeOrders = orders.filter((o) => !['completed', 'rejected'].includes(o.status) && o.isVisible);
   const completedOrders = orders.filter((o) => o.status === 'completed');
 
@@ -246,6 +260,17 @@ const DriverPanel = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleTogglePause}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${
+                driver.isPaused
+                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                  : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+              }`}
+            >
+              <Coffee className="w-3.5 h-3.5" />
+              {driver.isPaused ? 'Në pauzë' : 'Pauzë'}
+            </button>
             <button
               onClick={() => isTracking ? stopTracking() : startTracking()}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${
@@ -425,6 +450,15 @@ const DriverPanel = () => {
                       className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
                     >
                       <CheckCheck className="w-5 h-5" /> Përfundo Dërgesën
+                    </button>
+                  )}
+
+                  {['approved', 'preparing', 'out_for_delivery'].includes(selected.status) && (
+                    <button
+                      onClick={() => handleStatus(selected.id, 'completed')}
+                      className="w-full py-2.5 rounded-xl bg-secondary text-foreground text-sm font-semibold flex items-center justify-center gap-2 hover:bg-secondary/80 active:scale-95 transition-all"
+                    >
+                      <CheckCheck className="w-4 h-4" /> Mbaro bisedën · Përfundo
                     </button>
                   )}
 

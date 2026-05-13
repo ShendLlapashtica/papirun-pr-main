@@ -8,10 +8,18 @@ export interface DeliveryDriver {
   pin: string;
   role: string;
   isActive: boolean;
+  isPaused: boolean;
   createdAt: string;
   lat: number | null;
   lng: number | null;
   color: string | null;
+}
+
+/** e.g. Adhurimi → "AD6", Endriti → "EN1" */
+export function driverShortCode(driver: DeliveryDriver): string {
+  const initials = driver.name.slice(0, 2).toUpperCase();
+  const num = (driver.username || driver.phone).replace(/\D/g, '').slice(-1);
+  return `${initials}${num}`;
 }
 
 type Row = {
@@ -32,6 +40,7 @@ type Row = {
 
 const TABLE = 'delivery_drivers';
 const LOC_PREFIX = 'driver_loc_';
+const PAUSE_PREFIX = 'driver_pause_';
 
 // Default color palette — assigned round-robin when creating new drivers
 export const DRIVER_COLORS = [
@@ -79,6 +88,7 @@ function getDriverColor(row: Row, index = 0): string {
 // (key = 'driver_loc_{id}', value_json = {lat, lng, t}) so we need no schema changes.
 
 type LocMap = Record<string, { lat: number; lng: number }>;
+type PauseMap = Record<string, boolean>;
 
 async function fetchLocMap(): Promise<LocMap> {
   const client = supabase as any;
@@ -97,8 +107,23 @@ async function fetchLocMap(): Promise<LocMap> {
   return map;
 }
 
+async function fetchPauseMap(): Promise<PauseMap> {
+  const client = supabase as any;
+  const { data, error } = await client
+    .from('storefront_settings')
+    .select('key, value_json')
+    .like('key', `${PAUSE_PREFIX}%`);
+  if (error || !data) return {};
+  const map: PauseMap = {};
+  for (const row of data as { key: string; value_json: any }[]) {
+    const id = row.key.replace(PAUSE_PREFIX, '');
+    map[id] = Boolean(row.value_json?.paused);
+  }
+  return map;
+}
+
 // ── Row mapper ────────────────────────────────────────────────────────────────
-const mapRow = (row: Row, locMap: LocMap = {}, index = 0): DeliveryDriver => {
+const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 0): DeliveryDriver => {
   const loc = locMap[row.id];
   return {
     id: row.id,
@@ -108,6 +133,7 @@ const mapRow = (row: Row, locMap: LocMap = {}, index = 0): DeliveryDriver => {
     pin: row.pin || '',
     role: row.role || 'driver',
     isActive: row.is_active !== false,
+    isPaused: Boolean(pauseMap[row.id]),
     createdAt: row.created_at,
     lat: loc?.lat ?? (row.lat !== undefined && row.lat !== null ? Number(row.lat) : null),
     lng: loc?.lng ?? (row.lng !== undefined && row.lng !== null ? Number(row.lng) : null),
@@ -119,22 +145,24 @@ const mapRow = (row: Row, locMap: LocMap = {}, index = 0): DeliveryDriver => {
 
 export const fetchDrivers = async (): Promise<DeliveryDriver[]> => {
   const client = supabase as any;
-  const [{ data, error }, locMap] = await Promise.all([
+  const [{ data, error }, locMap, pauseMap] = await Promise.all([
     client.from(TABLE).select('*').order('name'),
     fetchLocMap(),
+    fetchPauseMap(),
   ]);
   if (error) throw error;
-  return (data as Row[]).map((row, i) => mapRow(row, locMap, i));
+  return (data as Row[]).map((row, i) => mapRow(row, locMap, pauseMap, i));
 };
 
 export const fetchDriverById = async (id: string): Promise<DeliveryDriver | null> => {
   const client = supabase as any;
-  const [{ data, error }, locMap] = await Promise.all([
+  const [{ data, error }, locMap, pauseMap] = await Promise.all([
     client.from(TABLE).select('*').eq('id', id).maybeSingle(),
     fetchLocMap(),
+    fetchPauseMap(),
   ]);
   if (error) throw error;
-  return data ? mapRow(data as Row, locMap) : null;
+  return data ? mapRow(data as Row, locMap, pauseMap) : null;
 };
 
 export const createDriver = async (
@@ -174,6 +202,18 @@ export const updateDriver = async (
   if (updates.role !== undefined) payload.role = updates.role;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   const { error } = await client.from(TABLE).update(payload).eq('id', id);
+  if (error) throw error;
+};
+
+/** Toggle a driver's pause/available state */
+export const setDriverPause = async (id: string, paused: boolean) => {
+  const client = supabase as any;
+  const { error } = await client
+    .from('storefront_settings')
+    .upsert(
+      { key: `${PAUSE_PREFIX}${id}`, value_json: { paused, t: Date.now() } },
+      { onConflict: 'key' }
+    );
   if (error) throw error;
 };
 
