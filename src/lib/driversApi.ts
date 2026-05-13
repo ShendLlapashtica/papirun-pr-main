@@ -58,6 +58,9 @@ export const DRIVER_COLORS = [
 /** Restaurant / base location used for distance calculations and as map center */
 export const RESTAURANT_COORDS = { lat: 42.6629, lng: 21.1655 };
 
+/** Çagllavicë branch location */
+export const CAGLLAVICE_COORDS = { lat: 42.618, lng: 21.077 };
+
 /** Haversine great-circle distance in kilometres */
 export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -140,7 +143,7 @@ async function fetchPauseMap(): Promise<PauseMap> {
 // ── Row mapper ────────────────────────────────────────────────────────────────
 const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 0): DeliveryDriver => {
   const loc = locMap[row.id];
-  const pause = pauseMap[row.id] ?? {};
+  const pause: PauseEntry = pauseMap[row.id] ?? { paused: false };
   return {
     id: row.id,
     name: row.name || row.display_name || row.username || 'Driver',

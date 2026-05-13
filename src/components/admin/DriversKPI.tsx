@@ -2,6 +2,10 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, type DeliveryDriver } from '@/lib/driversApi';
 import { fetchAllOrders, hardDeleteAllOrders, type OrderRecord } from '@/lib/ordersApi';
 import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle, Trash2, Loader2 } from 'lucide-react';
+import {
+  ResponsiveContainer, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, Tooltip, CartesianGrid,
+} from 'recharts';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -134,6 +138,22 @@ function PieChart({ happy, neutral, unhappy }: { happy: number; neutral: number;
 
 // ── Driver Detail Modal ────────────────────────────────────────────────────────
 
+function computeDailyData(completed: OrderRecord[], days = 14) {
+  const now = new Date();
+  return Array.from({ length: days }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - (days - 1 - i));
+    const startMs = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const endMs = startMs + 86_400_000;
+    const day = d.toLocaleDateString('default', { day: '2-digit', month: 'short' });
+    const dayOrders = completed.filter((o) => {
+      const t = new Date(o.updatedAt).getTime();
+      return t >= startMs && t < endMs;
+    });
+    return { day, porosi: dayOrders.length, te_ardhura: Math.round(dayOrders.reduce((s, o) => s + o.total, 0) * 100) / 100 };
+  });
+}
+
 interface DriverDetailProps {
   driver: DeliveryDriver;
   completed: OrderRecord[];
@@ -147,13 +167,28 @@ interface DriverDetailProps {
   onClose: () => void;
 }
 
-function DriverDetailModal({ driver, completed, active, waitMs, isBusy, ect, avgRating, happy, neutral, unhappy, total, isNext, onClose }: DriverDetailProps) {
+function DriverDetailModal({ driver, completed, waitMs, isBusy, ect, avgRating, happy, neutral, unhappy, total, isNext, onClose }: DriverDetailProps) {
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
+  const [tick, setTick] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setTick(Date.now()), 1000); return () => clearInterval(t); }, []);
+
+  const productiveMs = completed.reduce((sum, o) => {
+    const ms = new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime();
+    return sum + (ms > 0 ? ms : 0);
+  }, 0);
+  const totalRevenue = completed.reduce((s, o) => s + o.total, 0);
+  const avgDurationMs = completed.length > 0 ? productiveMs / completed.length : 0;
+  const currentWait = !isBusy && isFinite(waitMs) && waitMs >= 0 ? fmtDuration(waitMs) : null;
+  const currentPause = driver.isPaused && driver.pausedAt ? fmtDuration(tick - driver.pausedAt) : null;
+  const dailyData = useMemo(() => computeDailyData(completed, 14), [completed]);
+  const hasActivity = dailyData.some((d) => d.porosi > 0);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col border border-border/40">
+
+        {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border/40 shrink-0">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-base shrink-0 shadow" style={{ background: driver.color || '#6b7280' }}>
             {driverShortCode(driver)}
@@ -171,26 +206,45 @@ function DriverDetailModal({ driver, completed, active, waitMs, isBusy, ect, avg
         </div>
 
         <div className="overflow-y-auto flex-1 p-5 space-y-5">
-          <div className="grid grid-cols-3 gap-3">
+
+          {/* ── Stats grid ─────────────────────────────────────────── */}
+          <div className="grid grid-cols-3 gap-2">
             <div className="bg-secondary/40 rounded-2xl p-3 text-center">
               <div className="text-2xl font-bold">{completed.length}</div>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Dërgesa</div>
             </div>
             <div className="bg-secondary/40 rounded-2xl p-3 text-center">
-              <div className="text-2xl font-bold">{active.length}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Aktive</div>
+              <div className="text-2xl font-bold text-primary">€{totalRevenue.toFixed(0)}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Të ardhura</div>
             </div>
             <div className="bg-secondary/40 rounded-2xl p-3 text-center">
-              {isBusy
-                ? <><div className="text-lg font-bold text-amber-600">~{Math.ceil(ect)}m</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">ETA</div></>
-                : <><div className="text-xs font-bold text-emerald-600 leading-tight mt-1">{isFinite(waitMs) && waitMs >= 0 ? fmtDuration(waitMs) : 'Fre'}</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Pritje</div></>
+              <div className="text-sm font-bold text-emerald-600 leading-tight mt-0.5">{productiveMs > 0 ? fmtDuration(productiveMs) : '—'}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Produktive</div>
+            </div>
+            <div className="bg-secondary/40 rounded-2xl p-3 text-center">
+              <div className="text-sm font-bold leading-tight mt-0.5">{avgDurationMs > 0 ? fmtDuration(avgDurationMs) : '—'}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Mesatare/porosi</div>
+            </div>
+            <div className="bg-secondary/40 rounded-2xl p-3 text-center">
+              {currentWait
+                ? <><div className="text-sm font-bold font-mono text-emerald-600 leading-tight mt-0.5">{currentWait}</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Pritje</div></>
+                : isBusy
+                  ? <><div className="text-sm font-bold text-amber-600 leading-tight mt-0.5">~{Math.ceil(ect)}m</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">ETA</div></>
+                  : <><div className="text-sm font-bold text-muted-foreground leading-tight mt-0.5">—</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Pritje</div></>
+              }
+            </div>
+            <div className="bg-secondary/40 rounded-2xl p-3 text-center">
+              {currentPause
+                ? <><div className="text-sm font-bold font-mono text-amber-600 leading-tight mt-0.5">{currentPause}</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Pauzë</div></>
+                : <><div className="text-sm font-bold text-muted-foreground leading-tight mt-0.5">—</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Pauzë</div></>
               }
             </div>
           </div>
 
+          {/* ── Ratings ────────────────────────────────────────────── */}
           <div className="bg-secondary/30 rounded-2xl p-4">
             <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-3 flex items-center gap-1">
-              <Star className="w-3 h-3" /> Vlerësimet
+              <Star className="w-3 h-3" /> Vlerësimet · {total} vot
             </div>
             {avgRating !== null ? (
               <div className="flex items-center gap-4">
@@ -199,7 +253,6 @@ function DriverDetailModal({ driver, completed, active, waitMs, isBusy, ect, avg
                   <div>
                     <div className="text-3xl font-bold leading-none">{avgRating.toFixed(1)}</div>
                     <div className="flex mt-1">{[1,2,3,4,5].map((s) => <Star key={s} className={`w-3 h-3 ${s <= Math.round(avgRating) ? 'text-amber-400' : 'text-muted-foreground/25'}`} fill={s <= Math.round(avgRating) ? 'currentColor' : 'none'} />)}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">{total} vot</div>
                   </div>
                   {([['😊', happy, 'bg-emerald-400'], ['😐', neutral, 'bg-amber-400'], ['☹️', unhappy, 'bg-red-400']] as const).map(([emoji, count, color]) => (
                     <div key={emoji} className="flex items-center gap-2 text-xs">
@@ -215,6 +268,49 @@ function DriverDetailModal({ driver, completed, active, waitMs, isBusy, ect, avg
             ) : <p className="text-xs text-muted-foreground italic text-center py-2">Asnjë vlerësim ende</p>}
           </div>
 
+          {/* ── Daily charts ───────────────────────────────────────── */}
+          {hasActivity && (
+            <div className="space-y-4">
+              <div className="bg-secondary/30 rounded-2xl p-4">
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-3 flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" /> Porosi / ditë · 14 ditë
+                </div>
+                <ResponsiveContainer width="100%" height={110}>
+                  <BarChart data={dailyData} margin={{ top: 2, right: 4, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="day" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} interval={1} />
+                    <YAxis tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 11 }}
+                      cursor={{ fill: 'hsl(var(--primary) / 0.08)' }}
+                      formatter={(v: number) => [v, 'Porosi']}
+                    />
+                    <Bar dataKey="porosi" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-secondary/30 rounded-2xl p-4">
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-3 flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" /> Të ardhura / ditë · €
+                </div>
+                <ResponsiveContainer width="100%" height={110}>
+                  <LineChart data={dailyData} margin={{ top: 2, right: 4, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="day" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} interval={1} />
+                    <YAxis tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 11 }}
+                      formatter={(v: number) => [`€${v.toFixed(2)}`, 'Të ardhura']}
+                    />
+                    <Line type="monotone" dataKey="te_ardhura" stroke="#22c55e" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* ── Selected order detail ──────────────────────────────── */}
           {selectedOrder && (
             <div className="bg-primary/5 rounded-2xl p-4 border border-primary/20">
               <div className="flex items-center justify-between mb-2">
@@ -239,6 +335,7 @@ function DriverDetailModal({ driver, completed, active, waitMs, isBusy, ect, avg
             </div>
           )}
 
+          {/* ── Logbook ────────────────────────────────────────────── */}
           <div>
             <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center gap-1">
               <CheckCheck className="w-3 h-3" /> Logbook · {completed.length} dërgesa

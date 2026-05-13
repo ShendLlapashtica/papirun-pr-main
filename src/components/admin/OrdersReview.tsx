@@ -52,8 +52,9 @@ const STATUS_LABEL: Record<string, string> = {
 type FilterKey = 'hour' | 'today' | 'week' | 'month' | 'custom' | 'all';
 type StatusFilter = 'active' | 'pending' | 'approved' | 'rejected' | 'history';
 
-// Çagllavicë detection — address text or coordinate bounding box
+// Çagllavicë detection — uses suggestedLocation when set, falls back to address/coord for old orders
 const isCagllavice = (o: OrderRecord): boolean => {
+  if (o.suggestedLocation) return o.suggestedLocation === 'cagllavice';
   const addr = (o.deliveryAddress || '').toLowerCase();
   if (addr.includes('çagllavic') || addr.includes('cagllavic')) return true;
   if (o.deliveryLat !== null && o.deliveryLng !== null) {
@@ -192,6 +193,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [filter, setFilter] = useState<FilterKey>('month');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+  const [locationFilter, setLocationFilter] = useState<'all' | 'qender' | 'cagllavice'>('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -335,7 +337,9 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
         }
       })();
       if (!matchesStatus) return false;
-      if (caglOnly && !isCagllavice(o)) return false;
+      const effectiveLocFilter = caglOnly ? 'cagllavice' : locationFilter;
+      if (effectiveLocFilter === 'cagllavice' && !isCagllavice(o)) return false;
+      if (effectiveLocFilter === 'qender' && isCagllavice(o)) return false;
       if (!q) return true;
       const itemsStr = o.items.map((i: any) => `${i.name?.sq || ''} ${i.name?.en || ''}`).join(' ').toLowerCase();
       return (
@@ -353,7 +357,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFiltered, statusFilter, archivedIds, priorityIds, searchQuery, caglOnly]);
+  }, [timeFiltered, statusFilter, archivedIds, priorityIds, searchQuery, caglOnly, locationFilter]);
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
 
@@ -510,6 +514,29 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
           <FilterTab k="custom" label="Intervali" />
           <FilterTab k="all" label="Të gjitha" />
         </div>
+
+        {/* Location filter — hidden in caglOnly mode (AdminCg always shows cagllavice) */}
+        {!caglOnly && (
+          <div className="flex items-center gap-1.5">
+            {([
+              { key: 'all',        label: 'Të gjitha',   style: 'bg-secondary text-muted-foreground' },
+              { key: 'qender',     label: '🏙 Qendër',   style: 'bg-primary/10 text-primary' },
+              { key: 'cagllavice', label: '🗺 Çagllavicë', style: 'bg-blue-500/10 text-blue-600' },
+            ] as const).map(({ key, label, style }) => (
+              <button
+                key={key}
+                onClick={() => setLocationFilter(key)}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
+                  locationFilter === key
+                    ? `${style} ring-2 ring-offset-1 ring-current/30 shadow-sm`
+                    : 'bg-secondary/60 text-muted-foreground hover:bg-secondary'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {(filter === 'custom' || statusFilter === 'history') && (
           <div className="flex flex-wrap items-center gap-2 bg-secondary/40 rounded-xl p-2.5 text-xs">

@@ -7,7 +7,6 @@ import DriversKPI from '@/components/admin/DriversKPI';
 const ADMINCG_PASS = 'Pass123';
 const ADMINCG_AUTH_KEY = 'papirun_admincg_authed';
 
-// Blue-shifted CSS variable overrides for the Çagllavicë admin
 const BLUE_THEME: React.CSSProperties = {
   '--primary': '213 94% 49%',
   '--primary-foreground': '0 0% 100%',
@@ -21,7 +20,6 @@ export default function AdminCg() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'orders' | 'drivers'>('orders');
-  const [caglOnly, setCaglOnly] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,11 +82,10 @@ export default function AdminCg() {
             </div>
             <div>
               <h1 className="font-bold text-base leading-tight text-blue-700 dark:text-blue-400">Papirun Çagllavicë</h1>
-              <p className="text-[10px] text-muted-foreground">Admin Panel</p>
+              <p className="text-[10px] text-muted-foreground">Vetëm porositë e Çagllavicës</p>
             </div>
           </div>
 
-          {/* Tabs */}
           <div className="flex items-center gap-1 bg-secondary rounded-full p-1">
             {([
               { key: 'orders', label: 'Porositë', Icon: Package },
@@ -119,31 +116,8 @@ export default function AdminCg() {
       </div>
 
       <div className="container mx-auto px-4 py-6">
-        {activeTab === 'orders' && (
-          <div className="space-y-4">
-            {/* Çagllavicë filter toggle */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setCaglOnly((v) => !v)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
-                  caglOnly
-                    ? 'bg-blue-500 text-white border-blue-500 shadow'
-                    : 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-400/30 hover:bg-blue-500/20'
-                }`}
-              >
-                <span className="text-base leading-none">🗺</span>
-                {caglOnly ? 'Vetëm Çagllavicë · aktiv' : 'Vetëm Çagllavicë'}
-              </button>
-              {caglOnly && (
-                <span className="text-xs text-muted-foreground">
-                  Duke shfaqur vetëm porositë e Çagllavicës
-                </span>
-              )}
-            </div>
-            <OrdersReview caglOnly={caglOnly} />
-          </div>
-        )}
-
+        {/* caglOnly=true → OrdersReview always filters to Çagllavicë, hides location toggle */}
+        {activeTab === 'orders' && <OrdersReview caglOnly={true} />}
         {activeTab === 'drivers' && <DriversKPI />}
       </div>
     </div>

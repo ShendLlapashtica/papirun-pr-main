@@ -1,8 +1,17 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { CartItem } from '@/types/menu';
+import { haversineKm, RESTAURANT_COORDS, CAGLLAVICE_COORDS } from '@/lib/driversApi';
 
 export type OrderStatus = 'pending' | 'approved' | 'preparing' | 'out_for_delivery' | 'rejected' | 'completed' | 'histori';
 export type OrderSource = 'web' | 'app';
+export type OrderLocation = 'qender' | 'cagllavice';
+
+function suggestOrderLocation(lat: number | null, lng: number | null): OrderLocation {
+  if (lat == null || lng == null) return 'qender';
+  const dQ = haversineKm(lat, lng, RESTAURANT_COORDS.lat, RESTAURANT_COORDS.lng);
+  const dC = haversineKm(lat, lng, CAGLLAVICE_COORDS.lat, CAGLLAVICE_COORDS.lng);
+  return dC < dQ ? 'cagllavice' : 'qender';
+}
 
 export interface OrderStatusEvent {
   status: OrderStatus;
@@ -32,6 +41,7 @@ export interface OrderRecord {
   isVisible: boolean;
   assignedDriverId?: string | null;
   driverRating?: number | null;
+  suggestedLocation: OrderLocation;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,6 +68,7 @@ type Row = {
   is_visible: boolean | null;
   assigned_driver_id?: string | null;
   driver_rating?: number | null;
+  suggested_location?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -86,6 +97,7 @@ const mapRow = (row: Row): OrderRecord => ({
   isVisible: row.is_visible !== false,
   assignedDriverId: row.assigned_driver_id,
   driverRating: row.driver_rating,
+  suggestedLocation: (row.suggested_location === 'cagllavice' ? 'cagllavice' : 'qender') as OrderLocation,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -134,6 +146,7 @@ export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord>
     notes: input.notes ?? '',
     status: 'pending',
     source: input.source ?? detectOrderSource(),
+    suggested_location: suggestOrderLocation(input.deliveryLat, input.deliveryLng),
   };
   const { data, error } = await client.from(TABLE).insert(payload).select('*').single();
   if (error) throw error;
