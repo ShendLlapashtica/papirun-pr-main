@@ -6,7 +6,9 @@ export type OrderStatus = 'pending' | 'approved' | 'preparing' | 'out_for_delive
 export type OrderSource = 'web' | 'app';
 export type OrderLocation = 'qender' | 'cagllavice';
 
-function suggestOrderLocation(lat: number | null, lng: number | null): OrderLocation {
+function suggestOrderLocation(lat: number | null, lng: number | null, address = ''): OrderLocation {
+  const addr = address.toLowerCase();
+  if (addr.includes('çagllavic') || addr.includes('cagllavic')) return 'cagllavice';
   if (lat == null || lng == null) return 'qender';
   const dQ = haversineKm(lat, lng, RESTAURANT_COORDS.lat, RESTAURANT_COORDS.lng);
   const dC = haversineKm(lat, lng, CAGLLAVICE_COORDS.lat, CAGLLAVICE_COORDS.lng);
@@ -97,7 +99,10 @@ const mapRow = (row: Row): OrderRecord => ({
   isVisible: row.is_visible !== false,
   assignedDriverId: row.assigned_driver_id,
   driverRating: row.driver_rating,
-  suggestedLocation: (row.suggested_location === 'cagllavice' ? 'cagllavice' : 'qender') as OrderLocation,
+  // Use DB column when present (after migration); fall back to coords+address for old/unmigrated orders
+  suggestedLocation: (row.suggested_location === 'cagllavice' || row.suggested_location === 'qender')
+    ? row.suggested_location as OrderLocation
+    : suggestOrderLocation(row.delivery_lat ?? null, row.delivery_lng ?? null, row.delivery_address || ''),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -146,7 +151,6 @@ export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord>
     notes: input.notes ?? '',
     status: 'pending',
     source: input.source ?? detectOrderSource(),
-    suggested_location: suggestOrderLocation(input.deliveryLat, input.deliveryLng),
   };
   const { data, error } = await client.from(TABLE).insert(payload).select('*').single();
   if (error) throw error;
