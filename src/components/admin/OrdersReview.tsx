@@ -520,8 +520,8 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
           <div className="flex items-center gap-1.5">
             {([
               { key: 'all',        label: 'Të gjitha',   style: 'bg-secondary text-muted-foreground' },
-              { key: 'qender',     label: '🏙 Qendër',   style: 'bg-primary/10 text-primary' },
-              { key: 'cagllavice', label: '🗺 Çagllavicë', style: 'bg-blue-500/10 text-blue-600' },
+              { key: 'qender',     label: 'Q Qendër',     style: 'bg-primary/10 text-primary' },
+              { key: 'cagllavice', label: 'C Çagllavicë', style: 'bg-blue-500/10 text-blue-600' },
             ] as const).map(({ key, label, style }) => (
               <button
                 key={key}
@@ -800,7 +800,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                         </span>
                         {isCagl && (
                           <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold border border-blue-400/30">
-                            📍 Porosi për Çagllavicë!
+                            C Çagllavicë
                           </span>
                         )}
                         {isArchived && (

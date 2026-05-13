@@ -5,6 +5,8 @@ import {
   fetchDrivers,
   fetchDriverById,
   fetchDriverOrders,
+  fetchOrderAssignTimes,
+  saveDriverPushSub,
   seedDefaultDrivers,
   subscribeDriverOrdersRealtime,
   updateDriverLocation,
@@ -17,7 +19,14 @@ import { archiveAllActiveOrders } from '@/lib/ordersApi';
 import { playKrring } from '@/lib/sounds';
 
 const DRIVER_SESSION_KEY = 'papirun_driver_session';
-import { updateOrderStatus, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+}
+import { updateOrderStatus, suggestOrderLocation, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import OrderChat from '@/components/OrderChat';
 import DriverLocationMap from '@/components/DriverLocationMap';
 
@@ -44,6 +53,7 @@ const mapOrderRow = (row: any): OrderRecord => ({
   isVisible: row.is_visible !== false,
   assignedDriverId: row.assigned_driver_id ?? null,
   driverRating: row.driver_rating ?? null,
+  suggestedLocation: suggestOrderLocation(row.delivery_lat ?? null, row.delivery_lng ?? null, row.delivery_address || ''),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -70,6 +80,14 @@ function fmtHours(ms: number): string {
   return `${m}m`;
 }
 
+function fmtElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 const DriverPanel = () => {
   const [driver, setDriver] = useState<DeliveryDriver | null>(null);
   const [username, setUsername] = useState('');
@@ -80,6 +98,8 @@ const DriverPanel = () => {
   const prevOrderCountRef = useRef(0);
   const watchIdRef = useRef<number | null>(null);
   const driverRef = useRef<DeliveryDriver | null>(null);
+  const assignTimesRef = useRef<Record<string, number>>({});
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     seedDefaultDrivers().catch(console.error);
@@ -118,11 +138,17 @@ const DriverPanel = () => {
       const raw = await fetchDriverOrders(driverId);
       const mapped = (raw as any[]).map(mapOrderRow);
       setOrders(mapped);
-      const activeCount = mapped.filter((o) => !['completed', 'rejected', 'histori'].includes(o.status)).length;
+      const active = mapped.filter((o) => !['completed', 'rejected', 'histori'].includes(o.status));
+      const activeCount = active.length;
       if (activeCount > prevOrderCountRef.current && prevOrderCountRef.current >= 0) {
         playKrring();
       }
       prevOrderCountRef.current = activeCount;
+      if (active.length > 0) {
+        fetchOrderAssignTimes(active.map(o => o.id)).then(times => {
+          assignTimesRef.current = { ...assignTimesRef.current, ...times };
+        }).catch(() => {});
+      }
     } catch (e) { console.error(e); }
   }, []);
 
@@ -133,7 +159,8 @@ const DriverPanel = () => {
     const unsub = subscribeDriverOrdersRealtime(driver.id, () => {
       if (active) syncOrders(driver.id);
     });
-    return () => { active = false; unsub(); };
+    const poll = setInterval(() => { if (active) syncOrders(driver.id); }, 8000);
+    return () => { active = false; unsub(); clearInterval(poll); };
   }, [driver, syncOrders]);
 
   // Midnight clean-slate: archive all active orders at 00:00
@@ -158,6 +185,30 @@ const DriverPanel = () => {
   }, [driver, syncOrders]);
 
   useEffect(() => { driverRef.current = driver; }, [driver]);
+
+  useEffect(() => {
+    if (!driver) return;
+    const t = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [driver]);
+
+  useEffect(() => {
+    if (!driver || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+    if (!vapidKey) return;
+    navigator.serviceWorker.register('/sw.js').then(async (reg) => {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+      }
+      await saveDriverPushSub(driver.id, sub.toJSON());
+    }).catch(() => {});
+  }, [driver?.id]);
 
   const stopTracking = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -200,9 +251,15 @@ const DriverPanel = () => {
   const handleStatus = async (id: string, status: OrderStatus) => {
     setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status } : o));
     if (status === 'completed') setSelectedId(null);
+    if (status === 'out_for_delivery') {
+      const assignedAt = assignTimesRef.current[id];
+      if (assignedAt) {
+        toast.success(`Pranuat pas ${fmtElapsed(Date.now() - assignedAt)}`);
+      }
+    }
     try {
       await updateOrderStatus(id, status);
-      toast.success(STATUS_LABEL[status] ?? status);
+      if (status !== 'out_for_delivery') toast.success(STATUS_LABEL[status] ?? status);
     } catch {
       toast.error('Gabim');
       if (driver) syncOrders(driver.id);
@@ -380,9 +437,17 @@ const DriverPanel = () => {
                       <MapPin className="w-3 h-3" /> {o.deliveryAddress}
                     </div>
                   </div>
-                  <span className={`text-[10px] px-2 py-1 rounded-full font-medium whitespace-nowrap ${statusColor(o.status)}`}>
-                    {STATUS_LABEL[o.status] ?? o.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={`text-[10px] px-2 py-1 rounded-full font-medium whitespace-nowrap ${statusColor(o.status)}`}>
+                      {STATUS_LABEL[o.status] ?? o.status}
+                    </span>
+                    {assignTimesRef.current[o.id] && tick >= 0 && (
+                      <span className="text-[10px] text-amber-600 font-medium flex items-center gap-0.5">
+                        <Timer className="w-3 h-3" />
+                        {fmtElapsed(Date.now() - assignTimesRef.current[o.id])}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
                   <span className="text-xs text-muted-foreground">{o.items.length} artikuj</span>

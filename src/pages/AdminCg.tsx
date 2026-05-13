@@ -43,7 +43,7 @@ export default function AdminCg() {
         <div className="w-full max-w-sm bg-white/5 backdrop-blur rounded-3xl p-8 border border-white/10 shadow-2xl">
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center mx-auto mb-4 border border-blue-400/30">
-              <span className="text-3xl">🗺</span>
+              <span className="text-2xl font-black text-blue-400">C</span>
             </div>
             <h1 className="font-bold text-2xl text-white">Papirun Çagllavicë</h1>
             <p className="text-blue-300 text-sm mt-1">Paneli i Administratorit</p>
@@ -78,7 +78,7 @@ export default function AdminCg() {
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center border border-blue-400/30">
-              <span className="text-lg">🗺</span>
+              <span className="text-base font-black text-blue-500">C</span>
             </div>
             <div>
               <h1 className="font-bold text-base leading-tight text-blue-700 dark:text-blue-400">Papirun Çagllavicë</h1>

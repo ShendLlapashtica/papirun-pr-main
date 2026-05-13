@@ -6,7 +6,7 @@ export type OrderStatus = 'pending' | 'approved' | 'preparing' | 'out_for_delive
 export type OrderSource = 'web' | 'app';
 export type OrderLocation = 'qender' | 'cagllavice';
 
-function suggestOrderLocation(lat: number | null, lng: number | null, address = ''): OrderLocation {
+export function suggestOrderLocation(lat: number | null, lng: number | null, address = ''): OrderLocation {
   const addr = address.toLowerCase();
   if (addr.includes('çagllavic') || addr.includes('cagllavic')) return 'cagllavice';
   if (lat == null || lng == null) return 'qender';

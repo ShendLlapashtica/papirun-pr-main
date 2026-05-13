@@ -296,11 +296,58 @@ export const deleteDriver = async (id: string) => {
   if (error) throw error;
 };
 
-/** Assign a driver to an order */
+const PUSH_SUB_PREFIX = 'driver_push_sub_';
+
+/** Save a driver's Web Push subscription to storefront_settings */
+export const saveDriverPushSub = async (driverId: string, sub: PushSubscriptionJSON) => {
+  const client = supabase as any;
+  await client.from('storefront_settings').upsert(
+    { key: `${PUSH_SUB_PREFIX}${driverId}`, value_json: sub },
+    { onConflict: 'key' }
+  );
+};
+
+/** Assign a driver to an order, record assignment timestamp, and send a push notification */
 export const assignDriverToOrder = async (orderId: string, driverId: string) => {
   const client = supabase as any;
   const { error } = await client.from('orders').update({ assigned_driver_id: driverId }).eq('id', orderId);
   if (error) throw error;
+  await client.from('storefront_settings').upsert(
+    { key: `order_assign_${orderId}`, value_json: { at: Date.now(), driverId } },
+    { onConflict: 'key' }
+  );
+  // Fire-and-forget push notification to the driver
+  const { data: subRow } = await client
+    .from('storefront_settings')
+    .select('value_json')
+    .eq('key', `${PUSH_SUB_PREFIX}${driverId}`)
+    .maybeSingle();
+  if (subRow?.value_json) {
+    fetch('/api/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: subRow.value_json,
+        title: 'Porosi e re!',
+        body: 'Ke nje porosi te re.',
+        orderId,
+      }),
+    }).catch(() => {});
+  }
+};
+
+/** Fetch assignment timestamps for a batch of orders. Returns map orderId → ms timestamp. */
+export const fetchOrderAssignTimes = async (orderIds: string[]): Promise<Record<string, number>> => {
+  if (!orderIds.length) return {};
+  const client = supabase as any;
+  const keys = orderIds.map(id => `order_assign_${id}`);
+  const { data } = await client.from('storefront_settings').select('key, value_json').in('key', keys);
+  const map: Record<string, number> = {};
+  for (const row of (data ?? []) as { key: string; value_json: any }[]) {
+    const id = row.key.replace('order_assign_', '');
+    if (row.value_json?.at) map[id] = Number(row.value_json.at);
+  }
+  return map;
 };
 
 /** Rate a driver for a specific order (1-5) */
