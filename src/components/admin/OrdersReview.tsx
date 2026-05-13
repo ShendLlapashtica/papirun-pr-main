@@ -188,7 +188,7 @@ const ConfirmDeleteDialog = ({ title, description, onConfirm, onCancel }: Confir
   );
 };
 
-const OrdersReview = () => {
+const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [filter, setFilter] = useState<FilterKey>('month');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
@@ -335,6 +335,7 @@ const OrdersReview = () => {
         }
       })();
       if (!matchesStatus) return false;
+      if (caglOnly && !isCagllavice(o)) return false;
       if (!q) return true;
       const itemsStr = o.items.map((i: any) => `${i.name?.sq || ''} ${i.name?.en || ''}`).join(' ').toLowerCase();
       return (
@@ -352,7 +353,7 @@ const OrdersReview = () => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFiltered, statusFilter, archivedIds, priorityIds, searchQuery]);
+  }, [timeFiltered, statusFilter, archivedIds, priorityIds, searchQuery, caglOnly]);
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
 

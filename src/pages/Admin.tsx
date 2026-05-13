@@ -254,9 +254,6 @@ const DriversManager = () => {
 
   return (
     <div className="space-y-4">
-      {/* Live colored driver map */}
-      <DriverLocationMap drivers={drivers} height="340px" allowFullscreen />
-
       <div className="flex items-center justify-between">
         <h3 className="font-display font-bold text-lg">Menaxhimi i Shoferëve</h3>
         <button
@@ -288,7 +285,7 @@ const DriversManager = () => {
         <p className="text-sm text-muted-foreground py-4 text-center">Nuk ka shoferë. Shto njërin me butonin lart.</p>
       ) : (
         <div className="space-y-2">
-          {drivers.map((d) => (
+          {drivers.filter((d) => d.isActive).map((d) => (
             <div key={d.id} className={`bg-card rounded-2xl p-4 shadow-card border border-border/40 transition-opacity ${!d.isActive ? 'opacity-60' : ''}`}>
               {editingId === d.id ? (
                 <div className="space-y-2">
@@ -363,6 +360,9 @@ const DriversManager = () => {
           ))}
         </div>
       )}
+
+      {/* Map at bottom */}
+      <DriverLocationMap drivers={drivers} height="340px" allowFullscreen />
     </div>
   );
 };
@@ -898,8 +898,8 @@ const Admin = () => {
         {activeTab === 'users' && <SubscribersList />}
         {activeTab === 'drivers' && (
           <div className="space-y-8">
-            <DriversManager />
             <DriversKPI />
+            <DriversManager />
           </div>
         )}
         {activeTab === 'harta' && (

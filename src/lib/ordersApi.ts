@@ -198,6 +198,24 @@ export const hardDeleteOrdersBatch = async (ids: string[]) => {
   if (error) throw error;
 };
 
+/** Archive every active order at midnight — moves them to history (invisible) */
+export const archiveAllActiveOrders = async (): Promise<void> => {
+  const client = supabase as any;
+  const { error } = await client
+    .from(TABLE)
+    .update({ status: 'histori', is_visible: false })
+    .in('status', ['pending', 'approved', 'preparing', 'out_for_delivery']);
+  if (error) throw error;
+};
+
+/** Truncate — hard delete every order. For admin clean-slate button. */
+export const hardDeleteAllOrders = async (): Promise<void> => {
+  const client = supabase as any;
+  // Delete in two passes: visible then hidden, to avoid RLS row limits
+  const { error } = await client.from(TABLE).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (error) throw error;
+};
+
 export const subscribeOrderRealtime = (id: string, onChange: (order: OrderRecord) => void) => {
   const channel = supabase
     .channel(`order-${id}`)

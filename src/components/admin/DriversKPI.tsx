@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { fetchDrivers, setDriverPause, approvePause, driverShortCode, type DeliveryDriver } from '@/lib/driversApi';
-import { fetchAllOrders, type OrderRecord } from '@/lib/ordersApi';
-import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
+import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchAllOrders, hardDeleteAllOrders, type OrderRecord } from '@/lib/ordersApi';
+import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle, Trash2, Loader2 } from 'lucide-react';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -283,6 +283,8 @@ export default function DriversKPI() {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [tick, setTick] = useState(Date.now());
   const [detailDriverId, setDetailDriverId] = useState<string | null>(null);
+  const [showCleanConfirm, setShowCleanConfirm] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
 
   const load = useCallback(() => {
     fetchDrivers().then(setDrivers).catch(console.error);
@@ -311,9 +313,21 @@ export default function DriversKPI() {
     try { await setDriverPause(driverId, false); } catch { load(); }
   };
 
+  const handleCleanAll = async () => {
+    setCleaning(true);
+    try {
+      await hardDeleteAllOrders();
+      await resetAllDriverTimers();
+      setOrders([]);
+      load();
+      setShowCleanConfirm(false);
+    } catch { load(); }
+    finally { setCleaning(false); }
+  };
+
   const bestId = useMemo(() => pickBestDriver(drivers, orders), [drivers, orders, tick]);
 
-  const cols = useMemo(() => drivers.map((driver) => {
+  const cols = useMemo(() => drivers.filter((d) => d.isActive).map((driver) => {
     const all = orders.filter((o) => o.assignedDriverId === driver.id);
     const completed = all.filter((o) => o.status === 'completed')
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
@@ -472,6 +486,34 @@ export default function DriversKPI() {
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
           Live
         </span>
+        <div className="ml-auto">
+          {!showCleanConfirm ? (
+            <button
+              onClick={() => setShowCleanConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+            >
+              <Trash2 className="w-3 h-3" /> PASTRIMI I POROSIVE
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-destructive">Konfirmo fshirjen?</span>
+              <button
+                disabled={cleaning}
+                onClick={handleCleanAll}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-destructive text-white hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+              >
+                {cleaning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                Po, fshij
+              </button>
+              <button
+                onClick={() => setShowCleanConfirm(false)}
+                className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-secondary text-muted-foreground hover:bg-secondary/80 transition-colors"
+              >
+                Anulo
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════

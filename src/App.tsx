@@ -19,6 +19,7 @@ import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import DriverPanel from "./pages/DriverPanel";
 import InvoicePage from "./pages/InvoicePage";
+import AdminCg from "./pages/AdminCg";
 import OrderTrackingPill from "@/components/OrderTrackingPill";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
                   <Route path="/Driverpanel" element={<Navigate to="/driver" replace />} />
                   <Route path="/driverpanel" element={<Navigate to="/driver" replace />} />
                   <Route path="/driver-panel" element={<Navigate to="/driver" replace />} />
+                  <Route path="/admincg" element={<AdminCg />} />
                   <Route path="/invoice/:id" element={<InvoicePage />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

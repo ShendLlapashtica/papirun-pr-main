@@ -254,6 +254,21 @@ export const approvePause = async (id: string) => {
   await _upsertPause(id, { paused: true, pendingApproval: false, pausedAt: Date.now() });
 };
 
+/** Admin clean-slate: wipe all pause/wait state so every driver starts from 0s */
+export const resetAllDriverTimers = async (): Promise<void> => {
+  const client = supabase as any;
+  const now = Date.now();
+  // Set all drivers to available with availableSince = now
+  const { data } = await client.from('delivery_drivers').select('id');
+  if (!data) return;
+  for (const row of data as { id: string }[]) {
+    await client.from('storefront_settings').upsert(
+      { key: `${PAUSE_PREFIX}${row.id}`, value_json: { paused: false, pendingApproval: false, availableSince: now, t: now } },
+      { onConflict: 'key' }
+    );
+  }
+};
+
 /**
  * Update a driver's GPS position.
  * Location is stored in storefront_settings (key = driver_loc_{id}) so no
