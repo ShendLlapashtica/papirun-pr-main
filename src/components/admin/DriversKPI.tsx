@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { fetchDrivers, setDriverPause, driverShortCode, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, setDriverPause, approvePause, driverShortCode, type DeliveryDriver } from '@/lib/driversApi';
 import { fetchAllOrders, type OrderRecord } from '@/lib/ordersApi';
-import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp } from 'lucide-react';
+import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,23 @@ export function driverIdleMs(driverId: string, orders: OrderRecord[], now = Date
   return now - new Date(last.updatedAt).getTime();
 }
 
+/**
+ * Wait time for a driver — considers both order history and availableSince (from unpause).
+ * Returns -1 if busy, otherwise ms waited.
+ */
+function driverWaitMs(driver: DeliveryDriver, orders: OrderRecord[], now = Date.now()): number {
+  const idle = driverIdleMs(driver.id, orders, now);
+  if (idle === -1) return -1;
+
+  // availableSince is set when driver unpauses — use whichever is more recent
+  if (driver.availableSince != null) {
+    const sinceAvail = now - driver.availableSince;
+    if (!isFinite(idle)) return sinceAvail;
+    return Math.min(idle, sinceAvail);
+  }
+  return idle;
+}
+
 /** ECT: remaining minutes across all active orders for a driver */
 function driverECT(driverId: string, orders: OrderRecord[], now = Date.now()): number {
   return orders
@@ -53,22 +70,20 @@ function driverECT(driverId: string, orders: OrderRecord[], now = Date.now()): n
     }, 0);
 }
 
-/**
- * Pick best driver: skip paused drivers, prefer longest-idle, fallback to lowest ECT.
- */
+/** Pick best driver: skip paused/pending drivers, prefer longest-idle, fallback lowest ECT */
 export function pickBestDriver(drivers: DeliveryDriver[], orders: OrderRecord[]): string | null {
-  const active = drivers.filter((d) => d.isActive && !d.isPaused);
+  const active = drivers.filter((d) => d.isActive && !d.isPaused && !d.isPendingPause);
   if (!active.length) return null;
 
   const now = Date.now();
-  const withIdle = active.map((d) => ({ id: d.id, idleMs: driverIdleMs(d.id, orders, now) }));
-  const idle = withIdle.filter((x) => x.idleMs >= 0);
+  const withWait = active.map((d) => ({ id: d.id, waitMs: driverWaitMs(d, orders, now) }));
+  const idle = withWait.filter((x) => x.waitMs >= 0);
 
   if (idle.length > 0) {
     return idle.reduce((best, x) => {
-      if (!isFinite(best.idleMs)) return best;
-      if (!isFinite(x.idleMs)) return x;
-      return x.idleMs > best.idleMs ? x : best;
+      if (!isFinite(best.waitMs)) return best;
+      if (!isFinite(x.waitMs)) return x;
+      return x.waitMs > best.waitMs ? x : best;
     }).id;
   }
 
@@ -86,7 +101,7 @@ function PieChart({ happy, neutral, unhappy }: { happy: number; neutral: number;
   );
 
   const slices = [
-    { count: happy,   color: '#22c55e' },
+    { count: happy, color: '#22c55e' },
     { count: neutral, color: '#f59e0b' },
     { count: unhappy, color: '#ef4444' },
   ];
@@ -104,11 +119,7 @@ function PieChart({ happy, neutral, unhappy }: { happy: number; neutral: number;
     const y2 = cy + r * Math.sin(cumAngle);
     const largeArc = angle > Math.PI ? 1 : 0;
     return (
-      <path
-        key={color}
-        d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`}
-        fill={color}
-      />
+      <path key={color} d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`} fill={color} />
     );
   });
 
@@ -116,9 +127,7 @@ function PieChart({ happy, neutral, unhappy }: { happy: number; neutral: number;
     <svg viewBox="0 0 80 80" className="w-20 h-20 drop-shadow-sm">
       {paths}
       <circle cx={cx} cy={cy} r={16} fill="hsl(var(--card))" />
-      <text x={cx} y={cy + 5} textAnchor="middle" fontSize={12} fontWeight="bold" fill="currentColor">
-        {total}
-      </text>
+      <text x={cx} y={cy + 5} textAnchor="middle" fontSize={12} fontWeight="bold" fill="currentColor">{total}</text>
     </svg>
   );
 }
@@ -129,62 +138,39 @@ interface DriverDetailProps {
   driver: DeliveryDriver;
   completed: OrderRecord[];
   active: OrderRecord[];
-  idleMs: number;
+  waitMs: number;
   isBusy: boolean;
   ect: number;
   avgRating: number | null;
-  happy: number;
-  neutral: number;
-  unhappy: number;
-  total: number;
+  happy: number; neutral: number; unhappy: number; total: number;
   isNext: boolean;
   onClose: () => void;
 }
 
-function DriverDetailModal({
-  driver, completed, active, idleMs, isBusy, ect,
-  avgRating, happy, neutral, unhappy, total, isNext, onClose,
-}: DriverDetailProps) {
+function DriverDetailModal({ driver, completed, active, waitMs, isBusy, ect, avgRating, happy, neutral, unhappy, total, isNext, onClose }: DriverDetailProps) {
   const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-background rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col border border-border/40">
-        {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border/40 shrink-0">
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-base shrink-0 shadow"
-            style={{ background: driver.color || '#6b7280' }}
-          >
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-base shrink-0 shadow" style={{ background: driver.color || '#6b7280' }}>
             {driverShortCode(driver)}
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-bold text-lg leading-tight">{driver.name}</div>
             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-              {driver.isActive
-                ? <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">Aktiv</span>
-                : <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">Jo aktiv</span>
-              }
-              {driver.isPaused && (
-                <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                  <Coffee className="w-2.5 h-2.5" /> Në pauzë
-                </span>
-              )}
-              {isNext && (
-                <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                  <Zap className="w-2.5 h-2.5" /> Tjetri
-                </span>
-              )}
+              {driver.isActive ? <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">Aktiv</span>
+                : <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">Jo aktiv</span>}
+              {driver.isPaused && <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Coffee className="w-2.5 h-2.5" /> Në pauzë</span>}
+              {isNext && <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Zap className="w-2.5 h-2.5" /> Tjetri</span>}
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-secondary shrink-0">
-            <X className="w-5 h-5" />
-          </button>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-secondary shrink-0"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="overflow-y-auto flex-1 p-5 space-y-5">
-          {/* Stats row */}
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-secondary/40 rounded-2xl p-3 text-center">
               <div className="text-2xl font-bold">{completed.length}</div>
@@ -197,12 +183,11 @@ function DriverDetailModal({
             <div className="bg-secondary/40 rounded-2xl p-3 text-center">
               {isBusy
                 ? <><div className="text-lg font-bold text-amber-600">~{Math.ceil(ect)}m</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">ETA</div></>
-                : <><div className="text-sm font-bold text-emerald-600 leading-tight mt-1">{isFinite(idleMs) ? fmtDuration(idleMs) : 'Fre'}</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Pritje</div></>
+                : <><div className="text-xs font-bold text-emerald-600 leading-tight mt-1">{isFinite(waitMs) && waitMs >= 0 ? fmtDuration(waitMs) : 'Fre'}</div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Pritje</div></>
               }
             </div>
           </div>
 
-          {/* Ratings + Pie */}
           <div className="bg-secondary/30 rounded-2xl p-4">
             <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-3 flex items-center gap-1">
               <Star className="w-3 h-3" /> Vlerësimet
@@ -213,15 +198,7 @@ function DriverDetailModal({
                 <div className="flex-1 space-y-2">
                   <div>
                     <div className="text-3xl font-bold leading-none">{avgRating.toFixed(1)}</div>
-                    <div className="flex mt-1">
-                      {[1,2,3,4,5].map((s) => (
-                        <Star
-                          key={s}
-                          className={`w-3 h-3 ${s <= Math.round(avgRating) ? 'text-amber-400' : 'text-muted-foreground/25'}`}
-                          fill={s <= Math.round(avgRating) ? 'currentColor' : 'none'}
-                        />
-                      ))}
-                    </div>
+                    <div className="flex mt-1">{[1,2,3,4,5].map((s) => <Star key={s} className={`w-3 h-3 ${s <= Math.round(avgRating) ? 'text-amber-400' : 'text-muted-foreground/25'}`} fill={s <= Math.round(avgRating) ? 'currentColor' : 'none'} />)}</div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">{total} vot</div>
                   </div>
                   {([['😊', happy, 'bg-emerald-400'], ['😐', neutral, 'bg-amber-400'], ['☹️', unhappy, 'bg-red-400']] as const).map(([emoji, count, color]) => (
@@ -235,12 +212,9 @@ function DriverDetailModal({
                   ))}
                 </div>
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground italic text-center py-2">Asnjë vlerësim ende</p>
-            )}
+            ) : <p className="text-xs text-muted-foreground italic text-center py-2">Asnjë vlerësim ende</p>}
           </div>
 
-          {/* Order selected detail */}
           {selectedOrder && (
             <div className="bg-primary/5 rounded-2xl p-4 border border-primary/20">
               <div className="flex items-center justify-between mb-2">
@@ -255,146 +229,49 @@ function DriverDetailModal({
               </div>
               {selectedOrder.driverRating != null && (
                 <div className="mt-2 flex items-center gap-1.5">
-                  <span className="text-base">
-                    {selectedOrder.driverRating >= 4 ? '😊' : selectedOrder.driverRating >= 2 ? '😐' : '☹️'}
-                  </span>
-                  <div className="flex">
-                    {[1,2,3,4,5].map((s) => (
-                      <Star key={s} className={`w-3 h-3 ${s <= selectedOrder.driverRating! ? 'text-amber-400' : 'text-muted-foreground/20'}`} fill={s <= selectedOrder.driverRating! ? 'currentColor' : 'none'} />
-                    ))}
-                  </div>
+                  <span className="text-base">{selectedOrder.driverRating >= 4 ? '😊' : selectedOrder.driverRating >= 2 ? '😐' : '☹️'}</span>
+                  <div className="flex">{[1,2,3,4,5].map((s) => <Star key={s} className={`w-3 h-3 ${s <= selectedOrder.driverRating! ? 'text-amber-400' : 'text-muted-foreground/20'}`} fill={s <= selectedOrder.driverRating! ? 'currentColor' : 'none'} />)}</div>
                 </div>
               )}
               <div className="mt-2 space-y-0.5">
-                {selectedOrder.items.map((it: any, i) => (
-                  <div key={i} className="text-xs text-muted-foreground">• {it.quantity}x {it.name?.sq || it.name?.en || it.id}</div>
-                ))}
+                {selectedOrder.items.map((it: any, i) => <div key={i} className="text-xs text-muted-foreground">• {it.quantity}x {it.name?.sq || it.name?.en || it.id}</div>)}
               </div>
             </div>
           )}
 
-          {/* Full logbook */}
           <div>
             <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center gap-1">
               <CheckCheck className="w-3 h-3" /> Logbook · {completed.length} dërgesa
             </div>
-            {completed.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic text-center py-4">Asnjë dërgim i kryer</p>
-            ) : (
-              <div className="divide-y divide-border/20 rounded-2xl overflow-hidden border border-border/30">
-                {completed.map((o) => (
-                  <button
-                    key={o.id}
-                    onClick={() => setSelectedOrder(selectedOrder?.id === o.id ? null : o)}
-                    className={`w-full px-4 py-2.5 flex items-center gap-2 text-xs hover:bg-secondary/50 transition-colors text-left ${selectedOrder?.id === o.id ? 'bg-primary/5' : ''}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-[10px] text-muted-foreground leading-none mb-0.5">#{o.id.slice(0, 6).toUpperCase()}</div>
-                      <div className="font-semibold truncate">{o.customerName}</div>
-                      <div className="text-[10px] text-muted-foreground truncate">{o.deliveryAddress}</div>
-                    </div>
-                    <div className="text-right shrink-0 text-muted-foreground space-y-0.5">
-                      <div className="font-bold text-foreground">€{o.total.toFixed(2)}</div>
-                      <div className="text-[10px]">{fmtDate(o.updatedAt)}</div>
-                    </div>
-                    <div className="shrink-0 text-base leading-none w-6 text-center">
-                      {o.driverRating != null
-                        ? (o.driverRating >= 4 ? '😊' : o.driverRating >= 2 ? '😐' : '☹️')
-                        : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40" />
-                      }
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+            {completed.length === 0
+              ? <p className="text-xs text-muted-foreground italic text-center py-4">Asnjë dërgim i kryer</p>
+              : (
+                <div className="divide-y divide-border/20 rounded-2xl overflow-hidden border border-border/30">
+                  {completed.map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => setSelectedOrder(selectedOrder?.id === o.id ? null : o)}
+                      className={`w-full px-4 py-2.5 flex items-center gap-2 text-xs hover:bg-secondary/50 transition-colors text-left ${selectedOrder?.id === o.id ? 'bg-primary/5' : ''}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-[10px] text-muted-foreground leading-none mb-0.5">#{o.id.slice(0, 6).toUpperCase()}</div>
+                        <div className="font-semibold truncate">{o.customerName}</div>
+                        <div className="text-[10px] text-muted-foreground truncate">{o.deliveryAddress}</div>
+                      </div>
+                      <div className="text-right shrink-0 space-y-0.5">
+                        <div className="font-bold text-foreground">€{o.total.toFixed(2)}</div>
+                        <div className="text-[10px] text-muted-foreground">{fmtDate(o.updatedAt)}</div>
+                      </div>
+                      <div className="shrink-0 text-base leading-none w-6 text-center">
+                        {o.driverRating != null ? (o.driverRating >= 4 ? '😊' : o.driverRating >= 2 ? '😐' : '☹️') : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40" />}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── Queue row ──────────────────────────────────────────────────────────────────
-
-function QueueRow({
-  position,
-  driver,
-  idleMs,
-  isBusy,
-  ect,
-  isNext,
-  onTogglePause,
-}: {
-  position: number;
-  driver: DeliveryDriver;
-  idleMs: number;
-  isBusy: boolean;
-  ect: number;
-  isNext: boolean;
-  onTogglePause: (id: string, paused: boolean) => void;
-}) {
-  const isPaused = driver.isPaused;
-
-  return (
-    <div
-      className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl border transition-all ${
-        isPaused
-          ? 'bg-secondary/30 border-border/30 opacity-60'
-          : isNext
-            ? 'bg-primary/5 border-primary/30 shadow-sm'
-            : 'bg-card border-border/30'
-      }`}
-    >
-      {/* Position badge */}
-      <div
-        className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-        style={{
-          background: isPaused ? 'hsl(var(--secondary))' : (driver.color || '#6b7280') + '22',
-          color: isPaused ? 'hsl(var(--muted-foreground))' : (driver.color || '#6b7280'),
-        }}
-      >
-        {isPaused ? <Coffee className="w-3 h-3" /> : position}
-      </div>
-
-      {/* Avatar */}
-      <div
-        className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-[11px] shrink-0 shadow-sm"
-        style={{ background: driver.color || '#6b7280' }}
-      >
-        {driverShortCode(driver)}
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-bold truncate leading-tight">{driver.name}</div>
-        <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-          {isPaused ? (
-            <span className="text-amber-600 font-semibold flex items-center gap-0.5"><Coffee className="w-2.5 h-2.5" /> Në pauzë</span>
-          ) : isBusy ? (
-            <span className="text-amber-600">Aktiv · ETA ~{Math.ceil(ect)}min</span>
-          ) : (
-            <span className="text-emerald-600 font-semibold flex items-center gap-1">
-              <Clock className="w-2.5 h-2.5" />
-              {isFinite(idleMs)
-                ? <>Koha e pritjes {fmtDuration(idleMs)}</>
-                : 'I disponueshëm'}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Pause toggle */}
-      <button
-        onClick={() => onTogglePause(driver.id, !isPaused)}
-        className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
-          isPaused
-            ? 'bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25'
-            : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
-        }`}
-        title={isPaused ? 'I disponueshëm' : 'Pauzë'}
-      >
-        {isPaused ? 'Disponueshëm' : 'Pauzë'}
-      </button>
     </div>
   );
 }
@@ -403,8 +280,8 @@ function QueueRow({
 
 export default function DriversKPI() {
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
-  const [orders, setOrders]   = useState<OrderRecord[]>([]);
-  const [tick, setTick]       = useState(Date.now());
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [tick, setTick] = useState(Date.now());
   const [detailDriverId, setDetailDriverId] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -423,67 +300,172 @@ export default function DriversKPI() {
     return () => clearInterval(t);
   }, []);
 
-  const handleTogglePause = async (driverId: string, paused: boolean) => {
-    setDrivers((prev) => prev.map((d) => d.id === driverId ? { ...d, isPaused: paused } : d));
-    try {
-      await setDriverPause(driverId, paused);
-    } catch {
-      setDrivers((prev) => prev.map((d) => d.id === driverId ? { ...d, isPaused: !paused } : d));
-    }
+  const handleApprovePause = async (driverId: string) => {
+    setDrivers((prev) => prev.map((d) => d.id === driverId ? { ...d, isPendingPause: false, isPaused: true, pausedAt: Date.now() } : d));
+    try { await approvePause(driverId); } catch { load(); }
+  };
+
+  const handleUnpause = async (driverId: string) => {
+    const now = Date.now();
+    setDrivers((prev) => prev.map((d) => d.id === driverId ? { ...d, isPaused: false, isPendingPause: false, pausedAt: null, availableSince: now } : d));
+    try { await setDriverPause(driverId, false); } catch { load(); }
   };
 
   const bestId = useMemo(() => pickBestDriver(drivers, orders), [drivers, orders, tick]);
 
   const cols = useMemo(() => drivers.map((driver) => {
-    const all      = orders.filter((o) => o.assignedDriverId === driver.id);
-    const completed = all
-      .filter((o) => o.status === 'completed')
+    const all = orders.filter((o) => o.assignedDriverId === driver.id);
+    const completed = all.filter((o) => o.status === 'completed')
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    const active   = all.filter((o) => ['approved', 'preparing', 'out_for_delivery'].includes(o.status));
-    const idleMs   = driverIdleMs(driver.id, orders, tick);
-    const isBusy   = idleMs === -1;
-    const ect      = driverECT(driver.id, orders, tick);
+    const active = all.filter((o) => ['approved', 'preparing', 'out_for_delivery'].includes(o.status));
+    const waitMs = driverWaitMs(driver, orders, tick);
+    const isBusy = waitMs === -1;
+    const ect = driverECT(driver.id, orders, tick);
 
-    const rated    = completed.filter((o) => o.driverRating != null);
-    const avgRating = rated.length
-      ? rated.reduce((s, o) => s + (o.driverRating ?? 0), 0) / rated.length
-      : null;
-    const happy   = rated.filter((o) => (o.driverRating ?? 0) >= 4).length;
+    const rated = completed.filter((o) => o.driverRating != null);
+    const avgRating = rated.length ? rated.reduce((s, o) => s + (o.driverRating ?? 0), 0) / rated.length : null;
+    const happy = rated.filter((o) => (o.driverRating ?? 0) >= 4).length;
     const neutral = rated.filter((o) => (o.driverRating ?? 0) >= 2 && (o.driverRating ?? 0) < 4).length;
     const unhappy = rated.filter((o) => (o.driverRating ?? 0) < 2).length;
-    const total   = happy + neutral + unhappy;
+    const total = happy + neutral + unhappy;
 
-    return { driver, completed, active, idleMs, isBusy, ect, avgRating, happy, neutral, unhappy, total };
+    const pauseDurationMs = driver.isPaused && driver.pausedAt ? tick - driver.pausedAt : null;
+
+    return { driver, completed, active, waitMs, isBusy, ect, avgRating, happy, neutral, unhappy, total, pauseDurationMs };
   }), [drivers, orders, tick]);
 
-  // Queue: paused at end, busy next, then idle sorted by longest wait
-  const queue = useMemo(() => {
-    return [...cols].sort((a, b) => {
-      if (a.driver.isPaused && !b.driver.isPaused) return 1;
-      if (!a.driver.isPaused && b.driver.isPaused) return -1;
-      if (a.isBusy && !b.isBusy) return 1;
-      if (!a.isBusy && b.isBusy) return -1;
-      if (!a.isBusy && !b.isBusy) {
-        const aMs = isFinite(a.idleMs) ? a.idleMs : Infinity;
-        const bMs = isFinite(b.idleMs) ? b.idleMs : Infinity;
-        return bMs - aMs; // longest idle = first
-      }
-      return a.ect - b.ect; // both busy: lower ECT = first
-    });
-  }, [cols]);
+  // 3 sorted sections
+  const queueAvailable = useMemo(() =>
+    cols.filter((c) => !c.driver.isPaused && !c.driver.isPendingPause && !c.isBusy)
+      .sort((a, b) => {
+        const aMs = isFinite(a.waitMs) && a.waitMs >= 0 ? a.waitMs : Infinity;
+        const bMs = isFinite(b.waitMs) && b.waitMs >= 0 ? b.waitMs : Infinity;
+        return bMs - aMs; // longest wait first
+      }),
+  [cols]);
+
+  const queueBusy = useMemo(() =>
+    cols.filter((c) => !c.driver.isPaused && !c.driver.isPendingPause && c.isBusy)
+      .sort((a, b) => a.ect - b.ect),
+  [cols]);
+
+  const queuePaused = useMemo(() =>
+    cols.filter((c) => c.driver.isPaused || c.driver.isPendingPause),
+  [cols]);
 
   const detailCol = detailDriverId ? cols.find((c) => c.driver.id === detailDriverId) : null;
 
   if (cols.length === 0) {
-    return (
-      <div className="py-16 text-center text-muted-foreground text-sm">
-        Nuk ka shoferë të regjistruar ende.
-      </div>
-    );
+    return <div className="py-16 text-center text-muted-foreground text-sm">Nuk ka shoferë të regjistruar ende.</div>;
   }
 
+  // ── Queue row renderers ──────────────────────────────────────────────────────
+
+  const AvailableRow = ({ col, pos }: { col: typeof cols[0]; pos: number }) => {
+    const isNext = col.driver.id === bestId;
+    const hasWait = isFinite(col.waitMs) && col.waitMs >= 0;
+    return (
+      <div
+        onClick={() => setDetailDriverId(col.driver.id)}
+        className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:bg-secondary/50 ${isNext ? 'bg-primary/5 ring-1 ring-primary/30' : 'bg-background'}`}
+      >
+        {/* Position */}
+        <div className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
+          style={{ background: isNext ? 'hsl(var(--primary) / 0.15)' : 'hsl(var(--secondary))', color: isNext ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }}>
+          {pos}
+        </div>
+        {/* Avatar */}
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0" style={{ background: col.driver.color || '#6b7280' }}>
+          {driverShortCode(col.driver)}
+        </div>
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-sm truncate flex items-center gap-1.5">
+            {col.driver.name}
+            {isNext && <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Zap className="w-2 h-2" /> Tjetri</span>}
+          </div>
+          <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold mt-0.5">
+            <Clock className="w-2.5 h-2.5" />
+            {hasWait ? <>Koha e pritjes: <span className="font-mono ml-0.5">{fmtDuration(col.waitMs)}</span></> : 'I disponueshëm'}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-sm font-bold">{col.completed.length}</div>
+          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">dërgesa</div>
+        </div>
+      </div>
+    );
+  };
+
+  const BusyRow = ({ col }: { col: typeof cols[0] }) => (
+    <div
+      onClick={() => setDetailDriverId(col.driver.id)}
+      className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:bg-secondary/50 bg-background"
+    >
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0" style={{ background: col.driver.color || '#6b7280' }}>
+        {driverShortCode(col.driver)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-bold text-sm truncate">{col.driver.name}</div>
+        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-amber-600 font-semibold">
+          <span>{col.active.length} porosi aktive</span>
+          <span className="text-muted-foreground">·</span>
+          <span>ETA ~{Math.ceil(col.ect)}min</span>
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="text-sm font-bold">{col.completed.length}</div>
+        <div className="text-[9px] text-muted-foreground uppercase tracking-wider">dërgesa</div>
+      </div>
+    </div>
+  );
+
+  const PausedRow = ({ col }: { col: typeof cols[0] }) => {
+    const isPending = col.driver.isPendingPause;
+    return (
+      <div
+        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isPending ? 'bg-amber-500/10 ring-1 ring-amber-400/40' : 'bg-background opacity-70'}`}
+      >
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 opacity-60" style={{ background: col.driver.color || '#6b7280' }}>
+          {driverShortCode(col.driver)}
+        </div>
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setDetailDriverId(col.driver.id)}>
+          <div className="font-bold text-sm truncate">{col.driver.name}</div>
+          {isPending ? (
+            <div className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold mt-0.5">
+              <AlertCircle className="w-2.5 h-2.5" /> Kërkon pauzë
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold mt-0.5">
+              <Coffee className="w-2.5 h-2.5" />
+              {col.pauseDurationMs != null ? <>Pauzë: <span className="font-mono ml-0.5">{fmtDuration(col.pauseDurationMs)}</span></> : 'Në pauzë'}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isPending && (
+            <button
+              onClick={() => handleApprovePause(col.driver.id)}
+              className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+            >
+              <CheckCircle2 className="w-3 h-3" /> Aprovo
+            </button>
+          )}
+          <button
+            onClick={() => handleUnpause(col.driver.id)}
+            className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 transition-colors"
+          >
+            Disponueshëm
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ── render ───────────────────────────────────────────────────────────────────
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center gap-2 px-1">
         <h2 className="text-xl font-bold font-display">Shoferët · Logbook</h2>
         <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
@@ -492,204 +474,202 @@ export default function DriversKPI() {
         </span>
       </div>
 
-      {/* ── Queue panel ── */}
-      <div className="bg-card rounded-2xl border border-border/40 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-border/30 flex items-center gap-2">
-          <TrendingUp className="w-3.5 h-3.5 text-primary" />
-          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Radha e Shoferëve</span>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          RRADHITJA — top, largest, most prominent
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="rounded-2xl border-2 border-primary/20 bg-card shadow-md overflow-hidden">
+        <div className="px-5 py-4 bg-primary/5 border-b border-primary/15 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-primary" />
+          <div>
+            <h3 className="font-bold text-base text-primary">Rradhitja e marrjes së porosisë</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Auto-selection · Shoferët me pritje më të gjatë marrin porosinë e radhës</p>
+          </div>
         </div>
-        <div className="p-3 space-y-2">
-          {queue.map((col) => {
-            const position = col.driver.isPaused ? 0 : col.isBusy
-              ? queue.filter((x) => !x.driver.isPaused && x.isBusy).indexOf(col) + 1
-              : queue.filter((x) => !x.driver.isPaused && !x.isBusy).indexOf(col) + 1;
 
+        {/* Section 1: Available / in queue */}
+        <div className="px-4 pt-4 pb-2">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">I disponueshëm · {queueAvailable.length}</span>
+          </div>
+          {queueAvailable.length === 0
+            ? <div className="text-xs text-muted-foreground italic py-3 px-4">Asnjë shofer në radhë.</div>
+            : <div className="space-y-1">
+                {queueAvailable.map((col, i) => <AvailableRow key={col.driver.id} col={col} pos={i + 1} />)}
+              </div>
+          }
+        </div>
+
+        {/* Section 2: Busy */}
+        {queueBusy.length > 0 && (
+          <div className="px-4 py-2 border-t border-border/30">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">Të zënët me punë · {queueBusy.length}</span>
+            </div>
+            <div className="space-y-1">
+              {queueBusy.map((col) => <BusyRow key={col.driver.id} col={col} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Section 3: Paused */}
+        {queuePaused.length > 0 && (
+          <div className="px-4 py-2 border-t border-border/30 pb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Coffee className="w-2.5 h-2.5 text-muted-foreground" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Në pauzë · {queuePaused.length}</span>
+            </div>
+            <div className="space-y-1">
+              {queuePaused.map((col) => <PausedRow key={col.driver.id} col={col} />)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          DRIVER COLUMNS (detailed cards)
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <div>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1 mb-3">Statistikat e Shoferëve · kliko për detaje</h3>
+        <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollSnapType: 'x mandatory' }}>
+          {cols.map(({ driver, completed, active, waitMs, isBusy, ect, avgRating, happy, neutral, unhappy, total, pauseDurationMs }) => {
+            const isNext = driver.id === bestId;
             return (
-              <QueueRow
-                key={col.driver.id}
-                position={position}
-                driver={col.driver}
-                idleMs={col.idleMs}
-                isBusy={col.isBusy}
-                ect={col.ect}
-                isNext={col.driver.id === bestId}
-                onTogglePause={handleTogglePause}
-              />
+              <div
+                key={driver.id}
+                className="flex-shrink-0 w-72 rounded-2xl border flex flex-col overflow-hidden shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]"
+                style={{
+                  scrollSnapAlign: 'start',
+                  borderColor: isNext ? 'hsl(var(--primary) / 0.6)' : driver.isPaused ? 'hsl(var(--border) / 0.25)' : 'hsl(var(--border) / 0.4)',
+                  background: isNext ? 'hsl(var(--primary) / 0.035)' : 'hsl(var(--card))',
+                  opacity: driver.isPaused ? 0.75 : 1,
+                }}
+                onClick={() => setDetailDriverId(driver.id)}
+              >
+                {/* Header */}
+                <div className="px-4 py-3 flex items-center gap-3 border-b border-border/30">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm" style={{ background: driver.color || '#6b7280' }}>
+                    {driverShortCode(driver)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-sm truncate">{driver.name}</div>
+                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                      {driver.isActive
+                        ? <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">Aktiv</span>
+                        : <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">Jo aktiv</span>}
+                      {driver.isPendingPause && <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><AlertCircle className="w-2.5 h-2.5" /> Kërkon pauzë</span>}
+                      {driver.isPaused && <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Coffee className="w-2.5 h-2.5" /> Pauzë</span>}
+                      {isNext && <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Zap className="w-2.5 h-2.5" /> Tjetri</span>}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-xl font-bold leading-none">{completed.length}</div>
+                    <div className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">dërgesa</div>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className="px-4 py-2.5 border-b border-border/30 bg-secondary/20 flex items-center gap-2.5">
+                  {driver.isPaused ? (
+                    <>
+                      <Coffee className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <div>
+                        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Në pauzë</div>
+                        <div className="text-sm font-bold text-amber-600 font-mono">
+                          {pauseDurationMs != null ? fmtDuration(pauseDurationMs) : '—'}
+                        </div>
+                      </div>
+                    </>
+                  ) : isBusy ? (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                      <div>
+                        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Aktiv · {active.length} porosi</div>
+                        <div className="text-sm font-bold text-amber-600">ETA ~{Math.ceil(ect)} min</div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                      <div>
+                        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" /> Koha e pritjes
+                        </div>
+                        <div className="text-sm font-bold text-emerald-600 font-mono">
+                          {isFinite(waitMs) && waitMs >= 0 ? fmtDuration(waitMs) : 'I disponueshëm'}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Logbook */}
+                <div className="overflow-y-auto flex-1" style={{ maxHeight: 160 }}>
+                  {completed.length === 0
+                    ? <div className="py-4 text-center text-xs text-muted-foreground italic">Asnjë dërgim i kryer</div>
+                    : (
+                      <div className="divide-y divide-border/20">
+                        {completed.slice(0, 10).map((o) => (
+                          <div key={o.id} className="px-4 py-2 flex items-center gap-2 text-xs hover:bg-secondary/30 transition-colors">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-mono text-[10px] text-muted-foreground leading-none mb-0.5">#{o.id.slice(0, 6).toUpperCase()}</div>
+                              <div className="font-semibold truncate">{o.customerName}</div>
+                            </div>
+                            <div className="text-right shrink-0 text-muted-foreground">
+                              <div className="font-bold text-foreground">€{o.total.toFixed(2)}</div>
+                              <div className="text-[10px]">{fmtDate(o.updatedAt)} {fmtTime(o.updatedAt)}</div>
+                            </div>
+                            <div className="shrink-0 text-base leading-none">
+                              {o.driverRating != null ? (o.driverRating >= 4 ? '😊' : o.driverRating >= 2 ? '😐' : '☹️') : <span className="text-muted-foreground/30 text-xs">—</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                </div>
+
+                {/* Ratings */}
+                <div className="px-4 py-3 border-t border-border/30">
+                  {avgRating !== null ? (
+                    <div className="flex items-center gap-3">
+                      <div className="text-center shrink-0">
+                        <div className="text-2xl font-bold leading-none">{avgRating.toFixed(1)}</div>
+                        <div className="flex mt-1 justify-center">
+                          {[1,2,3,4,5].map((s) => <Star key={s} className={`w-2.5 h-2.5 ${s <= Math.round(avgRating) ? 'text-amber-400' : 'text-muted-foreground/25'}`} fill={s <= Math.round(avgRating) ? 'currentColor' : 'none'} />)}
+                        </div>
+                        <div className="text-[9px] text-muted-foreground mt-0.5">{total} vot</div>
+                      </div>
+                      <div className="flex-1 space-y-1.5 text-xs">
+                        {([['😊', happy, 'bg-emerald-400'], ['😐', neutral, 'bg-amber-400'], ['☹️', unhappy, 'bg-red-400']] as const).map(([emoji, count, color]) => (
+                          <div key={emoji} className="flex items-center gap-1.5">
+                            <span className="text-sm leading-none w-5">{emoji}</span>
+                            <div className="flex-1 bg-secondary rounded-full h-1.5 overflow-hidden">
+                              <div className={`h-1.5 rounded-full ${color} transition-all`} style={{ width: total > 0 ? `${(count / total) * 100}%` : '0%' }} />
+                            </div>
+                            <span className="w-5 text-right font-bold text-muted-foreground">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : <p className="text-xs text-muted-foreground italic text-center py-1">Asnjë vlerësim ende</p>}
+                </div>
+
+                <div className="px-4 py-2 bg-secondary/10 flex items-center justify-center gap-1 text-[10px] text-muted-foreground border-t border-border/20">
+                  <ChevronRight className="w-3 h-3" /> Kliko për statistika të plota
+                </div>
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* ── Driver columns ── */}
-      <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollSnapType: 'x mandatory' }}>
-        {cols.map(({ driver, completed, active, idleMs, isBusy, ect, avgRating, happy, neutral, unhappy, total }) => {
-          const isNext = driver.id === bestId;
-
-          return (
-            <div
-              key={driver.id}
-              className="flex-shrink-0 w-72 rounded-2xl border flex flex-col overflow-hidden shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]"
-              style={{
-                scrollSnapAlign: 'start',
-                borderColor: isNext ? 'hsl(var(--primary) / 0.6)' : driver.isPaused ? 'hsl(var(--border) / 0.25)' : 'hsl(var(--border) / 0.4)',
-                background: isNext ? 'hsl(var(--primary) / 0.035)' : 'hsl(var(--card))',
-                opacity: driver.isPaused ? 0.75 : 1,
-              }}
-              onClick={() => setDetailDriverId(driver.id)}
-            >
-              {/* ── Header ── */}
-              <div className="px-4 py-3 flex items-center gap-3 border-b border-border/30">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm"
-                  style={{ background: driver.color || '#6b7280' }}
-                >
-                  {driverShortCode(driver)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm truncate">{driver.name}</div>
-                  <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                    {driver.isActive
-                      ? <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">Aktiv</span>
-                      : <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">Jo aktiv</span>
-                    }
-                    {driver.isPaused && (
-                      <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                        <Coffee className="w-2.5 h-2.5" /> Pauzë
-                      </span>
-                    )}
-                    {isNext && (
-                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                        <Zap className="w-2.5 h-2.5" /> Tjetri
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-xl font-bold leading-none">{completed.length}</div>
-                  <div className="text-[9px] text-muted-foreground uppercase tracking-wider mt-0.5">dërgesa</div>
-                </div>
-              </div>
-
-              {/* ── Status / idle timer ── */}
-              <div className="px-4 py-2.5 border-b border-border/30 bg-secondary/20 flex items-center gap-2.5">
-                {driver.isPaused ? (
-                  <>
-                    <Coffee className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <div>
-                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Në pauzë</div>
-                      <div className="text-sm font-bold text-amber-600">Jo i disponueshëm</div>
-                    </div>
-                  </>
-                ) : isBusy ? (
-                  <>
-                    <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-                    <div>
-                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Aktiv · {active.length} {active.length === 1 ? 'porosi' : 'porosi'}</div>
-                      <div className="text-sm font-bold text-amber-600">ETA ~{Math.ceil(ect)} min</div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                    <div>
-                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                        <Clock className="w-2.5 h-2.5" /> Koha e pritjes
-                      </div>
-                      <div className="text-sm font-bold text-emerald-600">
-                        {isFinite(idleMs) ? fmtDuration(idleMs) : 'I disponueshëm'}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* ── Logbook (top section in card) ── */}
-              <div className="overflow-y-auto flex-1" style={{ maxHeight: 160 }}>
-                {completed.length === 0 ? (
-                  <div className="py-4 text-center text-xs text-muted-foreground italic">Asnjë dërgim i kryer</div>
-                ) : (
-                  <div className="divide-y divide-border/20">
-                    {completed.slice(0, 10).map((o) => (
-                      <div
-                        key={o.id}
-                        onClick={(e) => { e.stopPropagation(); setDetailDriverId(driver.id); }}
-                        className="px-4 py-2 flex items-center gap-2 text-xs hover:bg-secondary/30 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-mono text-[10px] text-muted-foreground leading-none mb-0.5">
-                            #{o.id.slice(0, 6).toUpperCase()}
-                          </div>
-                          <div className="font-semibold truncate">{o.customerName}</div>
-                        </div>
-                        <div className="text-right shrink-0 text-muted-foreground">
-                          <div className="font-bold text-foreground">€{o.total.toFixed(2)}</div>
-                          <div className="text-[10px]">{fmtDate(o.updatedAt)} {fmtTime(o.updatedAt)}</div>
-                        </div>
-                        <div className="shrink-0 text-base leading-none">
-                          {o.driverRating != null
-                            ? (o.driverRating >= 4 ? '😊' : o.driverRating >= 2 ? '😐' : '☹️')
-                            : <span className="text-muted-foreground/30 text-xs">—</span>
-                          }
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* ── Ratings summary ── */}
-              <div className="px-4 py-3 border-t border-border/30">
-                {avgRating !== null ? (
-                  <div className="flex items-center gap-3">
-                    <div className="text-center shrink-0">
-                      <div className="text-2xl font-bold leading-none">{avgRating.toFixed(1)}</div>
-                      <div className="flex mt-1 justify-center">
-                        {[1,2,3,4,5].map((s) => (
-                          <Star
-                            key={s}
-                            className={`w-2.5 h-2.5 ${s <= Math.round(avgRating) ? 'text-amber-400' : 'text-muted-foreground/25'}`}
-                            fill={s <= Math.round(avgRating) ? 'currentColor' : 'none'}
-                          />
-                        ))}
-                      </div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">{total} vot</div>
-                    </div>
-                    <div className="flex-1 space-y-1.5 text-xs">
-                      {([['😊', happy, 'bg-emerald-400'], ['😐', neutral, 'bg-amber-400'], ['☹️', unhappy, 'bg-red-400']] as const).map(([emoji, count, color]) => (
-                        <div key={emoji} className="flex items-center gap-1.5">
-                          <span className="text-sm leading-none w-5">{emoji}</span>
-                          <div className="flex-1 bg-secondary rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className={`h-1.5 rounded-full ${color} transition-all`}
-                              style={{ width: total > 0 ? `${(count / total) * 100}%` : '0%' }}
-                            />
-                          </div>
-                          <span className="w-5 text-right font-bold text-muted-foreground">{count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic text-center py-1">Asnjë vlerësim ende</p>
-                )}
-              </div>
-
-              {/* Click hint */}
-              <div className="px-4 py-2 bg-secondary/10 flex items-center justify-center gap-1 text-[10px] text-muted-foreground border-t border-border/20">
-                <ChevronRight className="w-3 h-3" /> Kliko për statistika të plota
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── Driver Detail Modal ── */}
       {detailDriverId && detailCol && (
         <DriverDetailModal
           driver={detailCol.driver}
           completed={detailCol.completed}
           active={detailCol.active}
-          idleMs={detailCol.idleMs}
+          waitMs={detailCol.waitMs}
           isBusy={detailCol.isBusy}
           ect={detailCol.ect}
           avgRating={detailCol.avgRating}

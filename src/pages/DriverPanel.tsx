@@ -9,6 +9,7 @@ import {
   subscribeDriverOrdersRealtime,
   updateDriverLocation,
   setDriverPause,
+  requestDriverPause,
   type DeliveryDriver,
 } from '@/lib/driversApi';
 import { playKrring } from '@/lib/sounds';
@@ -191,15 +192,43 @@ const DriverPanel = () => {
     }
   };
 
-  const handleTogglePause = async () => {
+  // Pause without admin approval — instant
+  const handlePauseDirect = async () => {
     if (!driver) return;
-    const next = !driver.isPaused;
-    setDriver((d) => d ? { ...d, isPaused: next } : d);
+    const now = Date.now();
+    setDriver((d) => d ? { ...d, isPaused: true, isPendingPause: false, pausedAt: now } : d);
     try {
-      await setDriverPause(driver.id, next);
-      toast.success(next ? 'Je në pauzë' : 'Je i disponueshëm');
+      await setDriverPause(driver.id, true);
+      toast.success('Je në pauzë');
     } catch {
-      setDriver((d) => d ? { ...d, isPaused: !next } : d);
+      setDriver((d) => d ? { ...d, isPaused: false } : d);
+      toast.error('Gabim');
+    }
+  };
+
+  // Request pause — needs admin approval
+  const handleRequestPause = async () => {
+    if (!driver) return;
+    setDriver((d) => d ? { ...d, isPendingPause: true } : d);
+    try {
+      await requestDriverPause(driver.id);
+      toast.success('Kërkesa për pauzë u dërgua tek admini');
+    } catch {
+      setDriver((d) => d ? { ...d, isPendingPause: false } : d);
+      toast.error('Gabim');
+    }
+  };
+
+  // Unpause — become available again
+  const handleUnpause = async () => {
+    if (!driver) return;
+    const now = Date.now();
+    setDriver((d) => d ? { ...d, isPaused: false, isPendingPause: false, pausedAt: null, availableSince: now } : d);
+    try {
+      await setDriverPause(driver.id, false);
+      toast.success('Je i disponueshëm');
+    } catch {
+      setDriver((d) => d ? { ...d, isPaused: true } : d);
       toast.error('Gabim');
     }
   };
@@ -260,17 +289,32 @@ const DriverPanel = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleTogglePause}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${
-                driver.isPaused
-                  ? 'bg-amber-500 text-white hover:bg-amber-600'
-                  : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
-              }`}
-            >
-              <Coffee className="w-3.5 h-3.5" />
-              {driver.isPaused ? 'Në pauzë' : 'Pauzë'}
-            </button>
+            {(driver.isPaused || driver.isPendingPause) ? (
+              <button
+                onClick={handleUnpause}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 transition-colors"
+              >
+                <Coffee className="w-3.5 h-3.5" />
+                {driver.isPendingPause ? 'Kërkon pauzë…' : 'Disponueshëm'}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleRequestPause}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-colors"
+                  title="Kërko aprovim nga admini"
+                >
+                  <Coffee className="w-3.5 h-3.5" /> Pauzë
+                </button>
+                <button
+                  onClick={handlePauseDirect}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-secondary text-muted-foreground hover:bg-secondary/80 transition-colors"
+                  title="Pa aprovim të adminit"
+                >
+                  Pa aprovim
+                </button>
+              </>
+            )}
             <button
               onClick={() => isTracking ? stopTracking() : startTracking()}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${

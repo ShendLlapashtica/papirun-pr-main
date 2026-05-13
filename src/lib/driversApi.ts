@@ -9,6 +9,9 @@ export interface DeliveryDriver {
   role: string;
   isActive: boolean;
   isPaused: boolean;
+  isPendingPause: boolean;   // requested pause, waiting for admin approval
+  pausedAt: number | null;   // timestamp when pause started
+  availableSince: number | null; // timestamp when became available (unpaused / app load)
   createdAt: string;
   lat: number | null;
   lng: number | null;
@@ -88,7 +91,13 @@ function getDriverColor(row: Row, index = 0): string {
 // (key = 'driver_loc_{id}', value_json = {lat, lng, t}) so we need no schema changes.
 
 type LocMap = Record<string, { lat: number; lng: number }>;
-type PauseMap = Record<string, boolean>;
+interface PauseEntry {
+  paused: boolean;
+  pendingApproval?: boolean;
+  pausedAt?: number;
+  availableSince?: number;
+}
+type PauseMap = Record<string, PauseEntry>;
 
 async function fetchLocMap(): Promise<LocMap> {
   const client = supabase as any;
@@ -117,7 +126,13 @@ async function fetchPauseMap(): Promise<PauseMap> {
   const map: PauseMap = {};
   for (const row of data as { key: string; value_json: any }[]) {
     const id = row.key.replace(PAUSE_PREFIX, '');
-    map[id] = Boolean(row.value_json?.paused);
+    const v = row.value_json ?? {};
+    map[id] = {
+      paused: Boolean(v.paused),
+      pendingApproval: Boolean(v.pendingApproval),
+      pausedAt: v.pausedAt ? Number(v.pausedAt) : undefined,
+      availableSince: v.availableSince ? Number(v.availableSince) : undefined,
+    };
   }
   return map;
 }
@@ -125,6 +140,7 @@ async function fetchPauseMap(): Promise<PauseMap> {
 // ── Row mapper ────────────────────────────────────────────────────────────────
 const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 0): DeliveryDriver => {
   const loc = locMap[row.id];
+  const pause = pauseMap[row.id] ?? {};
   return {
     id: row.id,
     name: row.name || row.display_name || row.username || 'Driver',
@@ -133,7 +149,10 @@ const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 
     pin: row.pin || '',
     role: row.role || 'driver',
     isActive: row.is_active !== false,
-    isPaused: Boolean(pauseMap[row.id]),
+    isPaused: Boolean(pause.paused),
+    isPendingPause: Boolean(pause.pendingApproval),
+    pausedAt: pause.pausedAt ?? null,
+    availableSince: pause.availableSince ?? null,
     createdAt: row.created_at,
     lat: loc?.lat ?? (row.lat !== undefined && row.lat !== null ? Number(row.lat) : null),
     lng: loc?.lng ?? (row.lng !== undefined && row.lng !== null ? Number(row.lng) : null),
@@ -205,16 +224,34 @@ export const updateDriver = async (
   if (error) throw error;
 };
 
-/** Toggle a driver's pause/available state */
-export const setDriverPause = async (id: string, paused: boolean) => {
+const _upsertPause = async (id: string, entry: PauseEntry) => {
   const client = supabase as any;
   const { error } = await client
     .from('storefront_settings')
     .upsert(
-      { key: `${PAUSE_PREFIX}${id}`, value_json: { paused, t: Date.now() } },
+      { key: `${PAUSE_PREFIX}${id}`, value_json: { ...entry, t: Date.now() } },
       { onConflict: 'key' }
     );
   if (error) throw error;
+};
+
+/** Driver: request pause — waits for admin approval */
+export const requestDriverPause = async (id: string) => {
+  await _upsertPause(id, { paused: false, pendingApproval: true });
+};
+
+/** Driver: go on pause immediately, no admin approval needed */
+export const setDriverPause = async (id: string, paused: boolean) => {
+  if (paused) {
+    await _upsertPause(id, { paused: true, pendingApproval: false, pausedAt: Date.now() });
+  } else {
+    await _upsertPause(id, { paused: false, pendingApproval: false, availableSince: Date.now() });
+  }
+};
+
+/** Admin: approve a pending pause request */
+export const approvePause = async (id: string) => {
+  await _upsertPause(id, { paused: true, pendingApproval: false, pausedAt: Date.now() });
 };
 
 /**
