@@ -120,7 +120,7 @@ const DriverPanel = () => {
     try {
       const drivers = await fetchDrivers();
       const found = drivers.find(
-        (d) => d.phone.toLowerCase() === username.trim().toLowerCase() && d.isActive
+        (d) => d.phone.trim().toLowerCase() === username.trim().toLowerCase() && d.isActive
       );
       if (found) {
         setDriver(found);
