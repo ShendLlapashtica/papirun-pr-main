@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import type { MenuItem } from '@/types/menu';
 import type { MenuExtra } from '@/types/menuExtra';
+import { compressImage } from '@/lib/imageUtils';
 export {
   OFFERS_SECTION_ENABLED_KEY,
   OFFER_BADGE_TEXT_KEY,
@@ -284,43 +285,10 @@ const deleteProductImageByUrl = async (imageUrl: string): Promise<void> => {
   await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([path]);
 };
 
-// Auto-pipeline: resize to max 800px wide, flatten on white, export JPEG 85%
-export const preprocessProductImage = (file: File): Promise<File> => {
-  const MAX_W = 800;
-  const QUALITY = 0.85;
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, MAX_W / img.width);
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
-      canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(new File([blob], 'image.jpg', { type: 'image/jpeg' }));
-          else resolve(file);
-        },
-        'image/jpeg',
-        QUALITY
-      );
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
-};
-
 export const uploadProductImage = async (file: File, productId: string, oldImageUrl?: string) => {
   if (oldImageUrl) await deleteProductImageByUrl(oldImageUrl);
 
-  const processed = await preprocessProductImage(file);
+  const processed = await compressImage(file);
   const path = `${productId}/${Date.now()}.jpg`;
 
   const { error } = await supabase.storage

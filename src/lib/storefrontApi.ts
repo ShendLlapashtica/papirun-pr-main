@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { OfferItem } from '@/data/menuData';
 import type { SiteTextOverrides } from '@/lib/siteTexts';
+import { compressImage } from '@/lib/imageUtils';
 
 const STOREFRONT_OFFERS_TABLE = 'storefront_offers';
 const STOREFRONT_SETTINGS_TABLE = 'storefront_settings';
@@ -287,12 +288,12 @@ const deleteImageByUrl = async (imageUrl: string): Promise<void> => {
 export const uploadStorefrontOfferImage = async (file: File, offerId: string, oldImageUrl?: string) => {
   if (oldImageUrl) await deleteImageByUrl(oldImageUrl);
 
-  const ext = file.name.split('.').pop() || 'jpg';
-  const path = `${offerId}/${Date.now()}.${ext}`;
+  const processed = await compressImage(file);
+  const path = `${offerId}/${Date.now()}.jpg`;
 
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGE_BUCKET)
-    .upload(path, file, { upsert: false, contentType: file.type });
+    .upload(path, processed, { upsert: false, contentType: 'image/jpeg' });
 
   if (error) throw error;
 
@@ -301,12 +302,12 @@ export const uploadStorefrontOfferImage = async (file: File, offerId: string, ol
 };
 
 export const addStorefrontOfferImage = async (file: File, offerId: string): Promise<string> => {
-  const ext = file.name.split('.').pop() || 'jpg';
-  const path = `${offerId}/${Date.now()}.${ext}`;
+  const processed = await compressImage(file);
+  const path = `${offerId}/${Date.now()}.jpg`;
 
   const { error } = await supabase.storage
     .from(PRODUCT_IMAGE_BUCKET)
-    .upload(path, file, { upsert: false, contentType: file.type });
+    .upload(path, processed, { upsert: false, contentType: 'image/jpeg' });
 
   if (error) throw error;
 

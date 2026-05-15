@@ -39,6 +39,7 @@ import {
   updateProductSortOrder,
 } from '@/lib/productsApi';
 import { getOptimizedImage } from '@/lib/utils';
+import { compressImage } from '@/lib/imageUtils';
 import { useLanguage, translations } from '@/contexts/LanguageContext';
 
 import type { Language } from '@/contexts/LanguageContext';
@@ -725,7 +726,15 @@ const Admin = () => {
     if (!replacingPath || !e.target.files?.[0]) return;
     const file = e.target.files[0];
     const client = supabase as any;
-    const { error } = await client.storage.from('product-images').upload(replacingPath, file, { upsert: true });
+    let processed: File;
+    try {
+      processed = await compressImage(file);
+    } catch {
+      toast.error(language === 'sq' ? 'Formati i fotos nuk mbështetet' : 'Unsupported image format');
+      e.target.value = '';
+      return;
+    }
+    const { error } = await client.storage.from('product-images').upload(replacingPath, processed, { upsert: true, contentType: 'image/jpeg' });
     if (error) { toast.error('Zëvendësimi dështoi'); return; }
     toast.success('Imazhi u zëvendësua');
     setReplacingPath(null);
