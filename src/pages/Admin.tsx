@@ -554,7 +554,7 @@ const Admin = () => {
     handleUpdate(id, { isAvailable: nextAvailability });
   };
 
-  const addNewItem = () => {
+  const addNewItem = async () => {
     const newItem: MenuItem = {
       id: `new-${Date.now()}`,
       name: { sq: 'Produkt i Ri', en: 'New Product' },
@@ -572,6 +572,11 @@ const Admin = () => {
     };
     setItems((prev) => [newItem, ...prev]);
     setEditingItem(newItem.id);
+    try {
+      await upsertProduct(newItem);
+    } catch (err) {
+      console.error('Failed to create new product in DB:', err);
+    }
   };
 
   const deleteItem = async (id: string) => {
@@ -601,8 +606,10 @@ const Admin = () => {
             const publicUrl = await uploadProductImage(file, itemId, oldUrl);
             updateItem(itemId, { image: publicUrl });
             await handleUpdate(itemId, { image: publicUrl });
+            toast.success(language === 'sq' ? 'Foto u ngarkua' : 'Image uploaded');
           } catch (uploadError) {
             console.error('Image paste upload failed:', uploadError);
+            toast.error(language === 'sq' ? 'Ngarkimi i fotos dështoi' : 'Image upload failed');
           }
         }
         break;
@@ -613,13 +620,16 @@ const Admin = () => {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && uploadingItemId) {
+      const targetId = uploadingItemId;
       try {
-        const oldUrl = items.find((i) => i.id === uploadingItemId)?.image || '';
-        const publicUrl = await uploadProductImage(file, uploadingItemId, oldUrl);
-        updateItem(uploadingItemId, { image: publicUrl });
-        await handleUpdate(uploadingItemId, { image: publicUrl });
+        const oldUrl = items.find((i) => i.id === targetId)?.image || '';
+        const publicUrl = await uploadProductImage(file, targetId, oldUrl);
+        updateItem(targetId, { image: publicUrl });
+        await handleUpdate(targetId, { image: publicUrl });
+        toast.success(language === 'sq' ? 'Foto u ngarkua' : 'Image uploaded');
       } catch (uploadError) {
         console.error('Image upload failed:', uploadError);
+        toast.error(language === 'sq' ? 'Ngarkimi i fotos dështoi' : 'Image upload failed');
       }
       setUploadingItemId(null);
     }
@@ -818,7 +828,6 @@ const Admin = () => {
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={handleFileChange}
       />
@@ -1057,9 +1066,13 @@ const Admin = () => {
                     {editingItem === item.id && (
                       <button
                         onClick={() => handleImageUpload(item.id)}
-                        className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm"
+                        disabled={uploadingItemId === item.id}
+                        className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm disabled:opacity-60"
                       >
-                        <Upload className="w-3.5 h-3.5" />
+                        {uploadingItemId === item.id
+                          ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          : <Upload className="w-3.5 h-3.5" />
+                        }
                       </button>
                     )}
                   </div>
