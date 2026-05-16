@@ -1,5 +1,5 @@
-const MAX_W = 800;
-const QUALITY = 0.80;
+const MAX_W = 900;
+const QUALITY = 0.92;
 
 export const compressImage = (file: File): Promise<File> =>
   new Promise((resolve, reject) => {
