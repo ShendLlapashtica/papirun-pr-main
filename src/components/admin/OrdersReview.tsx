@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, X, MapPin, Phone, Calendar, Smartphone, Globe, Clock, Printer, Trash2, ChefHat, Bike, CheckCheck, AlertCircle, Hourglass, Star, MessageCircle, Copy, Navigation, Receipt, Search, Download, Share2 } from 'lucide-react';
+import { Check, X, MapPin, Phone, Calendar, Smartphone, Globe, Clock, Printer, Trash2, ChefHat, Bike, CheckCheck, AlertCircle, Hourglass, Star, MessageCircle, Copy, Navigation, Receipt, Search, Download, Share2, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchAllOrders,
@@ -20,6 +20,7 @@ import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
 import { generateInvoice } from '@/lib/invoiceGenerator';
 import { assignDriverToOrder, fetchDrivers, subscribeAllDriverLocations, driverShortCode, type DeliveryDriver } from '@/lib/driversApi';
+import { pickBestDriver } from '@/components/admin/DriversKPI';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
 
@@ -112,6 +113,10 @@ const loadPriority = (): Set<string> => {
 const savePriority = (s: Set<string>) => {
   try { localStorage.setItem(PRIORITY_KEY, JSON.stringify(Array.from(s))); } catch {}
 };
+
+const AUTO_MODE_KEY = 'papirun_admin_auto_mode';
+const loadAutoMode = (): boolean => { try { return localStorage.getItem(AUTO_MODE_KEY) === 'true'; } catch { return false; } };
+const saveAutoMode = (v: boolean) => { try { localStorage.setItem(AUTO_MODE_KEY, v ? 'true' : 'false'); } catch {} };
 
 // ---- CSV/JSON export helpers ----
 const exportOrdersCSV = (orders: OrderRecord[]) => {
@@ -208,6 +213,10 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   const now = useNow(5000);
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [showDriverMap, setShowDriverMap] = useState(false);
+  const [autoMode, setAutoMode] = useState(() => loadAutoMode());
+  const [showAutoModeConfirm, setShowAutoModeConfirm] = useState(false);
+  const autoModeRef = useRef(false);
+  const driversRef = useRef<DeliveryDriver[]>([]);
 
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
@@ -219,6 +228,9 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
     const unsub = subscribeAllDriverLocations(reload);
     return unsub;
   }, []);
+
+  useEffect(() => { autoModeRef.current = autoMode; saveAutoMode(autoMode); }, [autoMode]);
+  useEffect(() => { driversRef.current = drivers; }, [drivers]);
 
   const archiveOrder = (id: string) => {
     setArchivedIds((prev) => {
@@ -267,6 +279,26 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                 return next;
               });
             }, 10000);
+
+            if (autoModeRef.current) {
+              const pendingNew = newOnes.filter((o) => o.status === 'pending');
+              for (const o of pendingNew) {
+                const DEFAULT_ETA = 20;
+                const autoMsg = `Po e përgatisim — gati për ~${DEFAULT_ETA} min ✓`;
+                (async () => {
+                  try {
+                    await sendOrderMessage(o.id, 'admin', autoMsg);
+                    await updateOrderStatus(o.id, 'approved', '');
+                    await setOrderEta(o.id, DEFAULT_ETA);
+                    const bestId = pickBestDriver(driversRef.current, all);
+                    if (bestId) {
+                      const target = driversRef.current.find((d) => d.id === bestId);
+                      if (target) await assignDriverToOrder(o.id, target.id);
+                    }
+                  } catch (e) { console.error('Auto-accept failed:', e); }
+                })();
+              }
+            }
           }
         }
         all.forEach((o) => seenIdsRef.current.add(o.id));
@@ -460,6 +492,38 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-4">
+      {/* Auto-Mode confirmation dialog */}
+      {showAutoModeConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={() => setShowAutoModeConfirm(false)} />
+          <div className="relative bg-background rounded-2xl p-6 w-full max-w-sm shadow-xl space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
+                <Zap className="w-5 h-5" />
+              </span>
+              <h3 className="font-bold text-base">Aktivizo Auto-Mode?</h3>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Porositë e reja do të pranohen <strong className="text-foreground">automatikisht</strong> dhe do t'i caktohen shoferit idle — pa asnjë konfirmim manual.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAutoModeConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80 transition-colors"
+              >
+                Anulo
+              </button>
+              <button
+                onClick={() => { setAutoMode(true); setShowAutoModeConfirm(false); }}
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 active:scale-[0.98] transition-all"
+              >
+                Aktivizo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirm-delete dialog */}
       {confirmDeleteTarget && (
         <ConfirmDeleteDialog
@@ -570,6 +634,24 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
             )}
           </div>
         )}
+
+        {/* Auto-Mode toggle */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => autoMode ? setAutoMode(false) : setShowAutoModeConfirm(true)}
+            className={`relative flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all ${
+              autoMode
+                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/40 animate-pulse'
+                : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+            }`}
+          >
+            <Zap className={`w-3.5 h-3.5 ${autoMode ? 'fill-white' : ''}`} />
+            {autoMode ? 'AUTO-MODE ON' : 'Auto-Mode OFF'}
+            {autoMode && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-300 rounded-full animate-ping" />
+            )}
+          </button>
+        </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <button

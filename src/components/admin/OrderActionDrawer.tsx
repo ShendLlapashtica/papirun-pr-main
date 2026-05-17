@@ -47,7 +47,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
       const trimmed = note.trim();
       if (isApprove) {
         // Send message FIRST so it's in DB before the status update triggers realtime on customer side
-        const msg = trimmed || (eta ? `Po e përgatisim — gati për ~${eta} min ✓` : 'Porosia u aprovua ✓');
+        const msg = trimmed || (eta ? `Po e përgatisim — gati për ~${eta} min ✓` : 'Po e përgatisim ✓');
         await sendOrderMessage(order.id, 'admin', msg);
         await updateOrderStatus(order.id, 'approved', trimmed);
         if (eta) await setOrderEta(order.id, eta);
