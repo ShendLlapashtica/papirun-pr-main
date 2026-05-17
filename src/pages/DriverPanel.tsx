@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation, Coffee, TrendingUp, Timer } from 'lucide-react';
+import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation, Coffee, TrendingUp, Timer, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchDrivers,
@@ -9,6 +9,7 @@ import {
   saveDriverPushSub,
   seedDefaultDrivers,
   subscribeDriverOrdersRealtime,
+  subscribeDriverPauseState,
   updateDriverLocation,
   setDriverPause,
   requestDriverPause,
@@ -29,6 +30,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 import { updateOrderStatus, suggestOrderLocation, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import OrderChat from '@/components/OrderChat';
 import DriverLocationMap from '@/components/DriverLocationMap';
+import DriverManual from '@/components/DriverManual';
 
 // --- Row mapper ---
 const mapOrderRow = (row: any): OrderRecord => ({
@@ -101,6 +103,7 @@ const DriverPanel = () => {
   const assignTimesRef = useRef<Record<string, number>>({});
   const [tick, setTick] = useState(0);
   const driverAlarmFiredRef = useRef<Set<string>>(new Set());
+  const [showManual, setShowManual] = useState(false);
 
   useEffect(() => {
     seedDefaultDrivers().catch(console.error);
@@ -223,12 +226,32 @@ const DriverPanel = () => {
       if (!sub) {
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+          applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as BufferSource,
         });
       }
       await saveDriverPushSub(driver.id, sub.toJSON());
     }).catch(() => {});
   }, [driver?.id]);
+
+  // Realtime: sync pause state when admin approves/rejects
+  useEffect(() => {
+    if (!driver) return;
+    const prevPending = driver.isPendingPause;
+    const unsub = subscribeDriverPauseState(driver.id, async () => {
+      try {
+        const updated = await fetchDriverById(driver.id);
+        if (!updated) return;
+        setDriver(updated);
+        // Toast when admin transitions from pendingPause → paused
+        if (prevPending && updated.isPaused && !updated.isPendingPause) {
+          toast.success('Admini aprovoi pauzën tënde ✓');
+        } else if (prevPending && !updated.isPaused && !updated.isPendingPause) {
+          toast('Kërkesa për pauzë u refuzua');
+        }
+      } catch {}
+    });
+    return unsub;
+  }, [driver?.id, driver?.isPendingPause]);
 
   const stopTracking = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -355,6 +378,7 @@ const DriverPanel = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {showManual && <DriverManual driverName={driver.name} onClose={() => setShowManual(false)} />}
       {/* Header */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-lg border-b border-border/50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
@@ -386,6 +410,10 @@ const DriverPanel = () => {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${isTracking ? 'bg-emerald-500 text-white' : 'bg-emerald-500/10 text-emerald-600'}`}>
               <Navigation className={`w-3.5 h-3.5 ${isTracking ? 'animate-pulse' : ''}`} />
               {isTracking ? 'GPS Live' : 'GPS'}
+            </button>
+            <button onClick={() => setShowManual(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-secondary text-sm font-medium" title="Manual">
+              <BookOpen className="w-4 h-4" />
             </button>
             <button onClick={() => { setDriver(null); localStorage.removeItem(DRIVER_SESSION_KEY); }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-secondary text-sm font-medium">

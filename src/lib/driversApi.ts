@@ -428,3 +428,19 @@ export const subscribeAllDriverLocations = (onChange: () => void) => {
     .subscribe();
   return () => { supabase.removeChannel(channel); };
 };
+
+/** Subscribe to a single driver's pause state changes (admin approve/unpause events). */
+export const subscribeDriverPauseState = (driverId: string, onChange: () => void) => {
+  const channel = supabase
+    .channel(`driver-pause-${driverId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'storefront_settings' },
+      (payload: any) => {
+        const key: string = payload?.new?.key || payload?.old?.key || '';
+        if (key === `${PAUSE_PREFIX}${driverId}`) onChange();
+      }
+    )
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+};
