@@ -19,7 +19,7 @@ import OrderActionDrawer from '@/components/admin/OrderActionDrawer';
 import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
 import { generateInvoice } from '@/lib/invoiceGenerator';
-import { assignDriverToOrder, fetchDrivers, subscribeAllDriverLocations, driverShortCode, type DeliveryDriver } from '@/lib/driversApi';
+import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllDriverLocations, driverShortCode, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
@@ -217,6 +217,8 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   const [showAutoModeConfirm, setShowAutoModeConfirm] = useState(false);
   const autoModeRef = useRef(false);
   const driversRef = useRef<DeliveryDriver[]>([]);
+  const [assignTimes, setAssignTimes] = useState<Record<string, number>>({});
+  const assignAlarmFiredRef = useRef<Set<string>>(new Set());
 
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
@@ -231,6 +233,34 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
 
   useEffect(() => { autoModeRef.current = autoMode; saveAutoMode(autoMode); }, [autoMode]);
   useEffect(() => { driversRef.current = drivers; }, [drivers]);
+
+  // Fetch assignment timestamps when assigned orders change
+  useEffect(() => {
+    const assignedIds = orders
+      .filter((o) => o.assignedDriverId && o.status === 'approved')
+      .map((o) => o.id);
+    if (assignedIds.length === 0) return;
+    fetchOrderAssignTimes(assignedIds).then(setAssignTimes).catch(() => {});
+  }, [orders]);
+
+  // 1-minute alarm: kling + alarm ref when driver hasn't accepted after 60s
+  useEffect(() => {
+    const ALARM_MS = 60_000;
+    const unaccepted = orders.filter(
+      (o) => o.assignedDriverId && o.status === 'approved' && assignTimes[o.id] && now - assignTimes[o.id] > ALARM_MS
+    );
+    for (const o of unaccepted) {
+      if (!assignAlarmFiredRef.current.has(o.id)) {
+        assignAlarmFiredRef.current.add(o.id);
+        playDing();
+      }
+    }
+    // Clear from alarm ref when order is no longer 'approved'
+    for (const id of Array.from(assignAlarmFiredRef.current)) {
+      const o = orders.find((x) => x.id === id);
+      if (!o || o.status !== 'approved') assignAlarmFiredRef.current.delete(id);
+    }
+  }, [orders, assignTimes, now]);
 
   const archiveOrder = (id: string) => {
     setArchivedIds((prev) => {
@@ -634,6 +664,30 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
             )}
           </div>
         )}
+
+        {/* 1-min unaccepted banner */}
+        {(() => {
+          const ALARM_MS = 60_000;
+          const unaccepted = orders.filter(
+            (o) => o.assignedDriverId && o.status === 'approved' && !isInHistory(o) && assignTimes[o.id] && now - assignTimes[o.id] > ALARM_MS
+          );
+          if (unaccepted.length === 0) return null;
+          const driverName = (o: OrderRecord) => drivers.find((d) => d.id === o.assignedDriverId)?.name ?? 'Shoferi';
+          return (
+            <div className="rounded-2xl bg-red-500/10 border border-red-500/40 ring-1 ring-red-400/30 p-3 space-y-1.5 animate-pulse">
+              <div className="flex items-center gap-2 text-red-600 font-bold text-xs uppercase tracking-wider">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                Shoferi nuk ka pranuar — më shumë se 1 min!
+              </div>
+              {unaccepted.map((o) => (
+                <div key={o.id} className="flex items-center justify-between text-xs bg-background/60 rounded-xl px-3 py-2">
+                  <span className="font-semibold">{o.customerName}</span>
+                  <span className="text-red-600 font-mono font-bold">{driverName(o)} · {Math.floor((now - assignTimes[o.id]) / 60_000)}m {Math.floor(((now - assignTimes[o.id]) % 60_000) / 1000)}s</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Auto-Mode toggle */}
         <div className="flex items-center justify-between">

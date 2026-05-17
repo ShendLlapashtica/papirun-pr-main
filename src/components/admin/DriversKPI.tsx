@@ -214,8 +214,8 @@ function DriverDetailModal({ driver, completed, waitMs, isBusy, ect, avgRating, 
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Dërgesa</div>
             </div>
             <div className="bg-secondary/40 rounded-2xl p-3 text-center">
-              <div className="text-2xl font-bold text-primary">€{totalRevenue.toFixed(0)}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Të ardhura</div>
+              <div className="text-lg font-bold leading-tight">{completed.length} <span className="text-primary text-sm">€{totalRevenue.toFixed(0)}</span></div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Gjithsej porosi</div>
             </div>
             <div className="bg-secondary/40 rounded-2xl p-3 text-center">
               <div className="text-sm font-bold text-emerald-600 leading-tight mt-0.5">{productiveMs > 0 ? fmtDuration(productiveMs) : '—'}</div>
@@ -292,7 +292,7 @@ function DriverDetailModal({ driver, completed, waitMs, isBusy, ect, avgRating, 
 
               <div className="bg-secondary/30 rounded-2xl p-4">
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-3 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" /> Të ardhura / ditë · €
+                  <TrendingUp className="w-3 h-3" /> Gjithsej porosi / ditë · €
                 </div>
                 <ResponsiveContainer width="100%" height={110}>
                   <LineChart data={dailyData} margin={{ top: 2, right: 4, left: -10, bottom: 0 }}>
@@ -533,21 +533,30 @@ export default function DriversKPI() {
 
   const PausedRow = ({ col }: { col: typeof cols[0] }) => {
     const isPending = col.driver.isPendingPause;
+    const OVERDUE_MS = 30 * 60 * 1000; // 30 min
+    const isOverdue = !isPending && col.pauseDurationMs != null && col.pauseDurationMs > OVERDUE_MS;
     return (
       <div
-        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isPending ? 'bg-amber-500/10 ring-1 ring-amber-400/40' : 'bg-background opacity-70'}`}
+        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+          isPending ? 'bg-amber-500/10 ring-1 ring-amber-400/40'
+          : isOverdue ? 'bg-red-500/10 ring-1 ring-red-400/50 animate-pulse'
+          : 'bg-background opacity-70'
+        }`}
       >
         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 opacity-60" style={{ background: col.driver.color || '#6b7280' }}>
           {driverShortCode(col.driver)}
         </div>
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setDetailDriverId(col.driver.id)}>
-          <div className="font-bold text-sm truncate">{col.driver.name}</div>
+          <div className="font-bold text-sm truncate flex items-center gap-1.5">
+            {col.driver.name}
+            {isOverdue && <span className="text-[9px] font-bold text-red-600 bg-red-500/15 px-1.5 py-0.5 rounded-full">PAUZË E GJATË</span>}
+          </div>
           {isPending ? (
             <div className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold mt-0.5">
               <AlertCircle className="w-2.5 h-2.5" /> Kërkon pauzë
             </div>
           ) : (
-            <div className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold mt-0.5">
+            <div className={`flex items-center gap-1 text-[11px] font-semibold mt-0.5 ${isOverdue ? 'text-red-600' : 'text-amber-600'}`}>
               <Coffee className="w-2.5 h-2.5" />
               {col.pauseDurationMs != null ? <>Pauzë: <span className="font-mono ml-0.5">{fmtDuration(col.pauseDurationMs)}</span></> : 'Në pauzë'}
             </div>

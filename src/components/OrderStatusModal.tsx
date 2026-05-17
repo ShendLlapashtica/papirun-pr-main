@@ -247,7 +247,12 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
                     disabled={ratingSubmitting}
                     onClick={async () => {
                       setRatingSubmitting(true);
-                      await rateDriver(order!.id, driverRating, ratingNote.trim() || undefined);
+                      try {
+                        await rateDriver(order!.id, driverRating, ratingNote.trim() || undefined);
+                      } catch {
+                        // retry without note in case driver_rating_note column is missing
+                        try { await rateDriver(order!.id, driverRating); } catch {}
+                      }
                       setRatingSubmitting(false);
                       setRatingSubmitted(true);
                       setThankYouVisible(true);

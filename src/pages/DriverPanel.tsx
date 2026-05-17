@@ -100,6 +100,7 @@ const DriverPanel = () => {
   const driverRef = useRef<DeliveryDriver | null>(null);
   const assignTimesRef = useRef<Record<string, number>>({});
   const [tick, setTick] = useState(0);
+  const driverAlarmFiredRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     seedDefaultDrivers().catch(console.error);
@@ -191,6 +192,25 @@ const DriverPanel = () => {
     const t = setInterval(() => setTick(n => n + 1), 1000);
     return () => clearInterval(t);
   }, [driver]);
+
+  // 1-minute alarm: kling when driver hasn't acted on an approved order for >60s
+  useEffect(() => {
+    if (!driver) return;
+    const ALARM_MS = 60_000;
+    const unaccepted = orders.filter(
+      (o) => o.status === 'approved' && assignTimesRef.current[o.id] && Date.now() - assignTimesRef.current[o.id] > ALARM_MS
+    );
+    for (const o of unaccepted) {
+      if (!driverAlarmFiredRef.current.has(o.id)) {
+        driverAlarmFiredRef.current.add(o.id);
+        playKrring();
+      }
+    }
+    for (const id of Array.from(driverAlarmFiredRef.current)) {
+      const o = orders.find((x) => x.id === id);
+      if (!o || o.status !== 'approved') driverAlarmFiredRef.current.delete(id);
+    }
+  }, [driver, orders, tick]);
 
   useEffect(() => {
     if (!driver || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
@@ -402,6 +422,32 @@ const DriverPanel = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4">
+          {/* 1-min unaccepted banner */}
+          {(() => {
+            const ALARM_MS = 60_000;
+            const unaccepted = activeOrders.filter(
+              (o) => o.status === 'approved' && assignTimesRef.current[o.id] && Date.now() - assignTimesRef.current[o.id] > ALARM_MS
+            );
+            if (unaccepted.length === 0) return null;
+            return (
+              <div className="rounded-2xl bg-red-500/15 border-2 border-red-500/50 p-4 animate-pulse">
+                <div className="flex items-center gap-2 text-red-600 font-bold text-sm mb-2">
+                  <Clock className="w-4 h-4 shrink-0" />
+                  Provo të pranosh porosinë — ka kaluar 1 minutë!
+                </div>
+                {unaccepted.map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => setSelectedId(o.id)}
+                    className="w-full text-left bg-background/70 rounded-xl px-3 py-2 text-xs font-semibold text-red-700 hover:bg-background transition-colors"
+                  >
+                    {o.customerName} · €{o.total.toFixed(2)}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* Active orders list */}
           <div className="space-y-3">
             <h2 className="font-display font-bold text-base flex items-center gap-2">
