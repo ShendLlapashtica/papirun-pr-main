@@ -187,7 +187,7 @@ export default function CustomerDriverMap({
           ? `~${etaMinutes} min deri tek ju`
           : 'Duke llogaritur...'}
       </div>
-      <div ref={containerRef} style={{ height: '260px', width: '100%' }} />
+      <div ref={containerRef} style={{ height: '200px', width: '100%' }} />
     </div>
   );
 }

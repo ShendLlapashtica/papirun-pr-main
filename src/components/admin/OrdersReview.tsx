@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, MapPin, Phone, Calendar, Smartphone, Globe, Clock, Printer, Trash2, ChefHat, Bike, CheckCheck, AlertCircle, Hourglass, Star, MessageCircle, Copy, Navigation, Receipt, Search, Download, Share2, Zap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -223,6 +223,17 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
 
+  // Tracks whether we're on a lg+ breakpoint — used to route inline vs sidebar detail
+  const [isLg, setIsLg] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setIsLg(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   useEffect(() => {
     const reload = () => fetchDrivers().then((d) => setDrivers(d.filter((x) => x.isActive))).catch(() => {});
     reload();
@@ -323,7 +334,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                     const bestId = pickBestDriver(driversRef.current, all);
                     if (bestId) {
                       const target = driversRef.current.find((d) => d.id === bestId);
-                      if (target) await assignDriverToOrder(o.id, target.id);
+                      if (target) await assignDriverToOrder(o.id, target.id, { customerName: o.customerName, address: o.deliveryAddress, total: o.total });
                     }
                   } catch (e) { console.error('Auto-accept failed:', e); }
                 })();
@@ -839,8 +850,8 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
             const isOverdue = isPending && ageMs > 60_000;
             const isCagl = isCagllavice(o);
             return (
+              <React.Fragment key={o.id}>
               <motion.div
-                key={o.id}
                 layout
                 initial={{ x: -40, opacity: 0, scale: 0.96 }}
                 animate={{ x: 0, opacity: isDeleting ? 0.45 : 1, scale: 1 }}
@@ -997,13 +1008,145 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                   </div>
                 )}
               </motion.div>
+
+              {/* Mobile inline detail — only visible on < lg, rendered right after the clicked order */}
+              {!isLg && selectedId === o.id && selected && (
+                <motion.div
+                  key="mobile-inline-detail"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                  className="mt-3 overflow-hidden"
+                >
+                  <div className="bg-card/90 backdrop-blur-xl rounded-3xl shadow-card overflow-hidden border border-border/40">
+                    <div className="p-4 border-b border-border/50 flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-base flex items-center gap-2">
+                          {selected.customerName}
+                          <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                            {selected.source === 'app' ? <><Smartphone className="w-2.5 h-2.5" /> App</> : <><Globe className="w-2.5 h-2.5" /> Web</>}
+                          </span>
+                        </h3>
+                        <a href={`tel:${selected.customerPhone}`} className="text-xs text-primary font-medium">{selected.customerPhone}</a>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handlePrint(selected)} className="p-2 rounded-full hover:bg-secondary" title="Print"><Printer className="w-4 h-4" /></button>
+                        <button onClick={() => setSelectedId(null)} className="p-2 rounded-full hover:bg-secondary"><X className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-4 text-xs">
+                      <div className="grid grid-cols-4 gap-2">
+                        <a href={`tel:${selected.customerPhone}`} className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-primary/10 text-primary hover:bg-primary/20 active:scale-95 transition-all">
+                          <Phone className="w-5 h-5" strokeWidth={2.4} /><span className="text-[10px] font-semibold">Thirr</span>
+                        </a>
+                        <a href={`https://wa.me/${selected.customerPhone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 active:scale-95 transition-all">
+                          <MessageCircle className="w-5 h-5" strokeWidth={2.4} /><span className="text-[10px] font-semibold">WhatsApp</span>
+                        </a>
+                        {selected.deliveryLat !== null && selected.deliveryLng !== null ? (
+                          <a href={`https://www.google.com/maps?q=${selected.deliveryLat},${selected.deliveryLng}`} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 active:scale-95 transition-all">
+                            <Navigation className="w-5 h-5" strokeWidth={2.4} /><span className="text-[10px] font-semibold">Navigo</span>
+                          </a>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-secondary/40 text-muted-foreground/50">
+                            <Navigation className="w-5 h-5" strokeWidth={2.4} /><span className="text-[10px] font-semibold">Pa Map</span>
+                          </div>
+                        )}
+                        <button onClick={() => { const text = `${selected.customerName}\n${selected.customerPhone}\n${selected.deliveryAddress}\n€${selected.total.toFixed(2)}`; navigator.clipboard?.writeText(text).then(() => toast.success('U kopjua')); }} className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-secondary text-foreground hover:bg-secondary/70 active:scale-95 transition-all">
+                          <Copy className="w-5 h-5" strokeWidth={2.4} /><span className="text-[10px] font-semibold">Kopjo</span>
+                        </button>
+                      </div>
+                      <div className="bg-secondary/40 rounded-2xl p-3.5 space-y-1">
+                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5"><Receipt className="w-3 h-3" /> Porosia</div>
+                        {selected.items.map((it: any, i) => (
+                          <div key={i} className="text-sm">• {it.quantity}x {it.name?.sq || it.name?.en || it.id}</div>
+                        ))}
+                        <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
+                          <span className="text-sm">Totali</span>
+                          <span className="text-primary text-lg">€{selected.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" /><p className="leading-snug">{selected.deliveryAddress}</p></div>
+                      {selected.notes && (
+                        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 dark:border-amber-500/30 rounded-xl px-3 py-2">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">Shënim klienti</p>
+                          <p className="italic text-foreground/90 text-xs">{selected.notes}</p>
+                        </div>
+                      )}
+                      {selected.status === 'pending' && (
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <button onClick={() => openDrawer(selected, 'reject')} className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-destructive/10 text-destructive font-bold text-sm hover:bg-destructive/20 active:scale-95 transition-all"><X className="w-5 h-5" strokeWidth={2.5} /> Refuzo</button>
+                          <button onClick={() => openDrawer(selected, 'approve')} className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/30 hover:bg-primary/90 active:scale-95 transition-all"><Check className="w-5 h-5" strokeWidth={2.5} /> Aprovo</button>
+                        </div>
+                      )}
+                      {(selected.status === 'approved' || selected.status === 'preparing' || selected.status === 'out_for_delivery') && (
+                        <div className="space-y-3 pt-1">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1 mb-1.5"><Clock className="w-3 h-3" /> ETA {selected.prepEtaMinutes ? `· tani ${selected.prepEtaMinutes} min` : ''}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {[15, 20, 30, 45, 60].map((m) => (
+                                <button key={m} onClick={() => handleEta(selected, m)} className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all active:scale-95 ${selected.prepEtaMinutes === m ? 'bg-primary text-primary-foreground shadow' : 'bg-secondary hover:bg-primary/10'}`}>{m} min</button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1.5">Ndrysho status</p>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              <button onClick={() => handleStatus(selected.id, 'preparing')} disabled={selected.status === 'preparing'} className="text-xs px-2 py-2.5 rounded-xl font-semibold bg-secondary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed inline-flex flex-col items-center gap-1 active:scale-95 transition-all"><ChefHat className="w-4 h-4" /> Përgatit</button>
+                              <button onClick={() => handleStatus(selected.id, 'out_for_delivery')} disabled={selected.status === 'out_for_delivery'} className="text-xs px-2 py-2.5 rounded-xl font-semibold bg-secondary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed inline-flex flex-col items-center gap-1 active:scale-95 transition-all"><Bike className="w-4 h-4" /> Në rrugë</button>
+                              <button onClick={() => handleStatus(selected.id, 'completed')} className="text-xs px-2 py-2.5 rounded-xl font-bold bg-primary text-primary-foreground inline-flex flex-col items-center gap-1 shadow-md active:scale-95 transition-all"><CheckCheck className="w-4 h-4" /> Përfundo</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {(selected.status === 'approved' || selected.status === 'preparing' || selected.status === 'out_for_delivery') && drivers.length > 0 && (
+                        <div className="bg-blue-500/5 rounded-2xl p-3 border border-blue-500/20 space-y-2">
+                          <p className="text-[10px] uppercase tracking-wider text-blue-600 font-bold flex items-center gap-1"><Bike className="w-3 h-3" /> Shoferi</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {drivers.map((d) => {
+                              const isAssigned = selected.assignedDriverId === d.id;
+                              return (
+                                <button key={d.id} onClick={async () => { try { await assignDriverToOrder(selected.id, d.id, { customerName: selected.customerName, address: selected.deliveryAddress, total: selected.total }); toast.success(`Shoferi ${d.name} u caktua`); } catch { toast.error('Gabim'); } }} className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all active:scale-95 ${isAssigned ? 'bg-blue-600 text-white shadow' : 'bg-secondary hover:bg-blue-500/10'}`}>{d.name}</button>
+                              );
+                            })}
+                          </div>
+                          {selected.assignedDriverId && (
+                            <button onClick={() => handleForwardToDriver(selected)} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 text-xs font-bold hover:bg-blue-600/20 active:scale-95 transition-all border border-blue-500/20"><Share2 className="w-3.5 h-3.5" /> Kaloj bisedën te shoferi</button>
+                          )}
+                        </div>
+                      )}
+                      {(selected.status === 'completed' || selected.status === 'rejected') && !isInHistory(selected) && (
+                        <button onClick={() => handleDelete(selected.id)} className="w-full py-3 rounded-2xl bg-destructive/10 text-destructive text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-destructive/20 transition-all"><Trash2 className="w-4 h-4" /> Fshi · ruaj në Histori</button>
+                      )}
+                      {isInHistory(selected) && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <button onClick={() => handleRestore(selected.id)} className="py-3 rounded-2xl bg-primary/10 text-primary text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-primary/20 transition-all"><Check className="w-4 h-4" /> Rikthe</button>
+                          <button onClick={() => setConfirmDeleteTarget({ id: selected.id })} className="py-3 rounded-2xl bg-destructive/10 text-destructive text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-destructive/20 transition-all"><Trash2 className="w-4 h-4" /> Fshij komplet</button>
+                        </div>
+                      )}
+                      {(selected.status === 'approved' || selected.status === 'preparing' || selected.status === 'out_for_delivery') && (
+                        <button onClick={async () => { if (!window.confirm('Mbyll bisedën dhe mark-o porosinë si të përfunduar?')) return; try { await updateOrderStatus(selected.id, 'completed'); const { deleteOrderMessages } = await import('@/lib/orderMessagesApi'); await deleteOrderMessages(selected.id); toast.success('Biseda u mbyll · porosia u përfundua'); } catch { toast.error('Gabim'); } }} className="w-full py-3 rounded-2xl bg-foreground/90 text-background text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-foreground transition-all"><CheckCheck className="w-4 h-4" /> Mbyll bisedën</button>
+                      )}
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2 flex items-center gap-1"><MessageCircle className="w-3 h-3" /> PapirunChat · me klientin</p>
+                        {isInHistory(selected) ? (
+                          <ArchivedChatView orderId={selected.id} />
+                        ) : (
+                          <OrderChat orderId={selected.id} viewerSide="admin" disabled={false} maxHeightClass="max-h-80" allowDelete />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              </React.Fragment>
             );
           })}
         </AnimatePresence>
       </div>
 
-      {/* Detail panel */}
-      <div className="lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto">
+      {/* Detail panel — desktop sidebar only; mobile version renders inline in the list */}
+      <div className="hidden lg:block lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto">
         {!selected && (
           <div className="bg-card rounded-3xl p-6 text-center text-sm text-muted-foreground shadow-card backdrop-blur-md">
             Zgjidh një porosi për të hapur detajet, hartën dhe chat.
@@ -1187,7 +1330,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                           key={d.id}
                           onClick={async () => {
                             try {
-                              await assignDriverToOrder(selected.id, d.id);
+                              await assignDriverToOrder(selected.id, d.id, { customerName: selected.customerName, address: selected.deliveryAddress, total: selected.total });
                               toast.success(`Shoferi ${d.name} u caktua`);
                             } catch { toast.error('Gabim'); }
                           }}

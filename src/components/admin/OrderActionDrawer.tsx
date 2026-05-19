@@ -62,7 +62,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
             targetDriver = drivers.find((d) => d.id === selectedDriverId) ?? null;
           }
           if (targetDriver) {
-            await assignDriverToOrder(order.id, targetDriver.id);
+            await assignDriverToOrder(order.id, targetDriver.id, { customerName: order.customerName, address: order.deliveryAddress, total: order.total });
             const label = selectedDriverId === 'auto' ? 'Auto (idle)' : 'Manual';
             toast.success(`Shoferi: ${targetDriver.name} (${label})`);
           }

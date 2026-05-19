@@ -560,7 +560,7 @@ const OrderTrackingPill = () => {
 
       {orderId && showModal && (
         <div className="fixed bottom-0 left-0 right-0 z-[60] p-3 pointer-events-none">
-          <div className="max-w-md mx-auto bg-background rounded-2xl shadow-2xl border border-border/50 overflow-hidden pointer-events-auto">
+          <div className="max-w-md mx-auto bg-background rounded-2xl shadow-2xl border border-border/50 overflow-hidden pointer-events-auto" style={{ maxHeight: '82vh' }}>
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40">
               <span className="text-sm font-semibold flex items-center gap-1.5">
                 <MessageCircle className="w-3.5 h-3.5 text-primary" />
@@ -592,7 +592,7 @@ const OrderTrackingPill = () => {
               orderId={orderId}
               viewerSide="user"
               disabled={order?.status === 'pending' || order?.status === 'rejected' || order?.status === 'completed'}
-              maxHeightClass="max-h-64"
+              maxHeightClass={order?.status === 'out_for_delivery' && driverPos ? 'max-h-36' : 'max-h-64'}
             />
           </div>
         </div>

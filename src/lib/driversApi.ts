@@ -319,7 +319,11 @@ export const saveDriverPushSub = async (driverId: string, sub: PushSubscriptionJ
 };
 
 /** Assign a driver to an order, record assignment timestamp, and send a push notification */
-export const assignDriverToOrder = async (orderId: string, driverId: string) => {
+export const assignDriverToOrder = async (
+  orderId: string,
+  driverId: string,
+  meta?: { customerName?: string; address?: string; total?: number }
+) => {
   const client = supabase as any;
   const { error } = await client.from('orders').update({ assigned_driver_id: driverId }).eq('id', orderId);
   if (error) throw error;
@@ -334,13 +338,17 @@ export const assignDriverToOrder = async (orderId: string, driverId: string) => 
     .eq('key', `${PUSH_SUB_PREFIX}${driverId}`)
     .maybeSingle();
   if (subRow?.value_json) {
+    const bodyParts: string[] = [];
+    if (meta?.customerName) bodyParts.push(meta.customerName);
+    if (meta?.address) bodyParts.push(meta.address);
+    if (meta?.total != null) bodyParts.push(`€${meta.total.toFixed(2)}`);
     fetch('/api/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         subscription: subRow.value_json,
-        title: 'Porosi e re!',
-        body: 'Ke nje porosi te re.',
+        title: '🛵 Porosi e re!',
+        body: bodyParts.length ? bodyParts.join(' · ') : 'Ke një porosi të re.',
         orderId,
       }),
     }).catch(() => {});
