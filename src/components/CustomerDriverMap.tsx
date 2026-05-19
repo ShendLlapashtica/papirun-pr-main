@@ -11,6 +11,7 @@ interface Props {
   etaMinutes: number | null;
   driverName?: string;
   driverColor?: string;
+  onRouteLoaded?: (durationSec: number) => void;
 }
 
 function injectPulseCSS() {
@@ -56,15 +57,19 @@ function makeDestIcon() {
 async function fetchOsrmRoute(
   dLat: number, dLng: number,
   cLat: number, cLng: number
-): Promise<[number, number][]> {
+): Promise<{ geometry: [number, number][]; durationSec: number }> {
   const url = `https://router.project-osrm.org/route/v1/driving/${dLng},${dLat};${cLng},${cLat}?overview=full&geometries=geojson`;
   const res = await fetch(url);
   if (!res.ok) throw new Error('OSRM error');
   const data = await res.json();
-  // OSRM returns [lng, lat]; Leaflet needs [lat, lng]
-  return data.routes[0].geometry.coordinates.map(
-    ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
-  );
+  const route = data.routes[0];
+  return {
+    // OSRM returns [lng, lat]; Leaflet needs [lat, lng]
+    geometry: route.geometry.coordinates.map(
+      ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
+    ),
+    durationSec: route.duration,
+  };
 }
 
 export default function CustomerDriverMap({
@@ -75,6 +80,7 @@ export default function CustomerDriverMap({
   etaMinutes,
   driverName = 'SH',
   driverColor = '#3b82f6',
+  onRouteLoaded,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -82,18 +88,22 @@ export default function CustomerDriverMap({
   const destMarkerRef = useRef<L.Marker | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
   const routeFetchRef = useRef<AbortController | null>(null);
+  // Keep latest onRouteLoaded without re-running effects
+  const onRouteLoadedRef = useRef(onRouteLoaded);
+  onRouteLoadedRef.current = onRouteLoaded;
 
   const updateRoute = async (dLat: number, dLng: number, cLat: number, cLng: number) => {
     if (routeFetchRef.current) routeFetchRef.current.abort();
     const ctrl = new AbortController();
     routeFetchRef.current = ctrl;
     try {
-      const coords = await fetchOsrmRoute(dLat, dLng, cLat, cLng);
+      const result = await fetchOsrmRoute(dLat, dLng, cLat, cLng);
       if (ctrl.signal.aborted) return;
-      routeLineRef.current?.setLatLngs(coords);
+      routeLineRef.current?.setLatLngs(result.geometry);
+      onRouteLoadedRef.current?.(result.durationSec);
     } catch {
       if (ctrl.signal.aborted) return;
-      // Fallback to straight line
+      // Fallback to straight line — don't update ETA so stale value stays
       routeLineRef.current?.setLatLngs([[dLat, dLng], [cLat, cLng]]);
     }
   };
@@ -143,7 +153,6 @@ export default function CustomerDriverMap({
 
     setTimeout(() => map.invalidateSize(), 200);
 
-    // Fetch initial road route
     updateRoute(driverLat, driverLng, customerLat, customerLng);
 
     return () => {
@@ -171,14 +180,14 @@ export default function CustomerDriverMap({
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border/40">
-      {/* ETA badge */}
-      <div className="absolute top-2 left-2 z-[400] flex items-center gap-1.5 bg-background/90 backdrop-blur-md rounded-full px-3 py-1.5 shadow-md border border-border/40 text-xs font-semibold">
+      {/* ETA badge — left-1 keeps it tight to the left edge */}
+      <div className="absolute top-2 left-1 z-[400] flex items-center gap-1.5 bg-background/90 backdrop-blur-md rounded-full px-3 py-1.5 shadow-md border border-border/40 text-xs font-semibold">
         <Navigation className="w-3 h-3 text-primary" />
         {etaMinutes !== null
           ? `~${etaMinutes} min deri tek ju`
           : 'Duke llogaritur...'}
       </div>
-      <div ref={containerRef} style={{ height: '200px', width: '100%' }} />
+      <div ref={containerRef} style={{ height: '260px', width: '100%' }} />
     </div>
   );
 }

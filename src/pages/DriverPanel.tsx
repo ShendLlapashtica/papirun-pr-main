@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation, Coffee, TrendingUp, Timer, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -104,6 +104,23 @@ const DriverPanel = () => {
   const [tick, setTick] = useState(0);
   const driverAlarmFiredRef = useRef<Set<string>>(new Set());
   const [showManual, setShowManual] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [isLg, setIsLg] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setIsLg(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Pre-register SW on page load so push notifications can arrive even before login
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     seedDefaultDrivers().catch(console.error);
@@ -112,9 +129,9 @@ const DriverPanel = () => {
       fetchDriverById(savedId)
         .then((d) => {
           if (d && d.isActive) setDriver(d);
-          else localStorage.removeItem(DRIVER_SESSION_KEY);
+          else if (d === null) localStorage.removeItem(DRIVER_SESSION_KEY);
         })
-        .catch(() => localStorage.removeItem(DRIVER_SESSION_KEY));
+        .catch(() => { /* network error — keep session, will restore on next load */ });
     }
   }, []);
 
@@ -123,14 +140,18 @@ const DriverPanel = () => {
     setError('');
     try {
       const drivers = await fetchDrivers();
+      const q = username.trim().toLowerCase();
       const found = drivers.find(
-        (d) => d.phone.trim().toLowerCase() === username.trim().toLowerCase() && d.isActive
+        (d) =>
+          (d.phone.trim().toLowerCase() === q ||
+           d.username.trim().toLowerCase() === q) &&
+          d.isActive
       );
       if (found) {
         setDriver(found);
         localStorage.setItem(DRIVER_SESSION_KEY, found.id);
       } else {
-        setError('Username i gabuar. Provo: driver1, driver2...');
+        setError('Username i gabuar.');
       }
     } catch {
       setError('Gabim në lidhje me bazën e të dhënave');
@@ -269,7 +290,7 @@ const DriverPanel = () => {
         const d = driverRef.current;
         if (!d) return;
         const now = Date.now();
-        if (now - lastWriteAt < 30_000) return;
+        if (now - lastWriteAt < 5_000) return;
         lastWriteAt = now;
         try {
           await updateDriverLocation(d.id, pos.coords.latitude, pos.coords.longitude);
@@ -335,7 +356,7 @@ const DriverPanel = () => {
 
   const activeOrders = orders.filter((o) => !['completed', 'rejected', 'histori'].includes(o.status) && o.isVisible !== false);
   const completedOrders = orders.filter((o) => o.status === 'completed');
-  const selected = activeOrders.find((o) => o.id === selectedId) ?? null;
+  const selected = orders.find((o) => o.id === selectedId) ?? null;
 
   // Stats
   const productiveMs = completedOrders.reduce((sum, o) => {
@@ -494,45 +515,154 @@ const DriverPanel = () => {
             )}
 
             {activeOrders.map((o) => (
-              <button
-                key={o.id}
-                onClick={() => setSelectedId(o.id === selectedId ? null : o.id)}
-                className={`w-full text-left bg-card rounded-2xl p-4 shadow-card transition-all hover:shadow-md ${
-                  selectedId === o.id ? 'ring-2 ring-blue-500' : ''
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-sm truncate">{o.customerName || 'Anonim'}</h3>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Phone className="w-3 h-3" /> {o.customerPhone}
+              <React.Fragment key={o.id}>
+                <button
+                  onClick={() => setSelectedId(o.id === selectedId ? null : o.id)}
+                  className={`w-full text-left bg-card rounded-2xl p-4 shadow-card transition-all hover:shadow-md ${
+                    selectedId === o.id ? 'ring-2 ring-blue-500' : ''
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-sm truncate">{o.customerName || 'Anonim'}</h3>
+                      <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Phone className="w-3 h-3" /> {o.customerPhone}
+                      </div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3 h-3" /> {o.deliveryAddress}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-3 h-3" /> {o.deliveryAddress}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className={`text-[10px] px-2 py-1 rounded-full font-medium whitespace-nowrap ${statusColor(o.status)}`}>
-                      {STATUS_LABEL[o.status] ?? o.status}
-                    </span>
-                    {assignTimesRef.current[o.id] && tick >= 0 && (
-                      <span className="text-[10px] text-amber-600 font-medium flex items-center gap-0.5">
-                        <Timer className="w-3 h-3" />
-                        {fmtElapsed(Date.now() - assignTimesRef.current[o.id])}
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className={`text-[10px] px-2 py-1 rounded-full font-medium whitespace-nowrap ${statusColor(o.status)}`}>
+                        {STATUS_LABEL[o.status] ?? o.status}
                       </span>
-                    )}
+                      {assignTimesRef.current[o.id] && tick >= 0 && (
+                        <span className="text-[10px] text-amber-600 font-medium flex items-center gap-0.5">
+                          <Timer className="w-3 h-3" />
+                          {fmtElapsed(Date.now() - assignTimesRef.current[o.id])}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
-                  <span className="text-xs text-muted-foreground">{o.items.length} artikuj</span>
-                  <span className="text-primary font-semibold text-sm">€{o.total.toFixed(2)}</span>
-                </div>
-              </button>
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40">
+                    <span className="text-xs text-muted-foreground">{o.items.length} artikuj</span>
+                    <span className="text-primary font-semibold text-sm">€{o.total.toFixed(2)}</span>
+                  </div>
+                </button>
+
+                {/* Mobile inline detail — shown right under the clicked order on small screens */}
+                {!isLg && selectedId === o.id && selected && (
+                  <div className="mt-2 bg-card rounded-2xl shadow-card overflow-hidden border border-border/40">
+                    <div className="p-3 border-b border-border/50 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-sm">{selected.customerName}</h3>
+                        <a href={`tel:${selected.customerPhone}`} className="text-xs text-blue-600 font-medium">{selected.customerPhone}</a>
+                      </div>
+                      <button onClick={() => setSelectedId(null)} className="p-1.5 rounded-full hover:bg-secondary">
+                        <CheckCheck className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                    <div className="p-3 space-y-3 text-xs">
+                      <div className="grid grid-cols-2 gap-2">
+                        <a href={`tel:${selected.customerPhone}`} className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-500/10 text-blue-600 font-semibold active:scale-95 transition-all">
+                          <Phone className="w-4 h-4" /> Thirr
+                        </a>
+                        {selected.deliveryLat !== null && selected.deliveryLng !== null && (
+                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${selected.deliveryLat},${selected.deliveryLng}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 font-semibold active:scale-95 transition-all">
+                            <MapPin className="w-4 h-4" /> Navigo
+                          </a>
+                        )}
+                      </div>
+                      <div className="bg-secondary/40 rounded-xl p-3 space-y-1">
+                        {selected.items.map((it: any, i) => (
+                          <div key={i} className="text-sm">• {it.quantity}x {it.name?.sq || it.name?.en || it.id}</div>
+                        ))}
+                        <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
+                          <span>Totali</span>
+                          <span className="text-primary text-sm">€{selected.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" /><p className="leading-snug">{selected.deliveryAddress}</p></div>
+                      {selected.notes && (
+                        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 rounded-xl px-3 py-2">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">Shënim</p>
+                          <p className="italic text-foreground/90">{selected.notes}</p>
+                        </div>
+                      )}
+                      {(selected.status === 'approved' || selected.status === 'preparing') && (
+                        <button onClick={() => handleStatus(selected.id, 'out_for_delivery')} className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
+                          <Bike className="w-5 h-5" /> Nise Dërgesën
+                        </button>
+                      )}
+                      {selected.status === 'out_for_delivery' && (
+                        <button onClick={() => handleStatus(selected.id, 'completed')} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
+                          <CheckCheck className="w-5 h-5" /> Përfundo Dërgesën
+                        </button>
+                      )}
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2 flex items-center gap-1"><MessageCircle className="w-3 h-3" /> Chat</p>
+                        <OrderChat orderId={selected.id} viewerSide="driver" disabled={selected.status === 'completed' || selected.status === 'rejected'} maxHeightClass="max-h-60" allowDelete={selected.status === 'completed'} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
             ))}
           </div>
 
-          {/* Detail panel */}
-          <div className="lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto">
+          {/* Completed orders today — collapsible */}
+          {completedOrders.length > 0 && (
+            <div className="space-y-2">
+              <button
+                onClick={() => setShowCompleted((v) => !v)}
+                className="w-full flex items-center justify-between px-1 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span className="flex items-center gap-1.5">
+                  <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  Përfunduar sot
+                  <span className="bg-emerald-500/15 text-emerald-600 px-1.5 py-0.5 rounded-full font-bold">{completedOrders.length}</span>
+                </span>
+                <span className="text-muted-foreground/60">{showCompleted ? '▲' : '▼'}</span>
+              </button>
+              {showCompleted && completedOrders.map((o) => (
+                <React.Fragment key={o.id}>
+                  <button
+                    onClick={() => setSelectedId(o.id === selectedId ? null : o.id)}
+                    className={`w-full text-left bg-card/60 rounded-2xl p-3 shadow-sm border border-border/30 transition-all hover:shadow-md ${selectedId === o.id ? 'ring-2 ring-emerald-500' : ''}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-sm truncate text-muted-foreground">{o.customerName || 'Anonim'}</h3>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{o.deliveryAddress}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-[10px] px-2 py-1 rounded-full font-medium bg-emerald-500/15 text-emerald-600">Përfunduar</span>
+                        <span className="text-primary font-semibold text-xs">€{o.total.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </button>
+                  {!isLg && selectedId === o.id && (
+                    <div className="mt-2 bg-card/80 rounded-2xl border border-border/30 overflow-hidden">
+                      <div className="p-3 space-y-2 text-xs">
+                        <div className="bg-secondary/40 rounded-xl p-3 space-y-1">
+                          {o.items.map((it: any, i) => (
+                            <div key={i} className="text-sm">• {it.quantity}x {it.name?.sq || it.name?.en || it.id}</div>
+                          ))}
+                          <div className="flex justify-between font-bold pt-2 border-t border-border/50 mt-2">
+                            <span>Totali</span><span className="text-primary">€{o.total.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <OrderChat orderId={o.id} viewerSide="driver" disabled maxHeightClass="max-h-52" allowDelete />
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+
+          {/* Detail panel — desktop sidebar only; mobile version is rendered inline in active orders list */}
+          <div className="hidden lg:block lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto">
             {!selected ? (
               <div className="bg-card rounded-2xl p-6 text-center text-sm text-muted-foreground shadow-card">
                 Zgjidh një porosi për detaje dhe chat.

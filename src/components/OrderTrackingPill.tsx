@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star } from 'lucide-react';
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
-import { rateDriver, fetchDriverLocation, subscribeDriverLocation, haversineKm } from '@/lib/driversApi';
+import { rateDriver, fetchDriverLocation, subscribeDriverLocation } from '@/lib/driversApi';
 import OrderStatusModal from '@/components/OrderStatusModal';
 import OrderChat from '@/components/OrderChat';
 import CustomerDriverMap from '@/components/CustomerDriverMap';
@@ -172,19 +172,10 @@ const OrderTrackingPill = () => {
     const customerLat = order.deliveryLat;
     const customerLng = order.deliveryLng;
 
-    const calcEta = (dLat: number, dLng: number) => {
-      if (customerLat == null || customerLng == null) return;
-      const km = haversineKm(dLat, dLng, customerLat, customerLng);
-      setEtaMinutes(Math.max(1, Math.ceil((km / 25) * 60)));
-    };
-
     const fetchPos = async () => {
       try {
         const loc = await fetchDriverLocation(driverId);
-        if (loc) {
-          setDriverPos({ lat: loc.lat, lng: loc.lng });
-          calcEta(loc.lat, loc.lng);
-        }
+        if (loc) setDriverPos({ lat: loc.lat, lng: loc.lng });
       } catch {}
     };
 
@@ -584,13 +575,16 @@ const OrderTrackingPill = () => {
               driverPos &&
               order.deliveryLat != null &&
               order.deliveryLng != null && (
-                <div className="p-2 border-b border-border/30">
+                <div className="border-b border-border/30">
                   <CustomerDriverMap
                     driverLat={driverPos.lat}
                     driverLng={driverPos.lng}
                     customerLat={order.deliveryLat}
                     customerLng={order.deliveryLng}
                     etaMinutes={etaMinutes}
+                    onRouteLoaded={(durationSec) =>
+                      setEtaMinutes(Math.max(1, Math.ceil((durationSec / 60) * 1.2)))
+                    }
                   />
                 </div>
               )}
