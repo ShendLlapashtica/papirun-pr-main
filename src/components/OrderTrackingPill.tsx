@@ -181,7 +181,7 @@ const OrderTrackingPill = () => {
 
     fetchPos(); // immediate first fetch
     const unsubRealtime = subscribeDriverLocation(driverId, fetchPos);
-    const interval = setInterval(fetchPos, 15_000); // fallback in case realtime drops
+    const interval = setInterval(fetchPos, 5_000); // 5s fallback — realtime may not fire for anon users
     return () => { clearInterval(interval); unsubRealtime(); };
   }, [order?.status, order?.assignedDriverId, order?.deliveryLat, order?.deliveryLng]);
 

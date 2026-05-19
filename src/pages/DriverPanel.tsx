@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, Component } from 'react';
 import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation, Coffee, TrendingUp, Timer, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -31,6 +31,38 @@ import { updateOrderStatus, suggestOrderLocation, type OrderRecord, type OrderSt
 import OrderChat from '@/components/OrderChat';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import DriverManual from '@/components/DriverManual';
+
+// Error boundary — prevents a single order detail crash from whiting out the page
+class OrderDetailBoundary extends Component<
+  { children: React.ReactNode; resetKey: string | null },
+  { crashed: boolean }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { crashed: false };
+  }
+  static getDerivedStateFromError() { return { crashed: true }; }
+  componentDidUpdate(prev: any) {
+    if (prev.resetKey !== this.props.resetKey) this.setState({ crashed: false });
+  }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div className="mt-2 bg-card rounded-2xl border border-border/40 p-6 text-center text-sm text-muted-foreground">
+          <p className="font-semibold mb-2 text-destructive">Gabim në ngarkimin e detajeve</p>
+          <button
+            type="button"
+            onClick={() => this.setState({ crashed: false })}
+            className="px-3 py-1.5 rounded-lg bg-secondary text-xs font-medium"
+          >
+            Provo përsëri
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // --- Row mapper ---
 const mapOrderRow = (row: any): OrderRecord => ({
@@ -553,59 +585,61 @@ const DriverPanel = () => {
 
                 {/* Mobile inline detail — shown right under the clicked order on small screens */}
                 {!isLg && selectedId === o.id && selected && (
-                  <div className="mt-2 bg-card rounded-2xl shadow-card overflow-hidden border border-border/40">
-                    <div className="p-3 border-b border-border/50 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-bold text-sm">{selected.customerName}</h3>
-                        <a href={`tel:${selected.customerPhone}`} className="text-xs text-blue-600 font-medium">{selected.customerPhone}</a>
+                  <OrderDetailBoundary resetKey={selectedId}>
+                    <div className="mt-2 bg-card rounded-2xl shadow-card overflow-hidden border border-border/40">
+                      <div className="p-3 border-b border-border/50 flex items-center justify-between">
+                        <div>
+                          <h3 className="font-bold text-sm">{selected.customerName}</h3>
+                          <a href={`tel:${selected.customerPhone}`} className="text-xs text-blue-600 font-medium">{selected.customerPhone}</a>
+                        </div>
+                        <button type="button" onClick={() => setSelectedId(null)} className="p-1.5 rounded-full hover:bg-secondary">
+                          <CheckCheck className="w-4 h-4 text-muted-foreground" />
+                        </button>
                       </div>
-                      <button onClick={() => setSelectedId(null)} className="p-1.5 rounded-full hover:bg-secondary">
-                        <CheckCheck className="w-4 h-4 text-muted-foreground" />
-                      </button>
-                    </div>
-                    <div className="p-3 space-y-3 text-xs">
-                      <div className="grid grid-cols-2 gap-2">
-                        <a href={`tel:${selected.customerPhone}`} className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-500/10 text-blue-600 font-semibold active:scale-95 transition-all">
-                          <Phone className="w-4 h-4" /> Thirr
-                        </a>
-                        {selected.deliveryLat !== null && selected.deliveryLng !== null && (
-                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${selected.deliveryLat},${selected.deliveryLng}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 font-semibold active:scale-95 transition-all">
-                            <MapPin className="w-4 h-4" /> Navigo
+                      <div className="p-3 space-y-3 text-xs">
+                        <div className="grid grid-cols-2 gap-2">
+                          <a href={`tel:${selected.customerPhone}`} className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-500/10 text-blue-600 font-semibold active:scale-95 transition-all">
+                            <Phone className="w-4 h-4" /> Thirr
                           </a>
+                          {selected.deliveryLat !== null && selected.deliveryLng !== null && (
+                            <a href={`https://www.google.com/maps/dir/?api=1&destination=${selected.deliveryLat},${selected.deliveryLng}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 font-semibold active:scale-95 transition-all">
+                              <MapPin className="w-4 h-4" /> Navigo
+                            </a>
+                          )}
+                        </div>
+                        <div className="bg-secondary/40 rounded-xl p-3 space-y-1">
+                          {selected.items.map((it: any, i) => (
+                            <div key={i} className="text-sm">• {it.quantity}x {it.name?.sq || it.name?.en || it.id}</div>
+                          ))}
+                          <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
+                            <span>Totali</span>
+                            <span className="text-primary text-sm">€{selected.total.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" /><p className="leading-snug">{selected.deliveryAddress}</p></div>
+                        {selected.notes && (
+                          <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 rounded-xl px-3 py-2">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">Shënim</p>
+                            <p className="italic text-foreground/90">{selected.notes}</p>
+                          </div>
                         )}
-                      </div>
-                      <div className="bg-secondary/40 rounded-xl p-3 space-y-1">
-                        {selected.items.map((it: any, i) => (
-                          <div key={i} className="text-sm">• {it.quantity}x {it.name?.sq || it.name?.en || it.id}</div>
-                        ))}
-                        <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
-                          <span>Totali</span>
-                          <span className="text-primary text-sm">€{selected.total.toFixed(2)}</span>
+                        {(selected.status === 'approved' || selected.status === 'preparing') && (
+                          <button type="button" onClick={() => handleStatus(selected.id, 'out_for_delivery')} className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
+                            <Bike className="w-5 h-5" /> Nise Dërgesën
+                          </button>
+                        )}
+                        {selected.status === 'out_for_delivery' && (
+                          <button type="button" onClick={() => handleStatus(selected.id, 'completed')} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
+                            <CheckCheck className="w-5 h-5" /> Përfundo Dërgesën
+                          </button>
+                        )}
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2 flex items-center gap-1"><MessageCircle className="w-3 h-3" /> Chat</p>
+                          <OrderChat orderId={selected.id} viewerSide="driver" disabled={selected.status === 'completed' || selected.status === 'rejected'} maxHeightClass="max-h-60" allowDelete={selected.status === 'completed'} />
                         </div>
-                      </div>
-                      <div className="flex items-start gap-2 text-muted-foreground"><MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" /><p className="leading-snug">{selected.deliveryAddress}</p></div>
-                      {selected.notes && (
-                        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 rounded-xl px-3 py-2">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">Shënim</p>
-                          <p className="italic text-foreground/90">{selected.notes}</p>
-                        </div>
-                      )}
-                      {(selected.status === 'approved' || selected.status === 'preparing') && (
-                        <button onClick={() => handleStatus(selected.id, 'out_for_delivery')} className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
-                          <Bike className="w-5 h-5" /> Nise Dërgesën
-                        </button>
-                      )}
-                      {selected.status === 'out_for_delivery' && (
-                        <button onClick={() => handleStatus(selected.id, 'completed')} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
-                          <CheckCheck className="w-5 h-5" /> Përfundo Dërgesën
-                        </button>
-                      )}
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2 flex items-center gap-1"><MessageCircle className="w-3 h-3" /> Chat</p>
-                        <OrderChat orderId={selected.id} viewerSide="driver" disabled={selected.status === 'completed' || selected.status === 'rejected'} maxHeightClass="max-h-60" allowDelete={selected.status === 'completed'} />
                       </div>
                     </div>
-                  </div>
+                  </OrderDetailBoundary>
                 )}
               </React.Fragment>
             ))}
@@ -669,7 +703,8 @@ const DriverPanel = () => {
                 Zgjidh një porosi për detaje dhe chat.
               </div>
             ) : (
-              <div className="bg-card rounded-2xl shadow-card overflow-hidden border border-border/40">
+              <OrderDetailBoundary resetKey={selectedId}>
+                <div className="bg-card rounded-2xl shadow-card overflow-hidden border border-border/40">
                 <div className="p-4 border-b border-border/50">
                   <h3 className="font-bold text-base">{selected.customerName}</h3>
                   <a href={`tel:${selected.customerPhone}`} className="text-xs text-blue-600 font-medium flex items-center gap-1 mt-1">
@@ -757,7 +792,8 @@ const DriverPanel = () => {
                     />
                   </div>
                 </div>
-              </div>
+                </div>
+              </OrderDetailBoundary>
             )}
           </div>
         </div>
