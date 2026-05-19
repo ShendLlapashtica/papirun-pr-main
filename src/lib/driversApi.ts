@@ -288,6 +288,17 @@ export const updateDriverLocation = async (id: string, lat: number, lng: number)
   if (error) throw error;
 };
 
+export const fetchDriverLocation = async (
+  driverId: string
+): Promise<{ lat: number; lng: number; t: number } | null> => {
+  const { data } = await (supabase as any)
+    .from('storefront_settings')
+    .select('value_json')
+    .eq('key', `${LOC_PREFIX}${driverId}`)
+    .maybeSingle();
+  return (data?.value_json as { lat: number; lng: number; t: number }) ?? null;
+};
+
 export const deleteDriver = async (id: string) => {
   const client = supabase as any;
   // Also remove their location entry
@@ -405,6 +416,26 @@ export const subscribeDriverOrdersRealtime = (driverId: string, onChange: () => 
         filter: `assigned_driver_id=eq.${driverId}`,
       },
       onChange
+    )
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+};
+
+/**
+ * Subscribe to a single driver's location changes via Supabase Realtime.
+ * Fires onChange the instant the driver saves a new GPS position.
+ */
+export const subscribeDriverLocation = (driverId: string, onChange: () => void) => {
+  const key = `${LOC_PREFIX}${driverId}`;
+  const channel = supabase
+    .channel(`driver-loc-${driverId}-${Math.random().toString(36).slice(2)}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'storefront_settings' },
+      (payload: any) => {
+        const k: string = payload?.new?.key || payload?.old?.key || '';
+        if (k === key) onChange();
+      }
     )
     .subscribe();
   return () => { supabase.removeChannel(channel); };

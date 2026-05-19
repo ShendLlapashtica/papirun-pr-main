@@ -3,9 +3,10 @@ import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star } from 'lucide-react';
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
-import { rateDriver } from '@/lib/driversApi';
+import { rateDriver, fetchDriverLocation, subscribeDriverLocation, haversineKm } from '@/lib/driversApi';
 import OrderStatusModal from '@/components/OrderStatusModal';
 import OrderChat from '@/components/OrderChat';
+import CustomerDriverMap from '@/components/CustomerDriverMap';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
 
@@ -47,6 +48,9 @@ const OrderTrackingPill = () => {
   const [pendingElapsed, setPendingElapsed] = useState(0);
   // Auto-show chat when approved; set false when user explicitly closes so pill re-appears
   const [autoShowEnabled, setAutoShowEnabled] = useState(true);
+  // Live driver location for the customer map (only used when out_for_delivery)
+  const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
 
   useEffect(() => { setAutoShowEnabled(true); }, [orderId]);
 
@@ -140,6 +144,55 @@ const OrderTrackingPill = () => {
     }, 2000);
     return () => clearInterval(poll);
   }, [orderId, order?.status]);
+
+  // Poll every 5s while active — catches 'completed' transition if realtime misses it (rating form fix)
+  useEffect(() => {
+    if (!orderId || orderId.startsWith('optimistic-')) return;
+    const ACTIVE: OrderStatus[] = ['approved', 'preparing', 'out_for_delivery'];
+    if (!ACTIVE.includes(order?.status as OrderStatus)) return;
+    const poll = setInterval(async () => {
+      try {
+        const o = await fetchOrder(orderId);
+        if (o && o.status !== order?.status) setOrder(o);
+      } catch {}
+    }, 5_000);
+    return () => clearInterval(poll);
+  }, [orderId, order?.status]);
+
+  // Track driver GPS in real-time when out_for_delivery — powers the customer map + ETA.
+  // Primary: Supabase Realtime fires the instant the driver saves a new position.
+  // Fallback: poll every 15s in case the realtime channel drops.
+  useEffect(() => {
+    if (order?.status !== 'out_for_delivery' || !order?.assignedDriverId) {
+      setDriverPos(null);
+      setEtaMinutes(null);
+      return;
+    }
+    const driverId = order.assignedDriverId;
+    const customerLat = order.deliveryLat;
+    const customerLng = order.deliveryLng;
+
+    const calcEta = (dLat: number, dLng: number) => {
+      if (customerLat == null || customerLng == null) return;
+      const km = haversineKm(dLat, dLng, customerLat, customerLng);
+      setEtaMinutes(Math.max(1, Math.ceil((km / 25) * 60)));
+    };
+
+    const fetchPos = async () => {
+      try {
+        const loc = await fetchDriverLocation(driverId);
+        if (loc) {
+          setDriverPos({ lat: loc.lat, lng: loc.lng });
+          calcEta(loc.lat, loc.lng);
+        }
+      } catch {}
+    };
+
+    fetchPos(); // immediate first fetch
+    const unsubRealtime = subscribeDriverLocation(driverId, fetchPos);
+    const interval = setInterval(fetchPos, 15_000); // fallback in case realtime drops
+    return () => { clearInterval(interval); unsubRealtime(); };
+  }, [order?.status, order?.assignedDriverId, order?.deliveryLat, order?.deliveryLng]);
 
   // Tick elapsed seconds while pending — enables emergency escape after 8 min
   useEffect(() => {
@@ -526,6 +579,21 @@ const OrderTrackingPill = () => {
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
+            {/* Live driver map — only when out_for_delivery and driver location is known */}
+            {order?.status === 'out_for_delivery' &&
+              driverPos &&
+              order.deliveryLat != null &&
+              order.deliveryLng != null && (
+                <div className="p-2 border-b border-border/30">
+                  <CustomerDriverMap
+                    driverLat={driverPos.lat}
+                    driverLng={driverPos.lng}
+                    customerLat={order.deliveryLat}
+                    customerLng={order.deliveryLng}
+                    etaMinutes={etaMinutes}
+                  />
+                </div>
+              )}
             <OrderChat
               orderId={orderId}
               viewerSide="user"
