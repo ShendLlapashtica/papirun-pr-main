@@ -131,6 +131,8 @@ const DriverPanel = () => {
   const [isTracking, setIsTracking] = useState(false);
   const prevOrderCountRef = useRef(0);
   const watchIdRef = useRef<number | null>(null);
+  const gpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wakeLockRef = useRef<any>(null);
   const driverRef = useRef<DeliveryDriver | null>(null);
   const assignTimesRef = useRef<Record<string, number>>({});
   const [tick, setTick] = useState(0);
@@ -312,29 +314,46 @@ const DriverPanel = () => {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
+    if (gpsIntervalRef.current !== null) {
+      clearInterval(gpsIntervalRef.current);
+      gpsIntervalRef.current = null;
+    }
     setIsTracking(false);
   }, []);
 
   const startTracking = useCallback(() => {
     if (!navigator.geolocation || watchIdRef.current !== null) return;
     let lastWriteAt = 0;
+
+    const savePos = async (lat: number, lng: number) => {
+      const d = driverRef.current;
+      if (!d) return;
+      const now = Date.now();
+      if (now - lastWriteAt < 4_800) return;
+      lastWriteAt = now;
+      try {
+        await updateDriverLocation(d.id, lat, lng);
+        const updated = await fetchDriverById(d.id);
+        if (updated) setDriver(updated);
+      } catch {}
+    };
+
     const id = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const d = driverRef.current;
-        if (!d) return;
-        const now = Date.now();
-        if (now - lastWriteAt < 5_000) return;
-        lastWriteAt = now;
-        try {
-          await updateDriverLocation(d.id, pos.coords.latitude, pos.coords.longitude);
-          const updated = await fetchDriverById(d.id);
-          if (updated) setDriver(updated);
-        } catch {}
-      },
+      (pos) => { savePos(pos.coords.latitude, pos.coords.longitude); },
       (err) => { if (err.code !== 3) toast.error('GPS: ' + err.message); },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
     watchIdRef.current = id;
+
+    // Forced backup: getCurrentPosition every 5 s in case watchPosition stalls on mobile
+    gpsIntervalRef.current = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { savePos(pos.coords.latitude, pos.coords.longitude); },
+        () => {},
+        { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 }
+      );
+    }, 5000);
+
     setIsTracking(true);
   }, []);
 
@@ -343,6 +362,26 @@ const DriverPanel = () => {
     startTracking();
     return stopTracking;
   }, [driver?.id, startTracking, stopTracking]);
+
+  // Keep screen awake while driver has an active delivery so GPS doesn't suspend
+  useEffect(() => {
+    if (!driver || !('wakeLock' in navigator)) return;
+    const hasDelivery = orders.some((o) => o.status === 'out_for_delivery');
+    if (!hasDelivery) {
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+      return;
+    }
+    const acquire = async () => {
+      if (!wakeLockRef.current || wakeLockRef.current.released) {
+        try { wakeLockRef.current = await (navigator as any).wakeLock.request('screen'); } catch {}
+      }
+    };
+    acquire();
+    document.addEventListener('visibilitychange', acquire);
+    return () => document.removeEventListener('visibilitychange', acquire);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driver?.id, orders]);
 
   // Optimistic status update — no refresh required
   const handleStatus = async (id: string, status: OrderStatus) => {
