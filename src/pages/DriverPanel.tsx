@@ -177,10 +177,9 @@ const DriverPanel = () => {
       const q = username.trim().toLowerCase();
       const found = drivers.find(
         (d) =>
-          (d.phone.trim().toLowerCase() === q ||
-           d.username.trim().toLowerCase() === q ||
-           d.name.trim().toLowerCase() === q) &&
-          d.isActive
+          d.phone.trim().toLowerCase() === q ||
+          d.username.trim().toLowerCase() === q ||
+          d.name.trim().toLowerCase() === q
       );
       if (found) {
         setDriver(found);
