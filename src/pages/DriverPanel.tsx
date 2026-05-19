@@ -175,12 +175,13 @@ const DriverPanel = () => {
     try {
       const drivers = await fetchDrivers();
       const q = username.trim().toLowerCase();
-      const found = drivers.find(
-        (d) =>
-          d.phone.trim().toLowerCase() === q ||
-          d.username.trim().toLowerCase() === q ||
-          d.name.trim().toLowerCase() === q
-      );
+      const found = drivers.find((d) => {
+        const phone = d.phone.trim().toLowerCase();
+        const uname = d.username.trim().toLowerCase();
+        const fullName = d.name.trim().toLowerCase();
+        const firstName = fullName.split(/\s+/)[0];
+        return phone === q || uname === q || fullName === q || firstName === q;
+      });
       if (found) {
         setDriver(found);
         localStorage.setItem(DRIVER_SESSION_KEY, found.id);
