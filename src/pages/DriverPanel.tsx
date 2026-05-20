@@ -363,17 +363,26 @@ const DriverPanel = () => {
     return stopTracking;
   }, [driver?.id, startTracking, stopTracking]);
 
-  // Keep screen awake while driver has an active delivery so GPS doesn't suspend
+  // Keep screen awake + ensure GPS is running while driver has an active delivery.
+  // WakeLock prevents screen dimming; auto-restart GPS if driver accidentally stopped it.
   useEffect(() => {
-    if (!driver || !('wakeLock' in navigator)) return;
+    if (!driver) return;
     const hasDelivery = orders.some((o) => o.status === 'out_for_delivery');
+
     if (!hasDelivery) {
-      wakeLockRef.current?.release().catch(() => {});
-      wakeLockRef.current = null;
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current?.release().catch(() => {});
+        wakeLockRef.current = null;
+      }
       return;
     }
+
+    // Auto-restart GPS if it was somehow stopped during a delivery
+    if (!isTracking) startTracking();
+
+    if (!('wakeLock' in navigator)) return;
     const acquire = async () => {
-      if (!wakeLockRef.current || wakeLockRef.current.released) {
+      if (!wakeLockRef.current || (wakeLockRef.current as any).released) {
         try { wakeLockRef.current = await (navigator as any).wakeLock.request('screen'); } catch {}
       }
     };
@@ -381,7 +390,7 @@ const DriverPanel = () => {
     document.addEventListener('visibilitychange', acquire);
     return () => document.removeEventListener('visibilitychange', acquire);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [driver?.id, orders]);
+  }, [driver?.id, orders, isTracking]);
 
   // Optimistic status update — no refresh required
   const handleStatus = async (id: string, status: OrderStatus) => {
@@ -499,11 +508,21 @@ const DriverPanel = () => {
                 </button>
               </>
             )}
-            <button onClick={() => isTracking ? stopTracking() : startTracking()}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${isTracking ? 'bg-emerald-500 text-white' : 'bg-emerald-500/10 text-emerald-600'}`}>
-              <Navigation className={`w-3.5 h-3.5 ${isTracking ? 'animate-pulse' : ''}`} />
-              {isTracking ? 'GPS Live' : 'GPS'}
-            </button>
+            {(() => {
+              const delivering = orders.some((o) => o.status === 'out_for_delivery');
+              return (
+                <button
+                  onClick={() => !delivering && (isTracking ? stopTracking() : startTracking())}
+                  disabled={delivering}
+                  title={delivering ? 'GPS i bllokuar gjatë dërgesës' : undefined}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${delivering ? 'bg-emerald-500 text-white cursor-not-allowed opacity-90' : isTracking ? 'bg-emerald-500 text-white' : 'bg-emerald-500/10 text-emerald-600'}`}
+                >
+                  <Navigation className={`w-3.5 h-3.5 ${isTracking ? 'animate-pulse' : ''}`} />
+                  {isTracking ? 'GPS Live' : 'GPS'}
+                  {delivering && <span className="text-[9px] opacity-75 ml-0.5">🔒</span>}
+                </button>
+              );
+            })()}
             <button onClick={() => setShowManual(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-secondary text-sm font-medium" title="Manual">
               <BookOpen className="w-4 h-4" />

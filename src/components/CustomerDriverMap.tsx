@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Navigation } from 'lucide-react';
 
 interface Props {
   driverLat: number;
@@ -9,7 +8,7 @@ interface Props {
   customerLat: number;
   customerLng: number;
   etaMinutes: number | null;
-  driverName?: string;
+  driverCode?: string;
   driverColor?: string;
   onRouteLoaded?: (durationSec: number) => void;
 }
@@ -23,23 +22,16 @@ function injectPulseCSS() {
   document.head.appendChild(s);
 }
 
-function makeDriverMarkerIcon(color: string, name: string) {
-  const initials = name.slice(0, 2).toUpperCase();
+function makeDriverMarkerIcon(color: string = '#3b82f6') {
   return L.divIcon({
     html: `
-      <div style="position:relative;width:36px;height:36px;">
-        <div style="position:absolute;width:52px;height:52px;border-radius:50%;top:-8px;left:-8px;background:${color};opacity:0.35;animation:cdmPulse 2s ease-out infinite;pointer-events:none"></div>
-        <div style="
-          background:${color};width:36px;height:36px;border-radius:50%;
-          border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.35);
-          display:flex;align-items:center;justify-content:center;
-          font-size:11px;font-weight:700;color:white;font-family:sans-serif;
-          position:relative;z-index:1;
-        ">${initials}</div>
+      <div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;">
+        <div style="position:absolute;width:58px;height:58px;border-radius:50%;top:-7px;left:-7px;background:${color};opacity:0.28;animation:cdmPulse 2s ease-out infinite;pointer-events:none"></div>
+        <div style="font-size:30px;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.45));position:relative;z-index:1;">🏍️</div>
       </div>`,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -20],
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+    popupAnchor: [0, -26],
     className: '',
   });
 }
@@ -78,7 +70,7 @@ export default function CustomerDriverMap({
   customerLat,
   customerLng,
   etaMinutes,
-  driverName = 'SH',
+  driverCode,
   driverColor = '#3b82f6',
   onRouteLoaded,
 }: Props) {
@@ -128,7 +120,7 @@ export default function CustomerDriverMap({
     }).addTo(map);
 
     const driverMarker = L.marker([driverLat, driverLng], {
-      icon: makeDriverMarkerIcon(driverColor, driverName),
+      icon: makeDriverMarkerIcon(driverColor),
     }).addTo(map);
 
     const destMarker = L.marker([customerLat, customerLng], {
@@ -138,7 +130,7 @@ export default function CustomerDriverMap({
     // Start with straight line; OSRM route replaces it once loaded
     const routeLine = L.polyline(
       [[driverLat, driverLng], [customerLat, customerLng]],
-      { color: driverColor, weight: 4, opacity: 0.85, dashArray: '10, 6' }
+      { color: driverColor, weight: 5, opacity: 0.9 }
     ).addTo(map);
 
     map.fitBounds(
@@ -180,12 +172,16 @@ export default function CustomerDriverMap({
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border/40">
-      {/* ETA badge — left-1 keeps it tight to the left edge */}
-      <div className="absolute top-2 left-1 z-[400] flex items-center gap-1.5 bg-background/90 backdrop-blur-md rounded-full px-3 py-1.5 shadow-md border border-border/40 text-xs font-semibold">
-        <Navigation className="w-3 h-3 text-primary" />
-        {etaMinutes !== null
-          ? `~${etaMinutes} min deri tek ju`
-          : 'Duke llogaritur...'}
+      {/* Driver + ETA badge */}
+      <div className="absolute top-2 left-2 right-2 z-[400] flex items-center gap-2 bg-background/92 backdrop-blur-md rounded-full px-3 py-1.5 shadow-md border border-border/40 text-xs font-semibold">
+        <span style={{ fontSize: '16px', lineHeight: 1 }}>🏍️</span>
+        {driverCode && (
+          <span className="font-bold" style={{ color: driverColor }}>Shoferi {driverCode}</span>
+        )}
+        <span className="text-muted-foreground font-normal hidden sm:inline">është në rrugë</span>
+        <span className="ml-auto text-primary font-bold whitespace-nowrap">
+          {etaMinutes !== null ? `~${etaMinutes} min` : '⏳'}
+        </span>
       </div>
       <div ref={containerRef} style={{ height: '200px', width: '100%' }} />
     </div>

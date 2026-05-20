@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star } from 'lucide-react';
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
-import { rateDriver, fetchDriverLocation, subscribeDriverLocation } from '@/lib/driversApi';
+import { rateDriver, fetchDriverLocation, subscribeDriverLocation, fetchDriverById, driverShortCode } from '@/lib/driversApi';
 import OrderStatusModal from '@/components/OrderStatusModal';
 import OrderChat from '@/components/OrderChat';
 import CustomerDriverMap from '@/components/CustomerDriverMap';
@@ -51,6 +51,7 @@ const OrderTrackingPill = () => {
   // Live driver location for the customer map (only used when out_for_delivery)
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
+  const [driverInfo, setDriverInfo] = useState<{ code: string; color: string } | null>(null);
 
   useEffect(() => { setAutoShowEnabled(true); }, [orderId]);
 
@@ -184,6 +185,14 @@ const OrderTrackingPill = () => {
     const interval = setInterval(fetchPos, 5_000); // 5s fallback — realtime may not fire for anon users
     return () => { clearInterval(interval); unsubRealtime(); };
   }, [order?.status, order?.assignedDriverId, order?.deliveryLat, order?.deliveryLng]);
+
+  // Fetch driver info (code + color) for the map badge when order has an assigned driver
+  useEffect(() => {
+    if (!order?.assignedDriverId) { setDriverInfo(null); return; }
+    fetchDriverById(order.assignedDriverId)
+      .then((d) => { if (d) setDriverInfo({ code: driverShortCode(d), color: d.color || '#3b82f6' }); })
+      .catch(() => {});
+  }, [order?.assignedDriverId]);
 
   // Tick elapsed seconds while pending — enables emergency escape after 8 min
   useEffect(() => {
@@ -576,12 +585,29 @@ const OrderTrackingPill = () => {
               order.deliveryLat != null &&
               order.deliveryLng != null && (
                 <div className="border-b border-border/30">
+                  {/* Driver assigned banner */}
+                  {driverInfo && (
+                    <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/30 flex items-center gap-2 text-xs">
+                      <span style={{ fontSize: '15px' }}>🏍️</span>
+                      <span className="font-bold" style={{ color: driverInfo.color }}>
+                        Shoferi {driverInfo.code}
+                      </span>
+                      <span className="text-muted-foreground">është caktuar për porosinë tuaj</span>
+                      {etaMinutes !== null && (
+                        <span className="ml-auto font-bold" style={{ color: driverInfo.color }}>
+                          ~{etaMinutes} min
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <CustomerDriverMap
                     driverLat={driverPos.lat}
                     driverLng={driverPos.lng}
                     customerLat={order.deliveryLat}
                     customerLng={order.deliveryLng}
                     etaMinutes={etaMinutes}
+                    driverCode={driverInfo?.code}
+                    driverColor={driverInfo?.color}
                     onRouteLoaded={(durationSec) =>
                       setEtaMinutes(Math.max(1, Math.ceil((durationSec / 60) * 1.2)))
                     }
