@@ -236,6 +236,16 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  // Scroll the inline detail into view on mobile when a card is tapped
+  useEffect(() => {
+    if (!selectedId || isLg) return;
+    const t = setTimeout(() => {
+      const el = document.querySelector(`[data-detail-id="${selectedId}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [selectedId, isLg]);
+
   useEffect(() => {
     const reload = () => fetchDrivers().then((d) => setDrivers(d.filter((x) => x.isActive))).catch(() => {});
     reload();
@@ -1025,6 +1035,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
               {!isLg && selectedId === o.id && selected && (
                 <motion.div
                   key={`detail-${o.id}`}
+                  data-detail-id={o.id}
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
