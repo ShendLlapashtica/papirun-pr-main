@@ -222,6 +222,8 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
 
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
+  // Close-chat confirm (replaces window.confirm — blocked in iOS PWA)
+  const [closeChatTarget, setCloseChatTarget] = useState<string | null>(null);
 
   // Tracks whether we're on a lg+ breakpoint — used to route inline vs sidebar detail
   const [isLg, setIsLg] = useState(() =>
@@ -496,6 +498,16 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   };
 
   const handlePrint = (o: OrderRecord) => { generateInvoice(o); };
+
+  const handleCloseChat = async (orderId: string) => {
+    setCloseChatTarget(null);
+    try {
+      await updateOrderStatus(orderId, 'completed');
+      const { deleteOrderMessages } = await import('@/lib/orderMessagesApi');
+      await deleteOrderMessages(orderId);
+      toast.success('Biseda u mbyll · porosia u përfundua');
+    } catch { toast.error('Gabim'); }
+  };
 
   const openDrawer = (o: OrderRecord, mode: 'approve' | 'reject') => {
     setDrawerOrder(o);
@@ -1125,7 +1137,14 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                         </div>
                       )}
                       {(selected.status === 'approved' || selected.status === 'preparing' || selected.status === 'out_for_delivery') && (
-                        <button onClick={async () => { if (!window.confirm('Mbyll bisedën dhe mark-o porosinë si të përfunduar?')) return; try { await updateOrderStatus(selected.id, 'completed'); const { deleteOrderMessages } = await import('@/lib/orderMessagesApi'); await deleteOrderMessages(selected.id); toast.success('Biseda u mbyll · porosia u përfundua'); } catch { toast.error('Gabim'); } }} className="w-full py-3 rounded-2xl bg-foreground/90 text-background text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-foreground transition-all"><CheckCheck className="w-4 h-4" /> Mbyll bisedën</button>
+                        closeChatTarget === selected.id ? (
+                          <div className="flex gap-2">
+                            <button onClick={() => setCloseChatTarget(null)} className="flex-1 py-2.5 rounded-2xl bg-secondary text-xs font-semibold">Anulo</button>
+                            <button onClick={() => handleCloseChat(selected.id)} className="flex-[1.4] py-2.5 rounded-2xl bg-foreground text-background text-xs font-bold">Konfirmo mbylljen</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setCloseChatTarget(selected.id)} className="w-full py-3 rounded-2xl bg-foreground/90 text-background text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-foreground transition-all"><CheckCheck className="w-4 h-4" /> Mbyll bisedën</button>
+                        )
                       )}
                       <div>
                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2 flex items-center gap-1"><MessageCircle className="w-3 h-3" /> PapirunChat · me klientin</p>
@@ -1401,22 +1420,29 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
               )}
 
               {(selected.status === 'approved' || selected.status === 'preparing' || selected.status === 'out_for_delivery') && (
-                <button
-                  onClick={async () => {
-                    if (!window.confirm('Mbyll bisedën dhe mark-o porosinë si të përfunduar?')) return;
-                    try {
-                      await updateOrderStatus(selected.id, 'completed');
-                      const { deleteOrderMessages } = await import('@/lib/orderMessagesApi');
-                      await deleteOrderMessages(selected.id);
-                      toast.success('Biseda u mbyll · porosia u përfundua');
-                    } catch {
-                      toast.error('Gabim');
-                    }
-                  }}
-                  className="w-full py-3 rounded-2xl bg-foreground/90 text-background text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-foreground transition-all"
-                >
-                  <CheckCheck className="w-4 h-4" /> Mbyll bisedën
-                </button>
+                closeChatTarget === selected.id ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCloseChatTarget(null)}
+                      className="flex-1 py-2.5 rounded-2xl bg-secondary text-xs font-semibold active:scale-95 transition-all"
+                    >
+                      Anulo
+                    </button>
+                    <button
+                      onClick={() => handleCloseChat(selected.id)}
+                      className="flex-[1.4] py-2.5 rounded-2xl bg-foreground text-background text-xs font-bold active:scale-95 transition-all"
+                    >
+                      Konfirmo mbylljen
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setCloseChatTarget(selected.id)}
+                    className="w-full py-3 rounded-2xl bg-foreground/90 text-background text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 hover:bg-foreground transition-all"
+                  >
+                    <CheckCheck className="w-4 h-4" /> Mbyll bisedën
+                  </button>
+                )
               )}
 
               <div>

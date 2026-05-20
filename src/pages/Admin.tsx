@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, Component, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -407,6 +407,28 @@ const CAT_STYLES = {
   branding:{ card: 'bg-violet-50 border border-violet-200',  label: 'text-violet-700',  badge: 'bg-violet-100 text-violet-700' },
   public:  { card: 'bg-slate-50 border border-slate-200',    label: 'text-slate-700',   badge: 'bg-slate-100 text-slate-700' },
 } as const;
+
+class TabErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean; err: string }> {
+  constructor(props: any) { super(props); this.state = { crashed: false, err: '' }; }
+  static getDerivedStateFromError(e: Error) { return { crashed: true, err: e?.message ?? 'Gabim i panjohur' }; }
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div className="rounded-2xl bg-destructive/10 border border-destructive/30 p-6 text-center space-y-3">
+          <p className="font-bold text-destructive text-sm">Gabim gjatë ngarkimit</p>
+          <p className="text-xs text-muted-foreground font-mono">{this.state.err}</p>
+          <button
+            onClick={() => this.setState({ crashed: false, err: '' })}
+            className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+          >
+            Provo Përsëri
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -912,7 +934,7 @@ const Admin = () => {
           </div>
         )}
 
-        {activeTab === 'orders' && <OrdersReview />}
+        {activeTab === 'orders' && <TabErrorBoundary><OrdersReview /></TabErrorBoundary>}
         {activeTab === 'users' && <SubscribersList />}
         {activeTab === 'drivers' && (
           <div className="space-y-8">
