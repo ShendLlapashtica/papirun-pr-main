@@ -24,6 +24,13 @@ interface AddressMapPickerProps {
   onSelectAddress: (payload: { address: string; fullAddress: string; position: [number, number] }) => void;
 }
 
+interface Suggestion {
+  lat: number;
+  lng: number;
+  display: string;
+  short: string;
+}
+
 const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
   try {
     const response = await fetch(
@@ -37,17 +44,21 @@ const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
   }
 };
 
-const searchAddress = async (query: string): Promise<{ lat: number; lng: number; display: string } | null> => {
+const fetchSuggestions = async (query: string): Promise<Suggestion[]> => {
   try {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=xk&limit=1`
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' Prishtine')}&countrycodes=xk&limit=4`
     );
-    if (!response.ok) return null;
+    if (!response.ok) return [];
     const data = await response.json();
-    if (data.length === 0) return null;
-    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name };
+    return data.map((r: any) => ({
+      lat: parseFloat(r.lat),
+      lng: parseFloat(r.lon),
+      display: r.display_name,
+      short: r.display_name.split(',')[0]?.trim() ?? r.display_name,
+    }));
   } catch {
-    return null;
+    return [];
   }
 };
 
@@ -57,7 +68,8 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
   const markerRef = useRef<L.Marker | null>(null);
   const [position, setPosition] = useState<[number, number]>(selectedPosition ?? PRISHTINA_CENTER);
   const [streetInput, setStreetInput] = useState('');
-  const [searching, setSearching] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const [resolvingAddress, setResolvingAddress] = useState(false);
   const [hasUserLocation, setHasUserLocation] = useState(false);
@@ -132,8 +144,6 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
   useEffect(() => {
     let cancelled = false;
     setResolvingAddress(true);
-    // Optimistically clear stale address by emitting a placeholder
-    onSelectRef.current({ address: '', fullAddress: '', position });
 
     const timer = setTimeout(async () => {
       const fullAddress = await reverseGeocode(position[0], position[1]);
@@ -148,18 +158,44 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
     return () => { cancelled = true; clearTimeout(timer); setResolvingAddress(false); };
   }, [position]);
 
+  // Debounced autocomplete as user types
+  useEffect(() => {
+    if (streetInput.trim().length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    setSuggestionLoading(true);
+    const timer = setTimeout(async () => {
+      const results = await fetchSuggestions(streetInput.trim());
+      setSuggestions(results);
+      setSuggestionLoading(false);
+    }, 450);
+    return () => { clearTimeout(timer); setSuggestionLoading(false); };
+  }, [streetInput]);
+
+  const applySuggestion = useCallback((s: Suggestion) => {
+    setPosition([s.lat, s.lng]);
+    setStreetInput(s.short);
+    setSuggestions([]);
+  }, []);
+
+  // Fall back to first suggestion if user submits manually
   const handleSearch = useCallback(async (e: FormEvent) => {
     e.preventDefault();
+    if (suggestions.length > 0) {
+      applySuggestion(suggestions[0]);
+      return;
+    }
     if (!streetInput.trim()) return;
-    setSearching(true);
-    const result = await searchAddress(streetInput.trim() + ' Prishtine');
-    setSearching(false);
-    if (result) {
-      setPosition([result.lat, result.lng]);
+    setSuggestionLoading(true);
+    const results = await fetchSuggestions(streetInput.trim());
+    setSuggestionLoading(false);
+    if (results.length > 0) {
+      applySuggestion(results[0]);
     } else {
       toast.error('Adresa nuk u gjet');
     }
-  }, [streetInput]);
+  }, [streetInput, suggestions, applySuggestion]);
 
   const handleCurrentLocation = useCallback(async () => {
     if (!navigator.geolocation) {
@@ -167,7 +203,6 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
       return;
     }
 
-    // Check permission state for clear feedback
     try {
       const perms = (navigator as any).permissions;
       if (perms?.query) {
@@ -224,26 +259,50 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
       </div>
 
       <p className="text-xs text-muted-foreground text-center">Ndrysho adresën</p>
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="relative flex-1 flex items-center bg-secondary rounded-xl">
-          <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <span className="pl-9 pr-0.5 text-sm text-muted-foreground select-none whitespace-nowrap">Rruga:</span>
-          <input
-            type="text"
-            value={streetInput}
-            onChange={(e) => setStreetInput(e.target.value)}
-            placeholder="p.sh. Isa Kastrati"
-            className="flex-1 bg-transparent border-0 py-2 pr-3 pl-1 text-sm focus:ring-0 focus:outline-none"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={searching}
-          className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50"
-        >
-          {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Kërko'}
-        </button>
-      </form>
+      <div className="relative">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative flex-1 flex items-center bg-secondary rounded-xl">
+            <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <span className="pl-9 pr-0.5 text-sm text-muted-foreground select-none whitespace-nowrap">Rruga:</span>
+            <input
+              type="text"
+              value={streetInput}
+              onChange={(e) => setStreetInput(e.target.value)}
+              onBlur={() => setTimeout(() => setSuggestions([]), 150)}
+              placeholder="p.sh. Isa Kastrati"
+              className="flex-1 bg-transparent border-0 py-2 pr-3 pl-1 text-sm focus:ring-0 focus:outline-none"
+              autoComplete="off"
+            />
+            {suggestionLoading && (
+              <Loader2 className="absolute right-3 w-3.5 h-3.5 animate-spin text-muted-foreground" />
+            )}
+          </div>
+          <button
+            type="submit"
+            disabled={suggestionLoading}
+            className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        </form>
+
+        {suggestions.length > 0 && (
+          <ul className="absolute z-50 left-0 right-0 mt-1 bg-background border border-border rounded-xl shadow-lg overflow-hidden">
+            {suggestions.map((s, i) => (
+              <li key={i}>
+                <button
+                  type="button"
+                  onMouseDown={() => applySuggestion(s)}
+                  className={`w-full text-left px-4 py-2.5 text-sm hover:bg-secondary transition-colors flex items-center gap-2 ${i === 0 ? 'font-semibold bg-secondary/60' : ''}`}
+                >
+                  <MapPin className="w-3.5 h-3.5 shrink-0 text-primary" />
+                  <span className="truncate">{s.short}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 });
