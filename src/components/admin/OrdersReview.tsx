@@ -897,6 +897,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                   isCagl ? 'ring-1 ring-blue-400/40 shadow-[0_0_16px_-4px_rgba(59,130,246,0.25)]' :
                   'hover:shadow-md'
                 } ${!isPending && !isDeleting ? 'cursor-grab active:cursor-grabbing' : ''} ${isDeleting ? 'pointer-events-none grayscale' : ''}`}
+                onClick={() => setSelectedId(o.id)}
               >
                 <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
                   <button
