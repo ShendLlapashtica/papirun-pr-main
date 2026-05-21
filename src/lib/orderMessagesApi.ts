@@ -118,9 +118,10 @@ export const subscribeOrderMessages = (
   onInsert: (m: OrderMessage) => void,
   onDeleteAll?: () => void,
 ) => {
-  // Stable channel name per orderId — no Math.random() to avoid duplicate channels on re-render
+  // Unique suffix prevents supabase.channel() from returning a still-alive old channel
+  // (removeChannel is async; stable names caused "cannot add callbacks after subscribe()" crashes)
   const channel = supabase
-    .channel(`order-messages-${orderId}`)
+    .channel(`order-messages-${orderId}-${Date.now()}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: TABLE, filter: `order_id=eq.${orderId}` },
