@@ -4,20 +4,29 @@ import { Loader2 } from 'lucide-react';
 const THRESHOLD = 70;
 const MAX_PULL = 120;
 
-const PullToRefresh = ({ onRefresh, children }: { onRefresh: () => Promise<void> | void; children: ReactNode }) => {
+const PullToRefresh = ({
+  onRefresh,
+  children,
+  scrollRef,
+}: {
+  onRefresh: () => Promise<void> | void;
+  children: ReactNode;
+  scrollRef?: React.RefObject<HTMLElement | null>;
+}) => {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startY = useRef<number | null>(null);
 
   useEffect(() => {
+    const scrollTop = () => scrollRef?.current?.scrollTop ?? window.scrollY;
     const onTouchStart = (e: TouchEvent) => {
-      if (window.scrollY > 5 || refreshing) return;
+      if (scrollTop() > 5 || refreshing) return;
       startY.current = e.touches[0].clientY;
     };
     const onTouchMove = (e: TouchEvent) => {
       if (startY.current === null || refreshing) return;
       const delta = e.touches[0].clientY - startY.current;
-      if (delta > 0 && window.scrollY <= 0) {
+      if (delta > 0 && scrollTop() <= 0) {
         setPull(Math.min(delta * 0.5, MAX_PULL));
       }
     };

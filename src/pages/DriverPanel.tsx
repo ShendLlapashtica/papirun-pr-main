@@ -124,6 +124,8 @@ function fmtElapsed(ms: number): string {
 
 const DriverPanel = () => {
   const [driver, setDriver] = useState<DeliveryDriver | null>(null);
+  // False only when a saved session exists and is still being verified against the DB.
+  const [sessionChecked, setSessionChecked] = useState(() => !localStorage.getItem(DRIVER_SESSION_KEY));
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -165,7 +167,8 @@ const DriverPanel = () => {
           if (d && d.isActive) setDriver(d);
           else if (d === null) localStorage.removeItem(DRIVER_SESSION_KEY);
         })
-        .catch(() => { /* network error — keep session, will restore on next load */ });
+        .catch(() => { /* network error — keep session, will restore on next load */ })
+        .finally(() => setSessionChecked(true));
     }
   }, []);
 
@@ -444,6 +447,18 @@ const DriverPanel = () => {
     const ms = new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime();
     return sum + (ms > 0 ? ms : 0);
   }, 0);
+
+  // Verifying saved session — don't flash the login form
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Bike className="w-8 h-8 text-blue-500 animate-pulse" />
+          <p className="text-sm">Duke u kyçur...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Login screen
   if (!driver) {

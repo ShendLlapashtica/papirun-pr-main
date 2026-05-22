@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type FormEvent } from 'react';
 import { Settings as SettingsIcon, Search, Globe, X } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import logo from '@/assets/logo.png';
@@ -24,6 +24,7 @@ const AppShell = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
   const [params, setParams] = useSearchParams();
   const { language, setLanguage, t } = useLanguage();
+  const shellRef = useRef<HTMLDivElement>(null);
   const [splashed, setSplashed] = useState(() => !shouldShowSplash());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(() => params.get('search') ?? '');
@@ -91,12 +92,14 @@ const AppShell = ({ children }: { children: ReactNode }) => {
       {!splashed && <SplashScreen onDone={() => setSplashed(true)} />}
       {/* Phone-shaped frame */}
       <div
+        ref={shellRef}
         className="app-shell-sage mx-auto h-[100dvh] overflow-y-auto overflow-x-hidden scrollbar-hide pb-32 relative scroll-touch"
         style={{
           maxWidth: '430px',
           paddingTop: 'env(safe-area-inset-top)',
           background: 'hsl(var(--app-background))',
           boxShadow: '0 0 0 1px hsl(var(--app-border))',
+          touchAction: 'pan-y',
         }}
       >
         {/* Glassmorphic header — Web parity */}
@@ -177,7 +180,7 @@ const AppShell = ({ children }: { children: ReactNode }) => {
           )}
         </header>
 
-        <PullToRefresh onRefresh={handleRefresh}>{children}</PullToRefresh>
+        <PullToRefresh onRefresh={handleRefresh} scrollRef={shellRef}>{children}</PullToRefresh>
       </div>
       <BottomNav />
     </>
