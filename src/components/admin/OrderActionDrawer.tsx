@@ -131,7 +131,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
         <Drawer.Overlay className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-[70]" />
         <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[71] mt-24 flex flex-col rounded-t-[24px] bg-background/95 backdrop-blur-xl border-t border-border/40 max-h-[88vh]">
           <div className="mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-muted" />
-          <div className="px-5 pt-4 pb-6 overflow-y-auto">
+          <div className="px-5 pt-4 pb-6 overflow-y-auto flex-1 min-h-0">
             <Drawer.Title className="font-display font-bold text-lg flex items-center gap-2">
               {isApprove ? (
                 <>
