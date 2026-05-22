@@ -127,6 +127,7 @@ const DriverPanel = () => {
   // False only when a saved session exists and is still being verified against the DB.
   const [sessionChecked, setSessionChecked] = useState(() => !localStorage.getItem(DRIVER_SESSION_KEY));
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -186,6 +187,10 @@ const DriverPanel = () => {
         return phone === q || uname === q || fullName === q || firstName === q;
       });
       if (found) {
+        if (found.pin && found.pin !== password.trim()) {
+          setError('Fjalëkalim i gabuar.');
+          return;
+        }
         setDriver(found);
         localStorage.setItem(DRIVER_SESSION_KEY, found.id);
       } else {
@@ -480,6 +485,16 @@ const DriverPanel = () => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="driver1"
+                className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5">Fjalëkalimi</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••"
                 className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
