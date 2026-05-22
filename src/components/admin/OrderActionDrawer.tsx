@@ -1,12 +1,35 @@
 import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
-import { Check, X, Clock, Loader2, Bike, Zap } from 'lucide-react';
+import { Check, X, Clock, Loader2, Bike, Zap, Car } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchQuickReplies, type QuickReply } from '@/lib/quickRepliesApi';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
 import { updateOrderStatus, setOrderEta, fetchAllOrders, type OrderRecord } from '@/lib/ordersApi';
 import { fetchDrivers, assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
+import { fetchLocations } from '@/lib/locationsApi';
+
+interface RouteSuggestion {
+  locationName: string;
+  durationMin: number;
+}
+
+const fetchOSRMDuration = async (
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number }
+): Promise<number | null> => {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=false`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const duration = data.routes?.[0]?.duration;
+    if (!duration) return null;
+    return Math.max(1, Math.round(duration / 60));
+  } catch {
+    return null;
+  }
+};
 
 interface Props {
   order: OrderRecord | null;
@@ -24,6 +47,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
   const [selectedDriverId, setSelectedDriverId] = useState<string>('auto');
+  const [routeSuggestions, setRouteSuggestions] = useState<RouteSuggestion[]>([]);
 
   const open = !!order && !!mode;
   const isApprove = mode === 'approve';
@@ -33,10 +57,28 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
     setNote('');
     setEta(isApprove ? 20 : null);
     setSelectedDriverId('auto');
+    setRouteSuggestions([]);
     fetchQuickReplies(mode!).then(setReplies).catch(() => setReplies([]));
     if (isApprove) {
       fetchDrivers().then((d) => setDrivers(d.filter((x) => x.isActive))).catch(() => {});
       fetchAllOrders().then(setAllOrders).catch(() => {});
+      if (order?.deliveryLat && order?.deliveryLng) {
+        const destLat = order.deliveryLat;
+        const destLng = order.deliveryLng;
+        fetchLocations().then(async (locations) => {
+          const active = locations.filter((l) => l.isActive && l.lat && l.lng);
+          const results = await Promise.all(
+            active.map(async (loc) => {
+              const min = await fetchOSRMDuration({ lat: loc.lat, lng: loc.lng }, { lat: destLat, lng: destLng });
+              if (!min) return null;
+              return { locationName: loc.nameSq, durationMin: min } as RouteSuggestion;
+            })
+          );
+          setRouteSuggestions(
+            results.filter((r): r is RouteSuggestion => !!r).sort((a, b) => a.durationMin - b.durationMin)
+          );
+        }).catch(() => {});
+      }
     }
   }, [open, mode, order?.id]);
 
@@ -47,7 +89,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
       const trimmed = note.trim();
       if (isApprove) {
         // Send message FIRST so it's in DB before the status update triggers realtime on customer side
-        const msg = trimmed || (eta ? `Po e përgatisim — gati për ~${eta} min ✓` : 'Po e përgatisim ✓');
+        const msg = trimmed || 'Porosia juaj eshte aprovuar!';
         await sendOrderMessage(order.id, 'admin', msg);
         await updateOrderStatus(order.id, 'approved', trimmed);
         if (eta) await setOrderEta(order.id, eta);
@@ -183,6 +225,35 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
                     Sistemi zgjedh shoferin që ka pritur më gjatë pa porosi.
                   </p>
                 )}
+              </div>
+            )}
+
+            {isApprove && routeSuggestions.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                  <Car className="w-3 h-3" /> Rruga e sugjeruar
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {routeSuggestions.map((r, idx) => {
+                    const suggText = `Porosia juaj eshte aprovuar! Gati për ~${r.durationMin} min.`;
+                    return (
+                      <button
+                        key={r.locationName}
+                        onClick={() => setNote(suggText)}
+                        className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+                          note === suggText
+                            ? 'bg-primary text-primary-foreground shadow'
+                            : idx === 0
+                              ? 'bg-primary/10 text-primary hover:bg-primary/20 ring-1 ring-primary/30'
+                              : 'bg-secondary hover:bg-primary/10'
+                        }`}
+                      >
+                        ~{r.durationMin} min · {r.locationName}
+                        {idx === 0 && <span className="text-[9px] opacity-70 ml-0.5">· Sugjerohet</span>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

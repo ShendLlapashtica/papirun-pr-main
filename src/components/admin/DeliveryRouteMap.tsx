@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Loader2, Car } from 'lucide-react';
+import { Loader2, Car, Maximize2, Minimize2 } from 'lucide-react';
 import { fetchLocations, type StorefrontLocation } from '@/lib/locationsApi';
 
 interface Props {
@@ -48,6 +48,7 @@ const DeliveryRouteMap = ({ customerLat, customerLng, customerLabel }: Props) =>
   const [bases, setBases] = useState<StorefrontLocation[]>([]);
   const [routes, setRoutes] = useState<RouteResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
 
   // load bases
   useEffect(() => {
@@ -153,8 +154,19 @@ const DeliveryRouteMap = ({ customerLat, customerLng, customerLabel }: Props) =>
   }, [routes, fastestId, customerLat, customerLng, customerLabel]);
 
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-border/40 bg-secondary/30">
-      <div ref={mapElRef} className="w-full h-64" style={{ background: 'hsl(var(--secondary))' }} />
+    <div className={`relative overflow-hidden border border-border/40 bg-secondary/30 ${fullscreen ? 'fixed inset-0 z-[500] rounded-none' : 'rounded-2xl'}`}>
+      <div ref={mapElRef} className={`w-full ${fullscreen ? 'h-screen' : 'h-64'}`} style={{ background: 'hsl(var(--secondary))' }} />
+
+      {/* Fullscreen toggle */}
+      <button
+        onClick={() => {
+          setFullscreen((f) => !f);
+          setTimeout(() => mapRef.current?.invalidateSize(), 50);
+        }}
+        className="absolute bottom-2 right-2 z-[401] w-8 h-8 rounded-lg bg-background/80 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-background transition-colors"
+      >
+        {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+      </button>
 
       {/* Badges overlay */}
       <div className="absolute top-2 left-2 right-2 flex flex-wrap gap-1.5 pointer-events-none z-[400]">
