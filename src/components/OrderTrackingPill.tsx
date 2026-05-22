@@ -10,6 +10,8 @@ import CustomerDriverMap from '@/components/CustomerDriverMap';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
 
+const GOOGLE_REVIEW_URL = 'https://g.page/r/CXb5HpQx_FREEAB/review';
+
 const STORAGE_KEY = 'papirun_active_order_id';
 
 const getActiveId = (): string | null => {
@@ -40,6 +42,7 @@ const OrderTrackingPill = () => {
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [showRating, setShowRating] = useState(false);
+  const [showThankYou, setShowThankYou] = useState(false);
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingNote, setRatingNote] = useState('');
   const ratingTriggeredRef = useRef(false);
@@ -283,6 +286,63 @@ const OrderTrackingPill = () => {
   const isPending = status === 'pending';
   const isApproved = status === 'approved' || status === 'preparing' || status === 'out_for_delivery';
 
+  // ===== THANK-YOU SCREEN — shown after 5-star rating =====
+  if (showThankYou) {
+    const finish = () => {
+      setShowThankYou(false);
+      clearActiveId();
+      setHidden(true);
+      setOrderId(null);
+    };
+    return (
+      <AnimatePresence>
+        <motion.div
+          key="thankyou-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-[9998] flex flex-col items-center justify-center px-6"
+          style={{ background: 'hsl(var(--background) / 0.88)', backdropFilter: 'blur(18px)' }}
+        >
+          <motion.div
+            initial={{ scale: 0.88, opacity: 0, y: 24 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+            className="w-full max-w-sm bg-card rounded-3xl p-8 shadow-xl text-center"
+          >
+            <div className="text-6xl mb-4">😊</div>
+            <h2 className="font-display text-xl font-bold mb-2 tracking-tight">
+              Gezohemi që jeni të kënaqur me porosinë!
+            </h2>
+            <p className="text-muted-foreground text-sm mb-6 leading-relaxed">
+              Do e vlerësonim shumë nga ana juaj një Review në Google — ndihmon shumë biznesin tonë!
+            </p>
+            <a
+              href={GOOGLE_REVIEW_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={finish}
+              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[#4285F4] text-white text-sm font-bold shadow-lg shadow-[#4285F4]/30 hover:bg-[#3574E2] active:scale-[0.98] transition-all mb-3"
+            >
+              <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Lë një Review në Google
+            </a>
+            <button
+              onClick={finish}
+              className="w-full py-2.5 rounded-xl bg-secondary text-sm font-semibold hover:bg-secondary/80 transition-colors text-muted-foreground"
+            >
+              Tani jo, faleminderit
+            </button>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
   // ===== RATING FORM — appears when order is completed and driver was assigned =====
   if (showRating) {
     const dismiss = () => {
@@ -296,7 +356,12 @@ const OrderTrackingPill = () => {
         await rateDriver(order.id, ratingValue, ratingNote.trim() || undefined);
         try { localStorage.setItem(`papirun_rated_${order.id}`, '1'); } catch {}
       } catch { /* silent — still dismiss */ }
-      dismiss();
+      if (ratingValue === 5) {
+        setShowRating(false);
+        setShowThankYou(true);
+      } else {
+        dismiss();
+      }
     };
     return (
       <AnimatePresence>
