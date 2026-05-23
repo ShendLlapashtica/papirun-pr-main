@@ -220,7 +220,7 @@ export const updateDriver = async (
   if (updates.name !== undefined) payload.name = updates.name;
   if (updates.username !== undefined) payload.username = updates.username;
   if (updates.phone !== undefined) payload.phone = updates.phone;
-  if (updates.pin !== undefined) payload.pin = updates.pin;
+  if (updates.pin !== undefined) { payload.pin = updates.pin; payload.password_hash = updates.pin; }
   if (updates.role !== undefined) payload.role = updates.role;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   const { error } = await client.from(TABLE).update(payload).eq('id', id);

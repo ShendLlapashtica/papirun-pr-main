@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, Component } from 'react';
-import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation, Coffee, TrendingUp, Timer, BookOpen } from 'lucide-react';
+import { Bike, Phone, MapPin, Clock, MessageCircle, LogOut, Package, CheckCheck, Navigation, Coffee, TrendingUp, Timer, BookOpen, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchDrivers,
@@ -11,6 +11,7 @@ import {
   subscribeDriverOrdersRealtime,
   subscribeDriverPauseState,
   updateDriverLocation,
+  updateDriver,
   setDriverPause,
   requestDriverPause,
   driverShortCode,
@@ -142,6 +143,12 @@ const DriverPanel = () => {
   const driverAlarmFiredRef = useRef<Set<string>>(new Set());
   const [showManual, setShowManual] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showPinChange, setShowPinChange] = useState(false);
+  const [curPin, setCurPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
   const [isLg, setIsLg] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
   );
@@ -443,6 +450,24 @@ const DriverPanel = () => {
     catch { setDriver((d) => d ? { ...d, isPaused: true } : d); toast.error('Gabim'); }
   };
 
+  const handlePinChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError('');
+    if (!driver) return;
+    if (curPin !== driver.pin) { setPinError('PIN aktual i gabuar.'); return; }
+    if (newPin.length < 3) { setPinError('PIN i ri duhet të ketë të paktën 3 karaktere.'); return; }
+    if (newPin !== confirmPin) { setPinError('PINs nuk përputhen.'); return; }
+    setPinSaving(true);
+    try {
+      await updateDriver(driver.id, { pin: newPin });
+      setDriver((d) => d ? { ...d, pin: newPin } : d);
+      setShowPinChange(false);
+      setCurPin(''); setNewPin(''); setConfirmPin('');
+      toast.success('Fjalëkalimi u ndryshua');
+    } catch { setPinError('Gabim gjatë ndryshimit.'); }
+    finally { setPinSaving(false); }
+  };
+
   const activeOrders = orders.filter((o) => !['completed', 'rejected', 'histori'].includes(o.status) && o.isVisible !== false);
   const completedOrders = orders.filter((o) => o.status === 'completed');
   const selected = orders.find((o) => o.id === selectedId) ?? null;
@@ -511,6 +536,40 @@ const DriverPanel = () => {
   return (
     <div className="min-h-screen bg-background">
       {showManual && <DriverManual driverName={driver.name} onClose={() => setShowManual(false)} />}
+
+      {/* PIN change modal */}
+      {showPinChange && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => { setShowPinChange(false); setCurPin(''); setNewPin(''); setConfirmPin(''); setPinError(''); }} />
+          <div className="relative w-full max-w-xs bg-background rounded-2xl shadow-2xl border border-border/40 p-6 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Lock className="w-4 h-4 text-blue-500" />
+              <h2 className="font-bold text-base">Ndrysho Fjalëkalimin</h2>
+            </div>
+            <form onSubmit={handlePinChange} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1">PIN aktual</label>
+                <input type="password" value={curPin} onChange={(e) => setCurPin(e.target.value)} placeholder="••••" className="w-full px-3 py-2.5 rounded-xl bg-secondary text-sm border-0 focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">PIN i ri</label>
+                <input type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="••••" className="w-full px-3 py-2.5 rounded-xl bg-secondary text-sm border-0 focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Konfirmo PIN-in e ri</label>
+                <input type="password" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} placeholder="••••" className="w-full px-3 py-2.5 rounded-xl bg-secondary text-sm border-0 focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              {pinError && <p className="text-destructive text-xs">{pinError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => { setShowPinChange(false); setCurPin(''); setNewPin(''); setConfirmPin(''); setPinError(''); }} className="flex-1 py-2.5 rounded-xl bg-secondary text-sm font-semibold">Anulo</button>
+                <button type="submit" disabled={pinSaving} className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold disabled:opacity-50">
+                  {pinSaving ? 'Duke ruajtur…' : 'Ruaj'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-lg border-b border-border/50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
@@ -556,6 +615,10 @@ const DriverPanel = () => {
             <button onClick={() => setShowManual(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-secondary text-sm font-medium" title="Manual">
               <BookOpen className="w-4 h-4" />
+            </button>
+            <button onClick={() => setShowPinChange(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-secondary text-sm font-medium" title="Ndrysho fjalëkalimin">
+              <Lock className="w-4 h-4" />
             </button>
             <button onClick={() => { setDriver(null); localStorage.removeItem(DRIVER_SESSION_KEY); }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-secondary text-sm font-medium">

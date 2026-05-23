@@ -32,13 +32,12 @@ function fmtDate(iso: string): string {
 
 // ── algorithm ─────────────────────────────────────────────────────────────────
 
-/** ms idle since last completed order; -1 if driver has active orders; Infinity if never worked */
+/** ms idle since last completed order; -1 if driver is actively delivering (out_for_delivery); Infinity if never worked */
 export function driverIdleMs(driverId: string, orders: OrderRecord[], now = Date.now()): number {
-  const hasActive = orders.some(
-    (o) => o.assignedDriverId === driverId &&
-      ['approved', 'preparing', 'out_for_delivery'].includes(o.status),
+  const isDelivering = orders.some(
+    (o) => o.assignedDriverId === driverId && o.status === 'out_for_delivery',
   );
-  if (hasActive) return -1;
+  if (isDelivering) return -1;
 
   const done = orders.filter((o) => o.assignedDriverId === driverId && o.status === 'completed');
   if (done.length === 0) return Infinity;
