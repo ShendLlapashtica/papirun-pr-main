@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star } from 'lucide-react';
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
@@ -36,6 +36,7 @@ const HIDDEN_ROUTES = ['/login', '/signup', '/verify', '/admin', '/driver'];
 const OrderTrackingPill = () => {
   const { language } = useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
   const isHiddenRoute = HIDDEN_ROUTES.some((p) => location.pathname.startsWith(p));
   const [orderId, setOrderId] = useState<string | null>(getActiveId());
   const [order, setOrder] = useState<OrderRecord | null>(null);
@@ -264,16 +265,20 @@ const OrderTrackingPill = () => {
     };
   }, [order?.status]);
 
-  // Auto-open chat the moment admin approves the order + haptic feedback
+  // Auto-open chat the moment admin approves/rejects the order + haptic feedback
   const prevStatusRef = useRef<OrderStatus | undefined>(undefined);
   useEffect(() => {
     const prev = prevStatusRef.current;
     prevStatusRef.current = order?.status;
+    const wasOnCart = location.search.includes('tab=cart');
     if (prev === 'pending' && order?.status === 'approved') {
       haptic('success');
       setOpen(true);
+      if (wasOnCart) navigate('/', { replace: true });
     } else if (prev === 'pending' && order?.status === 'rejected') {
       haptic('error');
+      setOpen(true);
+      if (wasOnCart) navigate('/', { replace: true });
     }
   }, [order?.status]);
 
@@ -644,6 +649,18 @@ const OrderTrackingPill = () => {
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
+            {/* Rejection banner with admin note */}
+            {isRejected && (
+              <div className="px-4 py-3 bg-red-50 dark:bg-red-950/40 border-b border-red-100 dark:border-red-900/40">
+                <p className="text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5 mb-1">
+                  <XCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={2.4} />
+                  {language === 'sq' ? 'Porosia u refuzua' : 'Order rejected'}
+                </p>
+                {order?.adminNote && (
+                  <p className="text-sm text-red-700 dark:text-red-300 leading-snug">{order.adminNote}</p>
+                )}
+              </div>
+            )}
             {/* Live driver map — only when out_for_delivery and driver location is known */}
             {order?.status === 'out_for_delivery' &&
               driverPos &&
