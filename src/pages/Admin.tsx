@@ -14,6 +14,7 @@ import {
   OFFER_BADGE_TEXT_KEY,
   DEFAULT_OFFER_BADGE_TEXT,
   SITE_TEXTS_SETTING_KEY,
+  WHATSAPP_FALLBACK_KEY,
   type StorefrontOffer,
   deleteStorefrontOffer,
   deleteMenuExtra,
@@ -316,9 +317,13 @@ const DriversManager = () => {
                       </span>
                     </div>
                     {d.phone && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                        <Phone className="w-3 h-3" /> {d.phone}
-                      </p>
+                      <a
+                        href={`tel:${d.phone}`}
+                        className="text-xs flex items-center gap-1 mt-0.5 text-emerald-600 dark:text-emerald-400 hover:underline"
+                        title={`Thirr ${d.name}`}
+                      >
+                        📞 {d.phone}
+                      </a>
                     )}
                     <div className="flex items-center gap-1.5 mt-1">
                       <span className="text-[10px] text-muted-foreground font-medium">PIN:</span>
@@ -442,6 +447,7 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'harta' | 'databaze'>('orders');
   const [contentSubTab, setContentSubTab] = useState<'texts' | 'locations' | 'replies'>('texts');
   const [ofertaEnabled, setOfertaEnabled] = useState(true);
+  const [whatsappFallbackEnabled, setWhatsappFallbackEnabled] = useState(true);
   const [offerBadgeText, setOfferBadgeText] = useState(DEFAULT_OFFER_BADGE_TEXT);
   const [offerBadgeSaving, setOfferBadgeSaving] = useState(false);
   const [offers, setOffers] = useState<StorefrontOffer[]>(() =>
@@ -519,9 +525,18 @@ const Admin = () => {
       }
     };
 
+    const syncWhatsappFallback = async () => {
+      try {
+        await ensureStorefrontSetting(WHATSAPP_FALLBACK_KEY, true);
+        const val = await fetchStorefrontSetting<boolean>(WHATSAPP_FALLBACK_KEY, true);
+        if (isMounted) setWhatsappFallbackEnabled(val);
+      } catch {}
+    };
+
     syncOffers();
     syncOfertaEnabled();
     syncOfferBadgeText();
+    syncWhatsappFallback();
     // Seed all 6 default drivers on every admin mount so they exist before the Shoferët tab is opened
     seedDefaultDrivers().catch(() => {});
 
@@ -668,6 +683,16 @@ const Admin = () => {
     } catch (error) {
       console.error('Failed to update offers section setting:', error);
       setOfertaEnabled(!nextValue);
+    }
+  };
+
+  const toggleWhatsappFallback = async () => {
+    const nextValue = !whatsappFallbackEnabled;
+    setWhatsappFallbackEnabled(nextValue);
+    try {
+      await upsertStorefrontSetting(WHATSAPP_FALLBACK_KEY, nextValue);
+    } catch {
+      setWhatsappFallbackEnabled(!nextValue);
     }
   };
 
@@ -1419,6 +1444,28 @@ const Admin = () => {
                   }`}
                 >
                   {ofertaEnabled ? <><ToggleRight className="w-5 h-5" /> ON</> : <><ToggleLeft className="w-5 h-5" /> OFF</>}
+                </button>
+              </div>
+            </div>
+
+            {/* WhatsApp fallback button toggle */}
+            <div className="bg-card rounded-2xl p-5 shadow-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-semibold text-lg">
+                    💬 Butoni "Backup WhatsApp"
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Shfaq ose fsheh butonin "Backup: dërgo në WhatsApp" te checkout
+                  </p>
+                </div>
+                <button
+                  onClick={toggleWhatsappFallback}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    whatsappFallbackEnabled ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
+                  }`}
+                >
+                  {whatsappFallbackEnabled ? <><ToggleRight className="w-5 h-5" /> ON</> : <><ToggleLeft className="w-5 h-5" /> OFF</>}
                 </button>
               </div>
             </div>

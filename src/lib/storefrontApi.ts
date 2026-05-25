@@ -14,6 +14,7 @@ const LEGACY_SITE_TEXTS_KEY = 'papirun_site_texts';
 export const OFFERS_SECTION_ENABLED_KEY = 'offers_section_enabled';
 export const SITE_TEXTS_SETTING_KEY = 'site_texts';
 export const OFFER_BADGE_TEXT_KEY = 'offer_badge_text';
+export const WHATSAPP_FALLBACK_KEY = 'whatsapp_fallback_enabled';
 export const DEFAULT_OFFER_BADGE_TEXT = 'Vetëm në pikën Papirun Çagllavicë';
 
 export interface StorefrontOffer extends OfferItem {

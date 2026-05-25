@@ -11,6 +11,8 @@ import { getCartLineTotal } from '@/lib/cartPricing';
 import { createOrder, detectOrderSource } from '@/lib/ordersApi';
 import { setActiveOrderId, clearActiveOrderId } from '@/components/OrderTrackingPill';
 import { fetchAddresses, saveAddress, deleteAddress, type SavedAddress } from '@/lib/addressesApi';
+import { fetchStorefrontSetting } from '@/lib/storefrontApi';
+import { WHATSAPP_FALLBACK_KEY } from '@/lib/storefrontApi';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -38,6 +40,13 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   // Empty label by default so the user types a meaningful name (no auto-"Shtëpia").
   const [saveAddrFlag, setSaveAddrFlag] = useState(false);
   const [saveAddrLabel, setSaveAddrLabel] = useState('');
+  const [whatsappFallbackEnabled, setWhatsappFallbackEnabled] = useState(true);
+
+  useEffect(() => {
+    fetchStorefrontSetting<boolean>(WHATSAPP_FALLBACK_KEY, true)
+      .then(setWhatsappFallbackEnabled)
+      .catch(() => {});
+  }, []);
 
   // Autofill name+phone from last order (guests and logged-in users)
   useEffect(() => {
@@ -395,15 +404,17 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
                   {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : !hasLocation ? <MapPin className="w-5 h-5" /> : <Send className="w-5 h-5" />}
                   {submitting ? 'Duke dërguar...' : !hasLocation ? (language === 'sq' ? 'AKTIVIZO LOKACIONIN' : 'ENABLE LOCATION') : 'POROSIT'}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleWhatsAppFallback}
-                  disabled={!isFormValid}
-                  className="w-full flex items-center justify-center gap-2 text-xs font-medium py-2.5 px-4 rounded-xl bg-secondary text-muted-foreground transition-all hover:bg-secondary/80 disabled:opacity-50"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Backup: dërgo në WhatsApp
-                </button>
+                {whatsappFallbackEnabled && (
+                  <button
+                    type="button"
+                    onClick={handleWhatsAppFallback}
+                    disabled={!isFormValid}
+                    className="w-full flex items-center justify-center gap-2 text-xs font-medium py-2.5 px-4 rounded-xl bg-secondary text-muted-foreground transition-all hover:bg-secondary/80 disabled:opacity-50"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Backup: dërgo në WhatsApp
+                  </button>
+                )}
               </div>
             </div>
           </div>

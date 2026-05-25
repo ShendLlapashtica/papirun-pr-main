@@ -8,6 +8,7 @@ export {
   OFFER_BADGE_TEXT_KEY,
   DEFAULT_OFFER_BADGE_TEXT,
   SITE_TEXTS_SETTING_KEY,
+  WHATSAPP_FALLBACK_KEY,
   type StorefrontOffer,
   deleteStorefrontOffer,
   ensureSeedStorefrontOffers,

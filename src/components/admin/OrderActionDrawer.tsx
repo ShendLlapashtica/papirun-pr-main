@@ -54,7 +54,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
 
   useEffect(() => {
     if (!open) return;
-    setNote('');
+    setNote(isApprove ? 'Porosia juaj eshte aprovuar !' : '');
     setEta(isApprove ? 20 : null);
     setSelectedDriverId('auto');
     setRouteSuggestions([]);
@@ -89,7 +89,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
       const trimmed = note.trim();
       if (isApprove) {
         // Send message FIRST so it's in DB before the status update triggers realtime on customer side
-        const msg = trimmed || 'Porosia juaj eshte aprovuar!';
+        const msg = trimmed || 'Porosia juaj eshte aprovuar !';
         await sendOrderMessage(order.id, 'admin', msg);
         await updateOrderStatus(order.id, 'approved', trimmed);
         if (eta) await setOrderEta(order.id, eta);
