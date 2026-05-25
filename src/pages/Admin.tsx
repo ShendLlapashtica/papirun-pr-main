@@ -317,13 +317,17 @@ const DriversManager = () => {
                       </span>
                     </div>
                     {d.phone && (
-                      <a
-                        href={`tel:${d.phone}`}
-                        className="text-xs flex items-center gap-1 mt-0.5 text-emerald-600 dark:text-emerald-400 hover:underline"
-                        title={`Thirr ${d.name}`}
-                      >
-                        📞 {d.phone}
-                      </a>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-muted-foreground font-mono">{d.phone}</span>
+                        <a
+                          href={`tel:${d.phone}`}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold hover:bg-emerald-600 active:scale-95 transition-all shadow-sm shadow-emerald-500/30"
+                          title={`Thirr ${d.name}`}
+                        >
+                          <Phone className="w-3 h-3" strokeWidth={2.5} />
+                          Thirr
+                        </a>
+                      </div>
                     )}
                     <div className="flex items-center gap-1.5 mt-1">
                       <span className="text-[10px] text-muted-foreground font-medium">PIN:</span>

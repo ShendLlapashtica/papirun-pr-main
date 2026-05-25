@@ -107,9 +107,25 @@ const Footer = () => {
           <p className="text-xs text-background/40">
             © {new Date().getFullYear()} Papirun. {t.footer.rights}
           </p>
-          <p className="text-xs text-background/30">
-            {language === 'sq' ? 'Ndertuar me dashuri ne Prishtine' : 'Crafted with care in Pristina'}
-          </p>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/privacy"
+              className="text-xs text-background/40 hover:text-primary transition-colors"
+            >
+              {language === 'sq' ? 'Politika e Privatësisë' : 'Privacy Policy'}
+            </Link>
+            <span className="text-background/20">·</span>
+            <Link
+              to="/privacy"
+              className="text-xs text-background/40 hover:text-primary transition-colors"
+            >
+              {language === 'sq' ? 'Të Drejtat e Përdoruesit' : 'User Rights'}
+            </Link>
+            <span className="text-background/20 hidden sm:inline">·</span>
+            <p className="text-xs text-background/30 hidden sm:block">
+              {language === 'sq' ? 'Ndërtuar me dashuri në Prishtinë' : 'Crafted with care in Pristina'}
+            </p>
+          </div>
         </div>
       </div>
     </footer>

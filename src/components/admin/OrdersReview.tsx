@@ -1000,13 +1000,27 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                   {(() => {
                     const drv = o.assignedDriverId ? drivers.find((d) => d.id === o.assignedDriverId) : null;
                     if (!drv) return null;
+                    const assignedMs = assignTimes[o.id];
+                    const isLate = o.status === 'approved' && assignedMs && (now - assignedMs) > 60_000;
                     return (
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: drv.color || '#6b7280' }} />
-                        <span className="text-[10px] font-bold text-muted-foreground" style={{ color: drv.color || undefined }}>
+                        <span className="text-[10px] font-bold" style={{ color: drv.color || undefined }}>
                           {driverShortCode(drv)}
                         </span>
-                        <span className="text-[10px] text-muted-foreground truncate">{drv.name}</span>
+                        <span className="text-[10px] text-muted-foreground truncate flex-1">{drv.name}</span>
+                        {isLate && drv.phone && (
+                          <a
+                            href={`tel:${drv.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500 text-white text-[10px] font-bold shadow-lg shadow-red-500/40 active:scale-95 transition-all shrink-0"
+                            title={`Thirr ${drv.name}`}
+                          >
+                            <span className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-50" />
+                            <Phone className="w-3 h-3 relative z-10" strokeWidth={2.5} />
+                            <span className="relative z-10">Thirr</span>
+                          </a>
+                        )}
                       </div>
                     );
                   })()}

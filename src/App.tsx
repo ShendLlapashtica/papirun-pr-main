@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import DriverPanel from "./pages/DriverPanel";
 import InvoicePage from "./pages/InvoicePage";
 import AdminCg from "./pages/AdminCg";
+import Privacy from "./pages/Privacy";
 import OrderTrackingPill from "@/components/OrderTrackingPill";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ const App = () => (
                   <Route path="/driver-panel" element={<Navigate to="/driver" replace />} />
                   <Route path="/admincg" element={<AdminCg />} />
                   <Route path="/invoice/:id" element={<InvoicePage />} />
+                  <Route path="/privacy" element={<Privacy />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 {/* Global pending overlay + status pill — visible on every route */}
