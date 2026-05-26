@@ -16,10 +16,12 @@ import {
 } from '@/lib/ordersApi';
 import OrderChat from '@/components/OrderChat';
 import OrderActionDrawer from '@/components/admin/OrderActionDrawer';
+import BulkAssignBar from '@/components/admin/BulkAssignBar';
+import ClientsOverviewMap from '@/components/admin/ClientsOverviewMap';
 import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
 import { generateInvoice } from '@/lib/invoiceGenerator';
-import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllDriverLocations, driverShortCode, type DeliveryDriver } from '@/lib/driversApi';
+import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllDriverLocations, driverShortCode, haversineKm, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
@@ -145,6 +147,23 @@ const exportOrdersJSON = (orders: OrderRecord[]) => {
   URL.revokeObjectURL(url);
 };
 
+// ---- Cluster finder: groups orders whose delivery coords are within 2km of each other ----
+function findBestCluster(orders: OrderRecord[]): OrderRecord[] | null {
+  const geo = orders.filter((o) => o.deliveryLat && o.deliveryLng && ['pending', 'approved'].includes(o.status));
+  if (geo.length < 3) return null;
+  let best: OrderRecord[] = [];
+  for (let i = 0; i < geo.length; i++) {
+    const cluster = [geo[i]];
+    for (let j = 0; j < geo.length; j++) {
+      if (i === j) continue;
+      const dist = haversineKm(geo[i].deliveryLat!, geo[i].deliveryLng!, geo[j].deliveryLat!, geo[j].deliveryLng!);
+      if (dist <= 2.0) cluster.push(geo[j]);
+    }
+    if (cluster.length > best.length) best = cluster;
+  }
+  return best.length >= 3 ? best.slice(0, 5) : null;
+}
+
 // ---- Confirm-text delete dialog ----
 const CONFIRM_PHRASE = 'konfirmoj fshirjen';
 
@@ -219,6 +238,9 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   const driversRef = useRef<DeliveryDriver[]>([]);
   const [assignTimes, setAssignTimes] = useState<Record<string, number>>({});
   const assignAlarmFiredRef = useRef<Set<string>>(new Set());
+  const [massSelectMode, setMassSelectMode] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [showClientsMap, setShowClientsMap] = useState(false);
 
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
@@ -722,8 +744,16 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
           );
         })()}
 
-        {/* Auto-Mode toggle */}
-        <div className="flex items-center justify-between">
+        {/* Auto-Mode toggle + Clients Map */}
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={() => setShowClientsMap((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition-colors ${
+              showClientsMap ? 'bg-indigo-600 text-white' : 'bg-secondary text-muted-foreground hover:bg-indigo-500/10'
+            }`}
+          >
+            🗺️ Harta e klientëve
+          </button>
           <button
             onClick={() => autoMode ? setAutoMode(false) : setShowAutoModeConfirm(true)}
             className={`relative flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all ${
@@ -739,6 +769,16 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
             )}
           </button>
         </div>
+
+        {showClientsMap && (
+          <div style={{ height: 420 }} className="rounded-2xl overflow-hidden">
+            <ClientsOverviewMap
+              orders={orders}
+              drivers={drivers}
+              onClose={() => setShowClientsMap(false)}
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <button
@@ -848,12 +888,46 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
               'Aktive'
             }
           </p>
-          {statusFilter !== 'active' && statusFilter !== 'history' && (
-            <button onClick={() => setStatusFilter('active')} className="text-[11px] text-primary font-medium hover:underline">
-              Pastro filtrin
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {(statusFilter === 'approved' || statusFilter === 'pending' || statusFilter === 'active') && (
+              <button
+                onClick={() => { setMassSelectMode((v) => !v); setSelectedOrderIds(new Set()); }}
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors ${
+                  massSelectMode ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-primary/10'
+                }`}
+              >
+                🎯 MASA CAKTO
+              </button>
+            )}
+            {statusFilter !== 'active' && statusFilter !== 'history' && (
+              <button onClick={() => setStatusFilter('active')} className="text-[11px] text-primary font-medium hover:underline">
+                Pastro filtrin
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Cluster suggestion tip */}
+        {!massSelectMode && (() => {
+          const cluster = findBestCluster(orders);
+          if (!cluster) return null;
+          const names = cluster.map((o) => o.deliveryAddress.split(',')[0]).join(' · ');
+          return (
+            <button
+              onClick={() => {
+                setMassSelectMode(true);
+                setSelectedOrderIds(new Set(cluster.map((o) => o.id)));
+              }}
+              className="flex items-center gap-2 w-full text-left px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-400/30 hover:bg-amber-500/15 transition-colors"
+            >
+              <span className="text-base shrink-0">💡</span>
+              <div>
+                <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Sugjerim: Bëji {cluster.length} porositë njëkohësisht</p>
+                <p className="text-[10px] text-muted-foreground truncate">{names}</p>
+              </div>
+            </button>
+          );
+        })()}
 
         {filtered.length === 0 && (
           <p className="text-center text-sm text-muted-foreground py-12">
@@ -864,6 +938,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
         <AnimatePresence initial={false}>
           {filtered.map((o) => {
             const isSelected = o.id === selectedId;
+            const isMassSelected = selectedOrderIds.has(o.id);
             const isGlowing = glowingIds.has(o.id);
             const isPending = o.status === 'pending';
             const isArchived = isInHistory(o);
@@ -891,14 +966,32 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                 className={`relative rounded-3xl p-4 shadow-card transition-all touch-pan-y ${
                   isCagl ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-400/30' : 'bg-card'
                 } ${
+                  isMassSelected ? 'ring-2 ring-primary bg-primary/5' :
                   isSelected ? 'ring-2 ring-primary' :
                   isOverdue ? 'ring-2 ring-red-500/60 shadow-[0_0_24px_-4px_hsl(0_70%_50%/0.5)]' :
                   isGlowing ? 'ring-2 ring-primary/60 shadow-[0_0_24px_-4px_hsl(var(--primary)/0.5)]' :
                   isCagl ? 'ring-1 ring-blue-400/40 shadow-[0_0_16px_-4px_rgba(59,130,246,0.25)]' :
                   'hover:shadow-md'
                 } ${!isPending && !isDeleting ? 'cursor-grab active:cursor-grabbing' : ''} ${isDeleting ? 'pointer-events-none grayscale' : ''}`}
-                onClick={() => setSelectedId(o.id)}
+                onClick={() => {
+                  if (massSelectMode) {
+                    setSelectedOrderIds((prev) => {
+                      const next = new Set(prev);
+                      next.has(o.id) ? next.delete(o.id) : next.add(o.id);
+                      return next;
+                    });
+                  } else {
+                    setSelectedId(o.id);
+                  }
+                }}
               >
+                {massSelectMode && (
+                  <div className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                    isMassSelected ? 'bg-primary border-primary text-primary-foreground' : 'bg-background border-border'
+                  }`}>
+                    {isMassSelected && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
+                  </div>
+                )}
                 <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
                   <button
                     onClick={(e) => { e.stopPropagation(); togglePriority(o.id); }}
@@ -1024,6 +1117,31 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                       </div>
                     );
                   })()}
+
+                  {/* Inline driver assign — shown on approved cards without a driver */}
+                  {o.status === 'approved' && !o.assignedDriverId && drivers.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap mt-1.5 pt-1.5 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[10px] text-muted-foreground font-medium shrink-0">Cakto →</span>
+                      {drivers.filter((d) => d.isActive).map((d) => {
+                        const emoji = d.isReturning ? '🏁' : d.isPaused ? '☕' : '✅';
+                        return (
+                          <button
+                            key={d.id}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await assignDriverToOrder(o.id, d.id, { customerName: o.customerName, address: o.deliveryAddress, total: o.total });
+                                toast.success(`${d.name} u caktua`);
+                              } catch { toast.error('Gabim'); }
+                            }}
+                            className="text-[10px] px-2 py-1 rounded-full font-medium bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20 transition-colors"
+                          >
+                            {emoji} {d.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </button>
 
                 {isPending && (
@@ -1575,6 +1693,15 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
           setDrawerOrder(null);
         }}
       />
+
+      {massSelectMode && (
+        <BulkAssignBar
+          selectedIds={selectedOrderIds}
+          orders={orders}
+          drivers={drivers}
+          onDone={() => { setMassSelectMode(false); setSelectedOrderIds(new Set()); }}
+        />
+      )}
     </div>
   );
 };

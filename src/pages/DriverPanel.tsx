@@ -13,6 +13,7 @@ import {
   updateDriverLocation,
   updateDriver,
   setDriverPause,
+  setDriverReturning,
   requestDriverPause,
   driverShortCode,
   type DeliveryDriver,
@@ -32,6 +33,7 @@ import { updateOrderStatus, suggestOrderLocation, type OrderRecord, type OrderSt
 import OrderChat from '@/components/OrderChat';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import DriverManual from '@/components/DriverManual';
+import GtaDriverMap from '@/components/GtaDriverMap';
 
 // Error boundary — prevents a single order detail crash from whiting out the page
 class OrderDetailBoundary extends Component<
@@ -420,9 +422,34 @@ const DriverPanel = () => {
     try {
       await updateOrderStatus(id, status);
       if (status !== 'out_for_delivery') toast.success(STATUS_LABEL[status] ?? status);
+      // After completing an order, check if all orders are done → enter returning state
+      if (status === 'completed' && driver) {
+        setOrders((prev) => {
+          const remaining = prev.filter((o) =>
+            o.id !== id && ['approved', 'preparing', 'out_for_delivery'].includes(o.status)
+          );
+          if (remaining.length === 0) {
+            setDriver((d) => d ? { ...d, isReturning: true } : d);
+            setDriverReturning(driver.id, true).catch(() => {});
+          }
+          return prev;
+        });
+      }
     } catch {
       toast.error('Gabim');
       if (driver) syncOrders(driver.id);
+    }
+  };
+
+  const handleReturnToBase = async () => {
+    if (!driver) return;
+    setDriver((d) => d ? { ...d, isReturning: false, isPaused: false, isPendingPause: false, availableSince: Date.now() } : d);
+    try {
+      await setDriverReturning(driver.id, false);
+      await setDriverPause(driver.id, false);
+      toast.success('Je i disponueshëm · Mirë se u ktheve! 🏁');
+    } catch {
+      toast.error('Gabim');
     }
   };
 
@@ -502,24 +529,28 @@ const DriverPanel = () => {
             <h1 className="font-display font-bold text-2xl">Driver Panel</h1>
             <p className="text-sm text-muted-foreground mt-1">Papirun Delivery</p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
             <div>
-              <label className="block text-xs font-medium mb-1.5">Username</label>
+              <label className="block text-xs font-medium mb-1.5">Emri</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="driver1"
+                placeholder="Emri yt"
+                autoComplete="off"
+                name="papirun-driver-id"
                 className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1.5">Fjalëkalimi</label>
+              <label className="block text-xs font-medium mb-1.5">PIN</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••"
+                placeholder="••••"
+                autoComplete="new-password"
+                name="papirun-driver-pin"
                 className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
               />
             </div>
@@ -546,18 +577,18 @@ const DriverPanel = () => {
               <Lock className="w-4 h-4 text-blue-500" />
               <h2 className="font-bold text-base">Ndrysho Fjalëkalimin</h2>
             </div>
-            <form onSubmit={handlePinChange} className="space-y-3">
+            <form onSubmit={handlePinChange} className="space-y-3" autoComplete="off">
               <div>
                 <label className="block text-xs font-medium mb-1">PIN aktual</label>
-                <input type="password" value={curPin} onChange={(e) => setCurPin(e.target.value)} placeholder="••••" className="w-full px-3 py-2.5 rounded-xl bg-secondary text-sm border-0 focus:ring-2 focus:ring-blue-500/20" />
+                <input type="password" value={curPin} onChange={(e) => setCurPin(e.target.value)} placeholder="••••" autoComplete="new-password" name="cur-pin-change" className="w-full px-3 py-2.5 rounded-xl bg-secondary text-sm border-0 focus:ring-2 focus:ring-blue-500/20" />
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1">PIN i ri</label>
-                <input type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="••••" className="w-full px-3 py-2.5 rounded-xl bg-secondary text-sm border-0 focus:ring-2 focus:ring-blue-500/20" />
+                <input type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="••••" autoComplete="new-password" name="new-pin-change" className="w-full px-3 py-2.5 rounded-xl bg-secondary text-sm border-0 focus:ring-2 focus:ring-blue-500/20" />
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1">Konfirmo PIN-in e ri</label>
-                <input type="password" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} placeholder="••••" className="w-full px-3 py-2.5 rounded-xl bg-secondary text-sm border-0 focus:ring-2 focus:ring-blue-500/20" />
+                <input type="password" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} placeholder="••••" autoComplete="new-password" name="confirm-pin-change" className="w-full px-3 py-2.5 rounded-xl bg-secondary text-sm border-0 focus:ring-2 focus:ring-blue-500/20" />
               </div>
               {pinError && <p className="text-destructive text-xs">{pinError}</p>}
               <div className="flex gap-2 pt-1">
@@ -578,12 +609,19 @@ const DriverPanel = () => {
               {driverShortCode(driver)}
             </div>
             <div>
-              <h1 className="font-display font-bold text-base leading-tight">{driver.name}</h1>
+              <h1 className="font-display font-bold text-base leading-tight">
+                {orders.some((o) => o.status === 'out_for_delivery') ? '🏍️ ' : driver.isReturning ? '🏁 ' : driver.isPaused ? '☕ ' : '✅ '}
+                {driver.name}
+              </h1>
               <p className="text-[10px] text-muted-foreground">{driver.lat != null ? '📍 GPS aktiv' : 'GPS joaktiv'}</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap justify-end">
-            {(driver.isPaused || driver.isPendingPause) ? (
+            {driver.isReturning ? (
+              <button onClick={handleReturnToBase} className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold bg-purple-500/15 text-purple-600 hover:bg-purple-500/25 transition-colors animate-pulse">
+                🏁 Ne Bazë
+              </button>
+            ) : (driver.isPaused || driver.isPendingPause) ? (
               <button onClick={handleUnpause} className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 transition-colors">
                 <Coffee className="w-3.5 h-3.5" />{driver.isPendingPause ? 'Duke pritur…' : 'Disponueshëm'}
               </button>
@@ -774,6 +812,16 @@ const DriverPanel = () => {
                             <p className="italic text-foreground/90">{selected.notes}</p>
                           </div>
                         )}
+                        {selected.status === 'out_for_delivery' &&
+                          selected.deliveryLat != null && selected.deliveryLng != null &&
+                          driver.lat != null && driver.lng != null && (
+                          <GtaDriverMap
+                            driverLat={driver.lat}
+                            driverLng={driver.lng}
+                            destLat={selected.deliveryLat}
+                            destLng={selected.deliveryLng}
+                          />
+                        )}
                         {(selected.status === 'approved' || selected.status === 'preparing') && (
                           <button type="button" onClick={() => handleStatus(selected.id, 'out_for_delivery')} className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
                             <Bike className="w-5 h-5" /> Nise Dërgesën
@@ -907,6 +955,18 @@ const DriverPanel = () => {
                       <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">Shënim klienti</p>
                       <p className="italic text-foreground/90">{selected.notes}</p>
                     </div>
+                  )}
+
+                  {/* Live GTA map — shown during active delivery when GPS is available */}
+                  {selected.status === 'out_for_delivery' &&
+                    selected.deliveryLat != null && selected.deliveryLng != null &&
+                    driver.lat != null && driver.lng != null && (
+                    <GtaDriverMap
+                      driverLat={driver.lat}
+                      driverLng={driver.lng}
+                      destLat={selected.deliveryLat}
+                      destLng={selected.deliveryLng}
+                    />
                   )}
 
                   {/* Status actions */}

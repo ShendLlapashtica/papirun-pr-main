@@ -10,6 +10,7 @@ export interface DeliveryDriver {
   isActive: boolean;
   isPaused: boolean;
   isPendingPause: boolean;   // requested pause, waiting for admin approval
+  isReturning: boolean;      // completed all orders, returning to base (not yet disponueshëm)
   pausedAt: number | null;   // timestamp when pause started
   availableSince: number | null; // timestamp when became available (unpaused / app load)
   createdAt: string;
@@ -97,6 +98,7 @@ type LocMap = Record<string, { lat: number; lng: number }>;
 interface PauseEntry {
   paused: boolean;
   pendingApproval?: boolean;
+  isReturning?: boolean;
   pausedAt?: number;
   availableSince?: number;
 }
@@ -154,6 +156,7 @@ const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 
     isActive: row.is_active !== false,
     isPaused: Boolean(pause.paused),
     isPendingPause: Boolean(pause.pendingApproval),
+    isReturning: Boolean(pause.isReturning),
     pausedAt: pause.pausedAt ?? null,
     availableSince: pause.availableSince ?? null,
     createdAt: row.created_at,
@@ -248,8 +251,20 @@ export const setDriverPause = async (id: string, paused: boolean) => {
   if (paused) {
     await _upsertPause(id, { paused: true, pendingApproval: false, pausedAt: Date.now() });
   } else {
-    await _upsertPause(id, { paused: false, pendingApproval: false, availableSince: Date.now() });
+    await _upsertPause(id, { paused: false, pendingApproval: false, isReturning: false, availableSince: Date.now() });
   }
+};
+
+/** Driver: mark as returning to base after completing all orders */
+export const setDriverReturning = async (id: string, val: boolean) => {
+  const client = supabase as any;
+  const { data } = await client
+    .from('storefront_settings')
+    .select('value_json')
+    .eq('key', `${PAUSE_PREFIX}${id}`)
+    .maybeSingle();
+  const current: PauseEntry = data?.value_json ?? { paused: false };
+  await _upsertPause(id, { ...current, isReturning: val });
 };
 
 /** Admin: approve a pending pause request */

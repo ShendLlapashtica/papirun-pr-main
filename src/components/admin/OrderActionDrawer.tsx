@@ -46,7 +46,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
   const [submitting, setSubmitting] = useState(false);
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
-  const [selectedDriverId, setSelectedDriverId] = useState<string>('auto');
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('none');
   const [routeSuggestions, setRouteSuggestions] = useState<RouteSuggestion[]>([]);
 
   const open = !!order && !!mode;
@@ -56,7 +56,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
     if (!open) return;
     setNote(isApprove ? 'Porosia juaj eshte aprovuar !' : '');
     setEta(isApprove ? 20 : null);
-    setSelectedDriverId('auto');
+    setSelectedDriverId('none');
     setRouteSuggestions([]);
     fetchQuickReplies(mode!).then(setReplies).catch(() => setReplies([]));
     if (isApprove) {
@@ -94,8 +94,8 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
         await updateOrderStatus(order.id, 'approved', trimmed);
         if (eta) await setOrderEta(order.id, eta);
 
-        // Assign driver — longest-idle auto or manual selection
-        if (drivers.length > 0) {
+        // Assign driver — skip if 'none' selected
+        if (selectedDriverId !== 'none' && drivers.length > 0) {
           let targetDriver: DeliveryDriver | null = null;
           if (selectedDriverId === 'auto') {
             const bestId = pickBestDriver(drivers, allOrders);
@@ -183,25 +183,38 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
             )}
 
             {/* Driver assignment — only shown when approving */}
-            {isApprove && drivers.length > 0 && (
+            {isApprove && (
               <div className="mb-4 bg-blue-500/5 rounded-2xl p-3 border border-blue-500/20">
                 <p className="text-[11px] uppercase tracking-wider font-semibold text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1">
                   <Bike className="w-3 h-3" /> Cakto Shoferin
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   <button
-                    onClick={() => setSelectedDriverId('auto')}
+                    onClick={() => setSelectedDriverId('none')}
                     className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all flex items-center gap-1 ${
-                      selectedDriverId === 'auto'
-                        ? 'bg-primary text-primary-foreground shadow'
-                        : 'bg-secondary hover:bg-primary/10'
+                      selectedDriverId === 'none'
+                        ? 'bg-foreground text-background shadow'
+                        : 'bg-secondary hover:bg-foreground/10'
                     }`}
                   >
-                    <Zap className="w-3 h-3" /> Auto (idle)
+                    ✕ Asnjë
                   </button>
+                  {drivers.length > 0 && (
+                    <button
+                      onClick={() => setSelectedDriverId('auto')}
+                      className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+                        selectedDriverId === 'auto'
+                          ? 'bg-primary text-primary-foreground shadow'
+                          : 'bg-secondary hover:bg-primary/10'
+                      }`}
+                    >
+                      <Zap className="w-3 h-3" /> Auto (idle)
+                    </button>
+                  )}
                   {drivers.map((d) => {
                     const bestId = pickBestDriver(drivers, allOrders);
                     const isNext = d.id === bestId;
+                    const emoji = d.isReturning ? '🏁' : d.isPaused ? '☕' : '✅';
                     return (
                       <button
                         key={d.id}
@@ -214,12 +227,17 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
                               : 'bg-secondary hover:bg-blue-500/10'
                         }`}
                       >
-                        {d.name}
+                        {emoji} {d.name}
                         {isNext && <span className="ml-1 text-[9px] opacity-80">★</span>}
                       </button>
                     );
                   })}
                 </div>
+                {selectedDriverId === 'none' && (
+                  <p className="text-[10px] text-muted-foreground mt-1.5">
+                    Porosia do të aprovohet pa shofer — mund të caktohet më vonë.
+                  </p>
+                )}
                 {selectedDriverId === 'auto' && (
                   <p className="text-[10px] text-muted-foreground mt-1.5">
                     Sistemi zgjedh shoferin që ka pritur më gjatë pa porosi.

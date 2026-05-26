@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
 import { fetchAllOrders, hardDeleteAllOrders, type OrderRecord } from '@/lib/ordersApi';
 import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle, Trash2, Loader2 } from 'lucide-react';
 import {
@@ -444,9 +444,9 @@ export default function DriversKPI() {
     return { driver, completed, active, waitMs, isBusy, ect, avgRating, happy, neutral, unhappy, total, pauseDurationMs };
   }), [drivers, orders, tick]);
 
-  // 3 sorted sections
+  // 4 sorted sections
   const queueAvailable = useMemo(() =>
-    cols.filter((c) => !c.driver.isPaused && !c.driver.isPendingPause && !c.isBusy)
+    cols.filter((c) => !c.driver.isPaused && !c.driver.isPendingPause && !c.isBusy && !c.driver.isReturning)
       .sort((a, b) => {
         const aMs = isFinite(a.waitMs) && a.waitMs >= 0 ? a.waitMs : Infinity;
         const bMs = isFinite(b.waitMs) && b.waitMs >= 0 ? b.waitMs : Infinity;
@@ -457,6 +457,10 @@ export default function DriversKPI() {
   const queueBusy = useMemo(() =>
     cols.filter((c) => !c.driver.isPaused && !c.driver.isPendingPause && c.isBusy)
       .sort((a, b) => a.ect - b.ect),
+  [cols]);
+
+  const queueReturning = useMemo(() =>
+    cols.filter((c) => !c.driver.isPaused && !c.driver.isPendingPause && !c.isBusy && c.driver.isReturning),
   [cols]);
 
   const queuePaused = useMemo(() =>
@@ -491,7 +495,7 @@ export default function DriversKPI() {
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="font-bold text-sm truncate flex items-center gap-1.5">
-            {col.driver.name}
+            ✅ {col.driver.name}
             {isNext && <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Zap className="w-2 h-2" /> Tjetri</span>}
           </div>
           <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold mt-0.5">
@@ -516,7 +520,7 @@ export default function DriversKPI() {
         {driverShortCode(col.driver)}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-bold text-sm truncate">{col.driver.name}</div>
+        <div className="font-bold text-sm truncate">🏍️ {col.driver.name}</div>
         <div className="flex items-center gap-2 mt-0.5 text-[11px] text-amber-600 font-semibold">
           <span>{col.active.length} porosi aktive</span>
           <span className="text-muted-foreground">·</span>
@@ -547,7 +551,7 @@ export default function DriversKPI() {
         </div>
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setDetailDriverId(col.driver.id)}>
           <div className="font-bold text-sm truncate flex items-center gap-1.5">
-            {col.driver.name}
+            ☕ {col.driver.name}
             {isOverdue && <span className="text-[9px] font-bold text-red-600 bg-red-500/15 px-1.5 py-0.5 rounded-full">PAUZË E GJATË</span>}
           </div>
           {isPending ? (
@@ -576,6 +580,32 @@ export default function DriversKPI() {
           >
             Disponueshëm
           </button>
+        </div>
+      </div>
+    );
+  };
+
+  const ReturningRow = ({ col }: { col: typeof cols[0] }) => {
+    const distKm = col.driver.lat != null && col.driver.lng != null
+      ? haversineKm(col.driver.lat, col.driver.lng, RESTAURANT_COORDS.lat, RESTAURANT_COORDS.lng)
+      : null;
+    return (
+      <div
+        onClick={() => setDetailDriverId(col.driver.id)}
+        className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:bg-purple-500/10 bg-purple-500/5 ring-1 ring-purple-400/30"
+      >
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0" style={{ background: col.driver.color || '#6b7280' }}>
+          {driverShortCode(col.driver)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-sm truncate">🏁 {col.driver.name}</div>
+          <div className="flex items-center gap-1 text-[11px] text-purple-600 font-semibold mt-0.5">
+            Duke u kthyer në bazë{distKm != null ? <> · <span className="font-mono">{distKm.toFixed(1)}km</span> larg</> : ''}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-sm font-bold">{col.completed.length}</div>
+          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">dërgesa</div>
         </div>
       </div>
     );
@@ -660,7 +690,20 @@ export default function DriversKPI() {
           </div>
         )}
 
-        {/* Section 3: Paused */}
+        {/* Section 3: Returning to base */}
+        {queueReturning.length > 0 && (
+          <div className="px-4 py-2 border-t border-purple-400/20">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-base leading-none">🏁</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600">Duke u kthyer · {queueReturning.length}</span>
+            </div>
+            <div className="space-y-1">
+              {queueReturning.map((col) => <ReturningRow key={col.driver.id} col={col} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Section 4: Paused */}
         {queuePaused.length > 0 && (
           <div className="px-4 py-2 border-t border-border/30 pb-4">
             <div className="flex items-center gap-2 mb-2">
