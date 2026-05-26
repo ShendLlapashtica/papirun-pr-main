@@ -20,7 +20,7 @@ const SAGE = '#749D79';
 const CartView = () => {
   const { language, t } = useLanguage();
   const navigate = useNavigate();
-  const { cart, updateQuantity, updateNote, removeFromCart, clearCart, isCheckoutOpen, setIsCheckoutOpen } = useCart();
+  const { cart, updateQuantity, updateNote, removeFromCart, clearCart, isCheckoutOpen, setIsCheckoutOpen, setIsTrayOpen } = useCart();
   const [editingNoteKey, setEditingNoteKey] = useState<string | null>(null);
 
   const total = getCartTotal(cart);
@@ -263,7 +263,7 @@ const CartView = () => {
         onClose={() => setIsCheckoutOpen(false)}
         items={cart}
         total={total}
-        onSuccess={clearCart}
+        onSuccess={() => { clearCart(); setIsTrayOpen(false); }}
       />
     </div>
   );

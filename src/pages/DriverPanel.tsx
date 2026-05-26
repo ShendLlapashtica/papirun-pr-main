@@ -22,6 +22,7 @@ import { archiveAllActiveOrders } from '@/lib/ordersApi';
 import { playKrring } from '@/lib/sounds';
 
 const DRIVER_SESSION_KEY = 'papirun_driver_session';
+const DRIVER_CACHE_KEY = 'papirun_driver_cache';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -127,8 +128,16 @@ function fmtElapsed(ms: number): string {
 
 const DriverPanel = () => {
   const [driver, setDriver] = useState<DeliveryDriver | null>(null);
-  // False only when a saved session exists and is still being verified against the DB.
-  const [sessionChecked, setSessionChecked] = useState(() => !localStorage.getItem(DRIVER_SESSION_KEY));
+  // Restore immediately from cache so driver NEVER sees a login screen on reload.
+  const [sessionChecked, setSessionChecked] = useState(() => {
+    const savedId = localStorage.getItem(DRIVER_SESSION_KEY);
+    if (!savedId) return true; // no session → show login immediately
+    try {
+      const cached = localStorage.getItem(DRIVER_CACHE_KEY);
+      if (cached) return true; // will be hydrated below synchronously
+    } catch {}
+    return false; // has savedId but no cache → show spinner while fetching
+  });
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -171,15 +180,36 @@ const DriverPanel = () => {
   useEffect(() => {
     seedDefaultDrivers().catch(console.error);
     const savedId = localStorage.getItem(DRIVER_SESSION_KEY);
-    if (savedId) {
-      fetchDriverById(savedId)
-        .then((d) => {
-          if (d && d.isActive) setDriver(d);
-          else if (d === null) localStorage.removeItem(DRIVER_SESSION_KEY);
-        })
-        .catch(() => { /* network error — keep session, will restore on next load */ })
-        .finally(() => setSessionChecked(true));
-    }
+    if (!savedId) return;
+
+    // Hydrate immediately from cache so there is ZERO login flash on any reload
+    try {
+      const cached = localStorage.getItem(DRIVER_CACHE_KEY);
+      if (cached) {
+        const parsed: DeliveryDriver = JSON.parse(cached);
+        if (parsed.id === savedId) {
+          setDriver(parsed);
+          setSessionChecked(true);
+        }
+      }
+    } catch {}
+
+    // Background verification — update driver data but NEVER clear session on failure
+    fetchDriverById(savedId)
+      .then((d) => {
+        if (d) {
+          setDriver(d);
+          try { localStorage.setItem(DRIVER_CACHE_KEY, JSON.stringify(d)); } catch {}
+        }
+        // d === null means driver was deleted from DB — only then clear
+        if (d === null) {
+          localStorage.removeItem(DRIVER_SESSION_KEY);
+          localStorage.removeItem(DRIVER_CACHE_KEY);
+          setDriver(null);
+        }
+      })
+      .catch(() => { /* network error — keep cached driver, stay logged in */ })
+      .finally(() => setSessionChecked(true));
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -202,6 +232,7 @@ const DriverPanel = () => {
         }
         setDriver(found);
         localStorage.setItem(DRIVER_SESSION_KEY, found.id);
+        try { localStorage.setItem(DRIVER_CACHE_KEY, JSON.stringify(found)); } catch {}
       } else {
         setError('Username i gabuar.');
       }
@@ -351,7 +382,10 @@ const DriverPanel = () => {
       try {
         await updateDriverLocation(d.id, lat, lng);
         const updated = await fetchDriverById(d.id);
-        if (updated) setDriver(updated);
+        if (updated) {
+          setDriver(updated);
+          try { localStorage.setItem(DRIVER_CACHE_KEY, JSON.stringify(updated)); } catch {}
+        }
       } catch {}
     };
 
@@ -658,7 +692,7 @@ const DriverPanel = () => {
               className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-secondary text-sm font-medium" title="Ndrysho fjalëkalimin">
               <Lock className="w-4 h-4" />
             </button>
-            <button onClick={() => { setDriver(null); localStorage.removeItem(DRIVER_SESSION_KEY); }}
+            <button onClick={() => { setDriver(null); localStorage.removeItem(DRIVER_SESSION_KEY); localStorage.removeItem(DRIVER_CACHE_KEY); }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-secondary text-sm font-medium">
               <LogOut className="w-4 h-4" />
             </button>

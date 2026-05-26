@@ -184,8 +184,14 @@ const SiteTextsEditor = ({ language }: { language: Language }) => {
   );
 };
 
-const ADMIN_PASSWORD = 'Pass123.';
 const ADMIN_AUTH_KEY = 'papirun_admin_authed';
+
+type AdminProfile = 'qendra' | 'cagllavice';
+
+const ADMIN_CREDENTIALS: Record<string, { password: string; profile: AdminProfile }> = {
+  qendra:     { password: 'Pass123', profile: 'qendra' },
+  cagllavice: { password: 'Pass123', profile: 'cagllavice' },
+};
 
 // ---- Drivers Manager ----
 const DriversManager = () => {
@@ -440,10 +446,17 @@ class TabErrorBoundary extends Component<{ children: ReactNode }, { crashed: boo
 }
 
 const Admin = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    try { return localStorage.getItem(ADMIN_AUTH_KEY) === '1'; } catch { return false; }
+  const [profile, setProfile] = useState<AdminProfile | null>(() => {
+    try {
+      const val = localStorage.getItem(ADMIN_AUTH_KEY);
+      if (val === 'qendra' || val === 'cagllavice') return val;
+      if (val === '1') return 'qendra'; // backward compat
+      return null;
+    } catch { return null; }
   });
-  const [password, setPassword] = useState('');
+  const isAuthenticated = profile !== null;
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [error, setError] = useState('');
   const [items, setItems] = useState<MenuItem[]>(initialMenuItems);
   const [menuExtras, setMenuExtras] = useState<MenuExtra[]>(defaultMenuExtras);
@@ -556,12 +569,14 @@ const Admin = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      try { localStorage.setItem(ADMIN_AUTH_KEY, '1'); } catch {}
+    const key = adminUsername.trim().toLowerCase();
+    const match = ADMIN_CREDENTIALS[key];
+    if (match && adminPassword === match.password) {
+      setProfile(match.profile);
+      try { localStorage.setItem(ADMIN_AUTH_KEY, match.profile); } catch {}
       setError('');
     } else {
-      setError(language === 'sq' ? 'Fjalekalimi i gabuar' : 'Wrong password');
+      setError('Username ose fjalëkalim i gabuar');
     }
   };
 
@@ -860,16 +875,27 @@ const Admin = () => {
             <h1 className="font-display font-bold text-2xl">Admin Panel</h1>
             <p className="text-sm text-muted-foreground mt-1">Papirun Dashboard</p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
+          <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
+            <div className="space-y-3">
               <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={language === 'sq' ? 'Fjalekalimi' : 'Password'}
+                type="text"
+                value={adminUsername}
+                onChange={(e) => setAdminUsername(e.target.value)}
+                placeholder="Username"
+                autoComplete="off"
+                name="papirun-admin-user"
                 className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 transition-all"
               />
-              {error && <p className="text-destructive text-xs mt-2">{error}</p>}
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder={language === 'sq' ? 'Fjalëkalimi' : 'Password'}
+                autoComplete="new-password"
+                name="papirun-admin-pass"
+                className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+              {error && <p className="text-destructive text-xs mt-1">{error}</p>}
             </div>
             <button type="submit" className="btn-sage w-full">
               {language === 'sq' ? 'Hyr' : 'Login'}
@@ -900,13 +926,15 @@ const Admin = () => {
               <Package className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-display font-bold text-lg">Papirun Admin</h1>
-              <p className="text-xs text-muted-foreground">Dashboard</p>
+              <h1 className="font-display font-bold text-lg">
+                {profile === 'cagllavice' ? 'Cagllavice Admin' : 'Papirun Admin'}
+              </h1>
+              <p className="text-xs text-muted-foreground capitalize">{profile ?? 'Dashboard'}</p>
             </div>
           </div>
           <button
             onClick={() => {
-              setIsAuthenticated(false);
+              setProfile(null);
               try { localStorage.removeItem(ADMIN_AUTH_KEY); } catch {}
             }}
             className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
@@ -920,7 +948,10 @@ const Admin = () => {
       <div className="container mx-auto px-4 py-6">
         {/* Main tabs (big navbar) */}
         <div className="flex gap-2 mb-4 overflow-x-auto -mx-1 px-1">
-          {(['orders', 'users', 'drivers', 'harta', 'menu', 'offers', 'content', 'databaze'] as const).map((tab) => (
+          {(profile === 'cagllavice'
+            ? ['orders', 'drivers', 'harta'] as const
+            : ['orders', 'users', 'drivers', 'harta', 'menu', 'offers', 'content', 'databaze'] as const
+          ).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
