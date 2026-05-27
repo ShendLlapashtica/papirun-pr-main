@@ -417,35 +417,34 @@ const REAL_DRIVERS = [
 ];
 
 /**
- * Idempotent: ensures exactly one record per real driver exists.
- * Deduplicates by phone (keeps oldest), then upserts missing drivers.
- * Replaces the old seedDefaultDrivers + migrateToRealDrivers pair.
+ * Idempotent: ensures the 5 real driver records are correct.
+ * Matches by phone OR name (prevents re-creating already-correct records).
+ * If a record is found, corrects its data. Never inserts if any match exists.
  */
 export const ensureRealDrivers = async (): Promise<void> => {
   const client = supabase as any;
-  for (const d of REAL_DRIVERS) {
-    const { data: rows } = await client
-      .from(TABLE)
-      .select('id, created_at')
-      .eq('phone', d.phone)
-      .order('created_at', { ascending: true });
+  const { data: all } = await client.from(TABLE).select('id, name, phone, created_at').order('created_at', { ascending: true });
+  if (!all) return;
 
-    if (!rows || rows.length === 0) {
-      // No record at all — create it
+  for (const d of REAL_DRIVERS) {
+    // Match by phone OR by name (case-insensitive) to avoid creating dupes
+    const matches = (all as { id: string; name: string; phone: string; created_at: string }[])
+      .filter(r => r.phone === d.phone || r.name?.toLowerCase() === d.name.toLowerCase());
+
+    if (matches.length === 0) {
       await client.from(TABLE).insert({
         name: d.name, username: d.name.toLowerCase(), display_name: d.name,
         phone: d.phone, pin: d.pin, role: 'driver', is_active: true, password_hash: d.pin,
       });
     } else {
-      // Keep the oldest record, delete any extras
-      const [keep, ...dupes] = rows as { id: string; created_at: string }[];
+      // Delete extras, update the survivor
+      const [keep, ...dupes] = matches;
       for (const dupe of dupes) {
         await client.from(TABLE).delete().eq('id', dupe.id);
       }
-      // Make sure the surviving record has the correct data
       await client.from(TABLE).update({
         name: d.name, username: d.name.toLowerCase(),
-        phone: d.phone, pin: d.pin, password_hash: d.pin,
+        phone: d.phone, pin: d.pin, password_hash: d.pin, is_active: true,
       }).eq('id', keep.id);
     }
   }
