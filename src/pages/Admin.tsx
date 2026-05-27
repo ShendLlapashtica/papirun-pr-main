@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, Component, type ReactNode } f
 import { toast } from 'sonner';
 import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchDrivers, createDriver, updateDriver, deleteDriver, seedDefaultDrivers, migrateToRealDrivers, subscribeAllDriverLocations, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, createDriver, updateDriver, deleteDriver, ensureRealDrivers, subscribeAllDriverLocations, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import { menuItems as initialMenuItems, ofertaRamazani as initialOffers } from '@/data/menuData';
 import { defaultMenuExtras } from '@/data/menuExtras';
@@ -210,7 +210,7 @@ const DriversManager = () => {
   };
 
   useEffect(() => {
-    seedDefaultDrivers().catch(() => {}).finally(reload);
+    ensureRealDrivers().catch(() => {}).finally(reload);
     // Real-time: refresh drivers when any location update comes in
     const unsub = subscribeAllDriverLocations(reload);
     return unsub;
@@ -554,9 +554,7 @@ const Admin = () => {
     syncOfertaEnabled();
     syncOfferBadgeText();
     syncWhatsappFallback();
-    // Seed real drivers and run one-time migration from legacy "Driver 1-5" placeholders
-    seedDefaultDrivers().catch(() => {});
-    migrateToRealDrivers().catch(() => {});
+    ensureRealDrivers().catch(() => {});
 
     const unsubscribeOffers = subscribeStorefrontOffersRealtime(syncOffers);
     const unsubscribeSettings = subscribeStorefrontSettingsRealtime(syncOfertaEnabled);

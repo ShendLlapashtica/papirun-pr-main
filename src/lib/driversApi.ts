@@ -408,7 +408,6 @@ export const fetchDriverOrders = async (driverId: string) => {
   return data;
 };
 
-/** Ensure all 6 default drivers exist — idempotent. */
 const REAL_DRIVERS = [
   { name: 'Lendrit', phone: '044532255', pin: '044532255' },
   { name: 'Olt',     phone: '045220353', pin: '045220353' },
@@ -417,43 +416,45 @@ const REAL_DRIVERS = [
   { name: 'Adhurim', phone: '045220355', pin: '045220355' },
 ];
 
-export const seedDefaultDrivers = async (): Promise<void> => {
+/**
+ * Idempotent: ensures exactly one record per real driver exists.
+ * Deduplicates by phone (keeps oldest), then upserts missing drivers.
+ * Replaces the old seedDefaultDrivers + migrateToRealDrivers pair.
+ */
+export const ensureRealDrivers = async (): Promise<void> => {
   const client = supabase as any;
   for (const d of REAL_DRIVERS) {
-    const { data } = await client.from(TABLE).select('id').eq('phone', d.phone).maybeSingle();
-    if (!data) {
-      const payload = { name: d.name, username: d.name.toLowerCase(), display_name: d.name, phone: d.phone, pin: d.pin, role: 'driver', is_active: true, password_hash: d.pin };
-      const { error } = await client.from(TABLE).insert(payload);
-      if (error) console.error(`[seedDrivers] insert failed for ${d.name}:`, error.message);
+    const { data: rows } = await client
+      .from(TABLE)
+      .select('id, created_at')
+      .eq('phone', d.phone)
+      .order('created_at', { ascending: true });
+
+    if (!rows || rows.length === 0) {
+      // No record at all — create it
+      await client.from(TABLE).insert({
+        name: d.name, username: d.name.toLowerCase(), display_name: d.name,
+        phone: d.phone, pin: d.pin, role: 'driver', is_active: true, password_hash: d.pin,
+      });
+    } else {
+      // Keep the oldest record, delete any extras
+      const [keep, ...dupes] = rows as { id: string; created_at: string }[];
+      for (const dupe of dupes) {
+        await client.from(TABLE).delete().eq('id', dupe.id);
+      }
+      // Make sure the surviving record has the correct data
+      await client.from(TABLE).update({
+        name: d.name, username: d.name.toLowerCase(),
+        phone: d.phone, pin: d.pin, password_hash: d.pin,
+      }).eq('id', keep.id);
     }
   }
 };
 
-/**
- * One-time migration: updates legacy "Driver 1-5" placeholder records to real
- * names, phones, and PINs. Safe to re-run — skips if already migrated.
- */
-export const migrateToRealDrivers = async (): Promise<void> => {
-  const client = supabase as any;
-  const LEGACY = ['Driver 1', 'Driver 2', 'Driver 3', 'Driver 4', 'Driver 5'];
-  for (let i = 0; i < REAL_DRIVERS.length; i++) {
-    const real = REAL_DRIVERS[i];
-    // Skip if a driver with this real phone already exists
-    const { data: already } = await client.from(TABLE).select('id').eq('phone', real.phone).maybeSingle();
-    if (already) continue;
-    // Try to find the corresponding legacy placeholder by name
-    const { data: legacy } = await client.from(TABLE).select('id').eq('name', LEGACY[i]).maybeSingle();
-    if (legacy) {
-      await client.from(TABLE).update({
-        name: real.name,
-        username: real.name.toLowerCase(),
-        phone: real.phone,
-        pin: real.pin,
-        password_hash: real.pin,
-      }).eq('id', legacy.id);
-    }
-  }
-};
+/** @deprecated use ensureRealDrivers */
+export const seedDefaultDrivers = ensureRealDrivers;
+/** @deprecated use ensureRealDrivers */
+export const migrateToRealDrivers = async (): Promise<void> => {};
 
 export const subscribeDriverOrdersRealtime = (driverId: string, onChange: () => void) => {
   const channel = supabase
