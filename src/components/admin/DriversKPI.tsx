@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
 import { fetchAllOrders, hardDeleteAllOrders, type OrderRecord } from '@/lib/ordersApi';
-import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle, Trash2, Loader2 } from 'lucide-react';
+import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle, Trash2, Loader2, Phone } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, CartesianGrid,
@@ -503,9 +503,21 @@ export default function DriversKPI() {
             {hasWait ? <>Koha e pritjes: <span className="font-mono ml-0.5">{fmtDuration(col.waitMs)}</span></> : 'I disponueshëm'}
           </div>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-sm font-bold">{col.completed.length}</div>
-          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">dërgesa</div>
+        <div className="flex items-center gap-2 shrink-0">
+          {col.driver.phone && (
+            <a
+              href={`tel:${col.driver.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold active:scale-95 transition-all"
+              title={`Thirr ${col.driver.name}`}
+            >
+              <Phone className="w-3 h-3" />
+            </a>
+          )}
+          <div className="text-right">
+            <div className="text-sm font-bold">{col.completed.length}</div>
+            <div className="text-[9px] text-muted-foreground uppercase tracking-wider">dërgesa</div>
+          </div>
         </div>
       </div>
     );
@@ -527,9 +539,21 @@ export default function DriversKPI() {
           <span>ETA ~{Math.ceil(col.ect)}min</span>
         </div>
       </div>
-      <div className="text-right shrink-0">
-        <div className="text-sm font-bold">{col.completed.length}</div>
-        <div className="text-[9px] text-muted-foreground uppercase tracking-wider">dërgesa</div>
+      <div className="flex items-center gap-2 shrink-0">
+        {col.driver.phone && (
+          <a
+            href={`tel:${col.driver.phone}`}
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold active:scale-95 transition-all"
+            title={`Thirr ${col.driver.name}`}
+          >
+            <Phone className="w-3 h-3" />
+          </a>
+        )}
+        <div className="text-right">
+          <div className="text-sm font-bold">{col.completed.length}</div>
+          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">dërgesa</div>
+        </div>
       </div>
     </div>
   );
@@ -566,6 +590,16 @@ export default function DriversKPI() {
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {col.driver.phone && (
+            <a
+              href={`tel:${col.driver.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold active:scale-95 transition-all"
+              title={`Thirr ${col.driver.name}`}
+            >
+              <Phone className="w-3 h-3" />
+            </a>
+          )}
           {isPending && (
             <button
               onClick={() => handleApprovePause(col.driver.id)}
@@ -603,9 +637,21 @@ export default function DriversKPI() {
             Duke u kthyer në bazë{distKm != null ? <> · <span className="font-mono">{distKm.toFixed(1)}km</span> larg</> : ''}
           </div>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-sm font-bold">{col.completed.length}</div>
-          <div className="text-[9px] text-muted-foreground uppercase tracking-wider">dërgesa</div>
+        <div className="flex items-center gap-2 shrink-0">
+          {col.driver.phone && (
+            <a
+              href={`tel:${col.driver.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold active:scale-95 transition-all"
+              title={`Thirr ${col.driver.name}`}
+            >
+              <Phone className="w-3 h-3" />
+            </a>
+          )}
+          <div className="text-right">
+            <div className="text-sm font-bold">{col.completed.length}</div>
+            <div className="text-[9px] text-muted-foreground uppercase tracking-wider">dërgesa</div>
+          </div>
         </div>
       </div>
     );

@@ -408,21 +408,48 @@ export const fetchDriverOrders = async (driverId: string) => {
 };
 
 /** Ensure all 6 default drivers exist — idempotent. */
+const REAL_DRIVERS = [
+  { name: 'Lendrit', phone: '044532255', pin: '044532255' },
+  { name: 'Olt',     phone: '045220353', pin: '045220353' },
+  { name: 'Endrit',  phone: '045416645', pin: '045416645' },
+  { name: 'Arlind',  phone: '045416566', pin: '045416566' },
+  { name: 'Adhurim', phone: '045220355', pin: '045220355' },
+];
+
 export const seedDefaultDrivers = async (): Promise<void> => {
   const client = supabase as any;
-  const defaults = [
-    { name: 'Driver 1', username: 'driver1', display_name: 'Driver 1', phone: 'driver1', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
-    { name: 'Driver 2', username: 'driver2', display_name: 'Driver 2', phone: 'driver2', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
-    { name: 'Driver 3', username: 'driver3', display_name: 'Driver 3', phone: 'driver3', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
-    { name: 'Driver 4', username: 'driver4', display_name: 'Driver 4', phone: 'driver4', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
-    { name: 'Driver 5', username: 'driver5', display_name: 'Driver 5', phone: 'driver5', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
-    { name: 'Driver 6', username: 'driver6', display_name: 'Driver 6', phone: 'driver6', pin: '123', role: 'driver', is_active: true, password_hash: '123' },
-  ];
-  for (const def of defaults) {
-    const { data } = await client.from(TABLE).select('id').eq('phone', def.phone).maybeSingle();
+  for (const d of REAL_DRIVERS) {
+    const { data } = await client.from(TABLE).select('id').eq('phone', d.phone).maybeSingle();
     if (!data) {
-      const { error } = await client.from(TABLE).insert(def);
-      if (error) console.error(`[seedDrivers] insert failed for ${def.name}:`, error.message);
+      const payload = { name: d.name, username: d.name.toLowerCase(), display_name: d.name, phone: d.phone, pin: d.pin, role: 'driver', is_active: true, password_hash: d.pin };
+      const { error } = await client.from(TABLE).insert(payload);
+      if (error) console.error(`[seedDrivers] insert failed for ${d.name}:`, error.message);
+    }
+  }
+};
+
+/**
+ * One-time migration: updates legacy "Driver 1-5" placeholder records to real
+ * names, phones, and PINs. Safe to re-run — skips if already migrated.
+ */
+export const migrateToRealDrivers = async (): Promise<void> => {
+  const client = supabase as any;
+  const LEGACY = ['Driver 1', 'Driver 2', 'Driver 3', 'Driver 4', 'Driver 5'];
+  for (let i = 0; i < REAL_DRIVERS.length; i++) {
+    const real = REAL_DRIVERS[i];
+    // Skip if a driver with this real phone already exists
+    const { data: already } = await client.from(TABLE).select('id').eq('phone', real.phone).maybeSingle();
+    if (already) continue;
+    // Try to find the corresponding legacy placeholder by name
+    const { data: legacy } = await client.from(TABLE).select('id').eq('name', LEGACY[i]).maybeSingle();
+    if (legacy) {
+      await client.from(TABLE).update({
+        name: real.name,
+        username: real.name.toLowerCase(),
+        phone: real.phone,
+        pin: real.pin,
+        password_hash: real.pin,
+      }).eq('id', legacy.id);
     }
   }
 };
