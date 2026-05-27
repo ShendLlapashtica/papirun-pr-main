@@ -45,6 +45,7 @@ export default function GtaDriverMap({ driverLat, driverLng, destLat, destLng, h
       zoom: 15,
       attributionControl: false,
       zoomControl: false,
+      scrollWheelZoom: false,
     });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -92,8 +93,10 @@ export default function GtaDriverMap({ driverLat, driverLng, destLat, destLng, h
   return (
     <div className="relative rounded-2xl overflow-hidden border border-border/40 shadow-md" style={{ height }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+      {/* Scroll-through overlay: lets vertical swipes reach the page scroll instead of Leaflet */}
+      <div className="absolute inset-0 z-10" style={{ touchAction: 'pan-y' }} />
       {routeError && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-background/90 text-xs text-muted-foreground px-3 py-1 rounded-full border border-border/40">
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-background/90 text-xs text-muted-foreground px-3 py-1 rounded-full border border-border/40">
           Rruga nuk mund të ngarkohet
         </div>
       )}

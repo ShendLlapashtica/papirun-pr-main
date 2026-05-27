@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Maximize2 } from 'lucide-react';
@@ -78,10 +78,18 @@ export default function DriverLocationMap({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const markersRef = useRef<L.Marker[]>([]);
   const destMarkerRef = useRef<L.Marker | null>(null);
   const restaurantMarkerRef = useRef<L.Marker | null>(null);
   const routeLinesRef = useRef<L.Polyline[]>([]);
+
+  // Track fullscreen state to show/hide scroll overlay
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
 
   // Init map once
   useEffect(() => {
@@ -91,6 +99,7 @@ export default function DriverLocationMap({
       center: [RESTAURANT_COORDS.lat, RESTAURANT_COORDS.lng],
       zoom: 13,
       zoomControl: true,
+      scrollWheelZoom: false,
     });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap',
@@ -201,6 +210,15 @@ export default function DriverLocationMap({
   return (
     <div className="relative rounded-2xl overflow-hidden border border-border/40 shadow-sm" style={{ height }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Scroll-through overlay: lets vertical swipes reach the page scroll instead of Leaflet.
+          Hidden in fullscreen so the map is fully interactive there. */}
+      {!isFullscreen && (
+        <div
+          className="absolute inset-0 z-[500]"
+          style={{ touchAction: 'pan-y' }}
+        />
+      )}
 
       {allowFullscreen && (
         <button

@@ -949,21 +949,21 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
             return (
               <React.Fragment key={o.id}>
               <motion.div
-                layout
-                initial={{ x: -40, opacity: 0, scale: 0.96 }}
-                animate={{ x: 0, opacity: isDeleting ? 0.45 : 1, scale: 1 }}
-                exit={{ x: 300, opacity: 0, scale: 0.92 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: isDeleting ? 0.45 : 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
                 drag={!isPending && !isDeleting ? 'x' : false}
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.4}
+                style={{ touchAction: 'pan-y' }}
                 onDragEnd={(_, info) => {
                   if (!isPending && Math.abs(info.offset.x) > 120) {
                     if (isArchived) unarchiveOrder(o.id);
                     else archiveOrder(o.id);
                   }
                 }}
-                className={`relative rounded-3xl p-4 shadow-card transition-all touch-pan-y ${
+                className={`relative rounded-3xl p-4 shadow-card transition-all ${
                   isCagl ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-400/30' : 'bg-card'
                 } ${
                   isMassSelected ? 'ring-2 ring-primary bg-primary/5' :
