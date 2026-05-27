@@ -1,4 +1,4 @@
-import { MapPin, Phone, Clock, ArrowUp } from 'lucide-react';
+import { MapPin, Phone, Clock, ArrowUp, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import logo from '@/assets/logo.png';
@@ -91,6 +91,15 @@ const Footer = () => {
             >
               <Phone className="w-4 h-4" />
               {language === 'sq' ? 'Thirr Direkt' : 'Call Direct'}
+            </a>
+            <a
+              href="https://www.google.com/search?q=Papirun+Reviews#lrd=0x13549ee685d7c721:0xff91baa797df481e,3,,,,"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2 px-4 py-2.5 rounded-full border border-background/20 hover:border-yellow-400 hover:bg-yellow-400/10 transition-all text-sm text-background/70 hover:text-yellow-400"
+            >
+              <Star className="w-4 h-4" />
+              {language === 'sq' ? 'Lër një koment' : 'Leave a Review'}
             </a>
             <button
               onClick={scrollToTop}

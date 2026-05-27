@@ -135,6 +135,7 @@ async function fetchPauseMap(): Promise<PauseMap> {
     map[id] = {
       paused: Boolean(v.paused),
       pendingApproval: Boolean(v.pendingApproval),
+      isReturning: Boolean(v.isReturning),
       pausedAt: v.pausedAt ? Number(v.pausedAt) : undefined,
       availableSince: v.availableSince ? Number(v.availableSince) : undefined,
     };
