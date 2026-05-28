@@ -74,24 +74,33 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
   const [resolvingAddress, setResolvingAddress] = useState(false);
   const [hasUserLocation, setHasUserLocation] = useState(false);
   const [autoTried, setAutoTried] = useState(false);
+  const userInteractedRef = useRef(false);
+  const [locationBanner, setLocationBanner] = useState(false);
 
   // Sync external selectedPosition prop
   useEffect(() => {
-    if (selectedPosition) setPosition(selectedPosition);
+    if (selectedPosition) {
+      userInteractedRef.current = true;
+      setLocationBanner(false);
+      setPosition(selectedPosition);
+    }
   }, [selectedPosition]);
 
-  // Auto-detect location on mount (silent, no error toasts)
+  // Auto-detect location on mount
   useEffect(() => {
-    if (autoTried || selectedPosition || !navigator.geolocation) return;
+    if (autoTried || selectedPosition) return;
+    if (!navigator.geolocation) { setLocationBanner(true); return; }
     setAutoTried(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        userInteractedRef.current = true;
+        setLocationBanner(false);
         setHasUserLocation(true);
         setPosition([pos.coords.latitude, pos.coords.longitude]);
         toast.success('Vendndodhja u gjet automatikisht ✓', { duration: 2000 });
       },
-      () => { /* silent fallback to Prishtina center */ },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      () => { setLocationBanner(true); },
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -108,11 +117,15 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
     const marker = L.marker(position, { icon: iconDefault, draggable: true }).addTo(map);
 
     marker.on('dragend', () => {
+      userInteractedRef.current = true;
+      setLocationBanner(false);
       const latlng = marker.getLatLng();
       setPosition([latlng.lat, latlng.lng]);
     });
 
     map.on('click', (e: L.LeafletMouseEvent) => {
+      userInteractedRef.current = true;
+      setLocationBanner(false);
       setPosition([e.latlng.lat, e.latlng.lng]);
     });
 
@@ -142,6 +155,7 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
   onSelectRef.current = onSelectAddress;
 
   useEffect(() => {
+    if (!userInteractedRef.current) return;
     let cancelled = false;
     setResolvingAddress(true);
 
@@ -174,6 +188,8 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
   }, [streetInput]);
 
   const applySuggestion = useCallback((s: Suggestion) => {
+    userInteractedRef.current = true;
+    setLocationBanner(false);
     setPosition([s.lat, s.lng]);
     setStreetInput(s.short);
     setSuggestions([]);
@@ -218,6 +234,8 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const newPos: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        userInteractedRef.current = true;
+        setLocationBanner(false);
         setHasUserLocation(true);
         setPosition(newPos);
         setLocating(false);
@@ -248,6 +266,22 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
         {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
         {hasUserLocation ? '📍 Përditëso lokacionin' : '📍 Vendos lokacionin aktual'}
       </button>
+
+      {locationBanner && (
+        <div className="flex items-center justify-between gap-3 bg-amber-500/15 border border-amber-500/30 rounded-xl px-3 py-2.5">
+          <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+            Adresa juaj nuk është aktualizuar.
+          </p>
+          <button
+            type="button"
+            onClick={handleCurrentLocation}
+            disabled={locating}
+            className="text-xs font-semibold text-amber-800 dark:text-amber-200 underline underline-offset-2 whitespace-nowrap disabled:opacity-50"
+          >
+            {locating ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'aktualizo'}
+          </button>
+        </div>
+      )}
 
       <div className="rounded-xl overflow-hidden border border-border bg-secondary/30 relative">
         <div ref={containerRef} className="h-56 w-full" style={{ zIndex: 0 }} />
