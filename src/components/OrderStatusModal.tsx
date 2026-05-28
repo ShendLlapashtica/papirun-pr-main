@@ -211,27 +211,28 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
           {status === 'completed' && order?.assignedDriverId && !ratingSubmitted && !thankYouVisible && (
             <div className="bg-secondary/30 p-4 rounded-xl border border-border/50">
               <p className="text-xs font-semibold text-center mb-3">{language === 'sq' ? 'Si ishte dërgesa?' : 'How was the delivery?'}</p>
-              <div className="flex items-center justify-center gap-5 mb-3">
-                {([
-                  { emoji: '😊', value: 5, label: language === 'sq' ? 'I kënaqur' : 'Happy', glow: 'shadow-[0_0_0_3px_#22c55e]' },
-                  { emoji: '😐', value: 3, label: language === 'sq' ? 'Neutral' : 'Neutral', glow: 'shadow-[0_0_0_3px_#f59e0b]' },
-                  { emoji: '☹️', value: 1, label: language === 'sq' ? 'I pakënaqur' : 'Unhappy', glow: 'shadow-[0_0_0_3px_#ef4444]' },
-                ] as const).map(({ emoji, value, label, glow }) => (
-                  <button
-                    key={value}
-                    onClick={() => setDriverRating(driverRating === value ? 0 : value)}
-                    title={label}
-                    className={[
-                      'text-4xl leading-none rounded-full p-1 transition-all duration-200',
-                      'hover:scale-125 active:scale-95',
-                      driverRating === value
-                        ? `scale-125 animate-bounce ${glow}`
-                        : 'scale-100 opacity-70 hover:opacity-100',
-                    ].join(' ')}
-                  >
-                    {emoji}
-                  </button>
-                ))}
+              <div className="mb-3">
+                <div className="text-4xl mb-2 text-center transition-all duration-200 select-none">
+                  {(['', '😢', '😕', '😐', '🙂', '🤩'] as const)[driverRating] || '🤔'}
+                </div>
+                <div className="flex gap-1.5 mb-1">
+                  {[1, 2, 3, 4, 5].map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setDriverRating(v === driverRating ? 0 : v)}
+                      className={[
+                        'flex-1 h-3 rounded-full transition-all duration-200',
+                        v <= driverRating
+                          ? driverRating <= 2 ? 'bg-red-400' : driverRating === 3 ? 'bg-amber-400' : 'bg-emerald-400'
+                          : 'bg-secondary hover:bg-muted',
+                      ].join(' ')}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
+                  <span>Keq</span>
+                  <span>Shkëlqyer</span>
+                </div>
               </div>
 
               {driverRating > 0 && (

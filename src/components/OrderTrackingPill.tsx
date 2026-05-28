@@ -10,7 +10,7 @@ import CustomerDriverMap from '@/components/CustomerDriverMap';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
 
-const GOOGLE_REVIEW_URL = 'https://g.page/r/CXb5HpQx_FREEAB/review';
+const GOOGLE_REVIEW_URL = 'https://www.google.com/search?q=papirun+reviews#lrd=0x13549ee685d7c721:0xff91baa797df481e,3,,,,';
 
 const STORAGE_KEY = 'papirun_active_order_id';
 
@@ -392,16 +392,28 @@ const OrderTrackingPill = () => {
             <p className="text-muted-foreground text-sm mb-6">
               {language === 'sq' ? 'Vlerëso shoferin tënd' : 'Rate your driver'}
             </p>
-            <div className="flex items-center justify-center gap-3 mb-6">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button key={star} onClick={() => setRatingValue(star)} className="transition-all duration-150 active:scale-90 hover:scale-110">
-                  <Star
-                    className={`w-10 h-10 transition-colors ${star <= ratingValue ? 'text-amber-400' : 'text-muted-foreground/25'}`}
-                    fill={star <= ratingValue ? 'currentColor' : 'none'}
-                    strokeWidth={1.5}
+            <div className="mb-6">
+              <div className="text-6xl mb-4 transition-all duration-200 select-none text-center">
+                {(['', '😢', '😕', '😐', '🙂', '🤩'] as const)[ratingValue] || '🤔'}
+              </div>
+              <div className="flex gap-1.5 mb-1.5">
+                {[1, 2, 3, 4, 5].map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setRatingValue(v)}
+                    className={[
+                      'flex-1 h-4 rounded-full transition-all duration-200',
+                      v <= ratingValue
+                        ? ratingValue <= 2 ? 'bg-red-400' : ratingValue === 3 ? 'bg-amber-400' : 'bg-emerald-400'
+                        : 'bg-secondary hover:bg-muted',
+                    ].join(' ')}
                   />
-                </button>
-              ))}
+                ))}
+              </div>
+              <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
+                <span>Keq</span>
+                <span>Shkëlqyer</span>
+              </div>
             </div>
             <textarea
               value={ratingNote}
