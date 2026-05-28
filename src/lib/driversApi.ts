@@ -414,6 +414,7 @@ const REAL_DRIVERS = [
   { name: 'Endrit',  phone: '045416645', pin: '045416645' },
   { name: 'Arlind',  phone: '045416566', pin: '045416566' },
   { name: 'Adhurim', phone: '045220355', pin: '045220355' },
+  { name: 'Fidan',   phone: '044220354', pin: '044220354' },
 ];
 
 /**
@@ -505,6 +506,26 @@ export const subscribeAllDriverLocations = (onChange: () => void) => {
       (payload: any) => {
         const key: string = payload?.new?.key || payload?.old?.key || '';
         if (key.startsWith(LOC_PREFIX)) onChange();
+      }
+    )
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+};
+
+/**
+ * Subscribe to ALL driver state changes — both GPS location (driver_loc_*) and
+ * pause/returning state (driver_pause_*). Use this in admin KPI / DriversKPI so
+ * Ne Bazë, Nise, Perfundo transitions reflect immediately without a page refresh.
+ */
+export const subscribeAllDriverStates = (onChange: () => void) => {
+  const channel = supabase
+    .channel(`driver-states-${Math.random().toString(36).slice(2)}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'storefront_settings' },
+      (payload: any) => {
+        const key: string = payload?.new?.key || payload?.old?.key || '';
+        if (key.startsWith(LOC_PREFIX) || key.startsWith(PAUSE_PREFIX)) onChange();
       }
     )
     .subscribe();
