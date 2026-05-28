@@ -30,12 +30,6 @@ const Index = () => {
 
   const cartTotal = getCartTotal(cart);
 
-  useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(() => {}, () => {}, { enableHighAccuracy: false, timeout: 10000 });
-    }
-  }, []);
-
   const visibleItems = useMemo(() => menuItems.filter((item) => item.category !== 'sides'), [menuItems]);
 
   const filteredItems = useMemo(() => {

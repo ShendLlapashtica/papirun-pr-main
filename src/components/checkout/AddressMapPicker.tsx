@@ -6,6 +6,7 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { Search, MapPin, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { subscribeGeo } from '@/lib/geoCache';
 
 const PRISHTINA_CENTER: [number, number] = [42.6629, 21.1655];
 
@@ -86,22 +87,23 @@ const AddressMapPicker = memo(({ selectedPosition, onSelectAddress }: AddressMap
     }
   }, [selectedPosition]);
 
-  // Auto-detect location on mount
+  // Auto-detect location on mount — reads from the app-level singleton (prewarmGeo fires
+  // before any component mounts, so this is usually instant by the time checkout opens).
   useEffect(() => {
     if (autoTried || selectedPosition) return;
-    if (!navigator.geolocation) { setLocationBanner(true); return; }
     setAutoTried(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
+    const unsub = subscribeGeo((result) => {
+      if (result) {
         userInteractedRef.current = true;
         setLocationBanner(false);
         setHasUserLocation(true);
-        setPosition([pos.coords.latitude, pos.coords.longitude]);
+        setPosition([result.lat, result.lng]);
         toast.success('Vendndodhja u gjet automatikisht ✓', { duration: 2000 });
-      },
-      () => { setLocationBanner(true); },
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 },
-    );
+      } else {
+        setLocationBanner(true);
+      }
+    });
+    return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
