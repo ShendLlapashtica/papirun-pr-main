@@ -396,23 +396,25 @@ const OrderTrackingPill = () => {
               <div className="text-6xl mb-4 transition-all duration-200 select-none text-center">
                 {(['', '😢', '😕', '😐', '🙂', '🤩'] as const)[ratingValue] || '🤔'}
               </div>
-              <div className="flex gap-1.5 mb-1.5">
-                {[1, 2, 3, 4, 5].map((v) => (
-                  <button
-                    key={v}
-                    onClick={() => setRatingValue(v)}
-                    className={[
-                      'flex-1 h-4 rounded-full transition-all duration-200',
-                      v <= ratingValue
-                        ? ratingValue <= 2 ? 'bg-red-400' : ratingValue === 3 ? 'bg-amber-400' : 'bg-emerald-400'
-                        : 'bg-secondary hover:bg-muted',
-                    ].join(' ')}
-                  />
-                ))}
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
-                <span>Keq</span>
-                <span>Shkëlqyer</span>
+              <div className="flex justify-center gap-3">
+                {[1, 2, 3, 4, 5].map((v) => {
+                  const filled = v <= ratingValue;
+                  const c = ratingValue <= 2 ? '#f87171' : ratingValue === 3 ? '#fbbf24' : ratingValue === 4 ? '#4ade80' : '#d946ef';
+                  return (
+                    <button
+                      key={v}
+                      onClick={() => setRatingValue(v)}
+                      className="transition-all duration-150 hover:scale-125 active:scale-95"
+                    >
+                      <Star
+                        className="w-10 h-10 transition-all duration-200"
+                        fill={filled ? c : 'transparent'}
+                        strokeWidth={1.5}
+                        style={{ color: filled ? c : 'hsl(var(--muted-foreground) / 0.3)' }}
+                      />
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <textarea

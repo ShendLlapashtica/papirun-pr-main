@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send, CheckCheck } from 'lucide-react';
+import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send, CheckCheck, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchOrder, subscribeOrderRealtime, softDeleteOrder, updateOrderStatus, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -193,6 +193,7 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
                 setEndingConvo(true);
                 try {
                   await updateOrderStatus(order.id, 'completed');
+                  setOrder(prev => prev ? { ...prev, status: 'completed' } : prev);
                 } catch {
                   toast.error(language === 'sq' ? 'Gabim' : 'Error');
                 } finally {
@@ -212,26 +213,28 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
             <div className="bg-secondary/30 p-4 rounded-xl border border-border/50">
               <p className="text-xs font-semibold text-center mb-3">{language === 'sq' ? 'Si ishte dërgesa?' : 'How was the delivery?'}</p>
               <div className="mb-3">
-                <div className="text-4xl mb-2 text-center transition-all duration-200 select-none">
+                <div className="text-4xl mb-3 text-center transition-all duration-200 select-none">
                   {(['', '😢', '😕', '😐', '🙂', '🤩'] as const)[driverRating] || '🤔'}
                 </div>
-                <div className="flex gap-1.5 mb-1">
-                  {[1, 2, 3, 4, 5].map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => setDriverRating(v === driverRating ? 0 : v)}
-                      className={[
-                        'flex-1 h-3 rounded-full transition-all duration-200',
-                        v <= driverRating
-                          ? driverRating <= 2 ? 'bg-red-400' : driverRating === 3 ? 'bg-amber-400' : 'bg-emerald-400'
-                          : 'bg-secondary hover:bg-muted',
-                      ].join(' ')}
-                    />
-                  ))}
-                </div>
-                <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
-                  <span>Keq</span>
-                  <span>Shkëlqyer</span>
+                <div className="flex justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((v) => {
+                    const filled = v <= driverRating;
+                    const c = driverRating <= 2 ? '#f87171' : driverRating === 3 ? '#fbbf24' : driverRating === 4 ? '#4ade80' : '#d946ef';
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => setDriverRating(v === driverRating ? 0 : v)}
+                        className="transition-all duration-150 hover:scale-125 active:scale-95"
+                      >
+                        <Star
+                          className="w-8 h-8 transition-all duration-200"
+                          fill={filled ? c : 'transparent'}
+                          strokeWidth={1.5}
+                          style={{ color: filled ? c : 'hsl(var(--muted-foreground) / 0.3)' }}
+                        />
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
