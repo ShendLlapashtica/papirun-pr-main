@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, haversineKm, RESTAURANT_COORDS, subscribeAllDriverStates, type DeliveryDriver } from '@/lib/driversApi';
 import { fetchAllOrders, hardDeleteAllOrders, type OrderRecord } from '@/lib/ordersApi';
 import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle, Trash2, Loader2, Phone } from 'lucide-react';
 import {
@@ -75,7 +75,7 @@ function driverECT(driverId: string, orders: OrderRecord[], now = Date.now()): n
 
 /** Pick best driver: skip paused/pending drivers, prefer longest-idle, fallback lowest ECT */
 export function pickBestDriver(drivers: DeliveryDriver[], orders: OrderRecord[]): string | null {
-  const active = drivers.filter((d) => d.isActive && !d.isPaused && !d.isPendingPause);
+  const active = drivers.filter((d) => d.isActive && !d.isPaused && !d.isPendingPause && !d.isMissing);
   if (!active.length) return null;
 
   const now = Date.now();
@@ -390,7 +390,8 @@ export default function DriversKPI() {
   useEffect(() => {
     load();
     const poll = setInterval(load, 10_000);
-    return () => clearInterval(poll);
+    const unsub = subscribeAllDriverStates(load);
+    return () => { clearInterval(poll); unsub(); };
   }, [load]);
 
   useEffect(() => {
@@ -444,9 +445,13 @@ export default function DriversKPI() {
     return { driver, completed, active, waitMs, isBusy, ect, avgRating, happy, neutral, unhappy, total, pauseDurationMs };
   }), [drivers, orders, tick]);
 
-  // 4 sorted sections
+  // 5 sorted sections
+  const queueMissing = useMemo(() =>
+    cols.filter((c) => c.driver.isMissing),
+  [cols]);
+
   const queueAvailable = useMemo(() =>
-    cols.filter((c) => !c.driver.isPaused && !c.driver.isPendingPause && !c.isBusy && !c.driver.isReturning)
+    cols.filter((c) => !c.driver.isMissing && !c.driver.isPaused && !c.driver.isPendingPause && !c.isBusy && !c.driver.isReturning)
       .sort((a, b) => {
         const aMs = isFinite(a.waitMs) && a.waitMs >= 0 ? a.waitMs : Infinity;
         const bMs = isFinite(b.waitMs) && b.waitMs >= 0 ? b.waitMs : Infinity;
@@ -455,16 +460,16 @@ export default function DriversKPI() {
   [cols]);
 
   const queueBusy = useMemo(() =>
-    cols.filter((c) => !c.driver.isPaused && !c.driver.isPendingPause && c.isBusy)
+    cols.filter((c) => !c.driver.isMissing && !c.driver.isPaused && !c.driver.isPendingPause && c.isBusy)
       .sort((a, b) => a.ect - b.ect),
   [cols]);
 
   const queueReturning = useMemo(() =>
-    cols.filter((c) => !c.driver.isPaused && !c.driver.isPendingPause && !c.isBusy && c.driver.isReturning),
+    cols.filter((c) => !c.driver.isMissing && !c.driver.isPaused && !c.driver.isPendingPause && !c.isBusy && c.driver.isReturning),
   [cols]);
 
   const queuePaused = useMemo(() =>
-    cols.filter((c) => c.driver.isPaused || c.driver.isPendingPause),
+    cols.filter((c) => !c.driver.isMissing && (c.driver.isPaused || c.driver.isPendingPause)),
   [cols]);
 
   const detailCol = detailDriverId ? cols.find((c) => c.driver.id === detailDriverId) : null;
@@ -751,13 +756,41 @@ export default function DriversKPI() {
 
         {/* Section 4: Paused */}
         {queuePaused.length > 0 && (
-          <div className="px-4 py-2 border-t border-border/30 pb-4">
+          <div className="px-4 py-2 border-t border-border/30">
             <div className="flex items-center gap-2 mb-2">
               <Coffee className="w-2.5 h-2.5 text-muted-foreground" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Në pauzë · {queuePaused.length}</span>
             </div>
             <div className="space-y-1">
               {queuePaused.map((col) => <PausedRow key={col.driver.id} col={col} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Section 5: Missing */}
+        {queueMissing.length > 0 && (
+          <div className="px-4 py-2 border-t border-red-500/25 pb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm leading-none">🚫</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-red-600">Mungon sot · {queueMissing.length}</span>
+            </div>
+            <div className="space-y-1">
+              {queueMissing.map(({ driver }) => (
+                <div key={driver.id} className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-red-500/5 ring-1 ring-red-500/15">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 opacity-60" style={{ background: driver.color || '#6b7280' }}>
+                    {driverShortCode(driver)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-sm truncate text-red-700 dark:text-red-400">🚫 {driver.name}</div>
+                    <div className="text-[10px] text-muted-foreground">Nuk paraqitet sot</div>
+                  </div>
+                  {driver.phone && (
+                    <a href={`tel:${driver.phone}`} className="p-1.5 rounded-lg bg-secondary text-muted-foreground hover:bg-secondary/80 transition-colors shrink-0">
+                      <Phone className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -768,7 +801,7 @@ export default function DriversKPI() {
       ═══════════════════════════════════════════════════════════════════════ */}
       <div>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1 mb-3">Statistikat e Shoferëve · kliko për detaje</h3>
-        <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollSnapType: 'x mandatory' }}>
+        <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollSnapType: 'x proximity', overscrollBehaviorX: 'contain' }}>
           {cols.map(({ driver, completed, active, waitMs, isBusy, ect, avgRating, happy, neutral, unhappy, total, pauseDurationMs }) => {
             const isNext = driver.id === bestId;
             return (
@@ -777,9 +810,9 @@ export default function DriversKPI() {
                 className="flex-shrink-0 w-72 rounded-2xl border flex flex-col overflow-hidden shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.99]"
                 style={{
                   scrollSnapAlign: 'start',
-                  borderColor: isNext ? 'hsl(var(--primary) / 0.6)' : driver.isPaused ? 'hsl(var(--border) / 0.25)' : 'hsl(var(--border) / 0.4)',
-                  background: isNext ? 'hsl(var(--primary) / 0.035)' : 'hsl(var(--card))',
-                  opacity: driver.isPaused ? 0.75 : 1,
+                  borderColor: driver.isMissing ? 'hsl(0 70% 60% / 0.25)' : isNext ? 'hsl(var(--primary) / 0.6)' : driver.isPaused ? 'hsl(var(--border) / 0.25)' : 'hsl(var(--border) / 0.4)',
+                  background: driver.isMissing ? 'hsl(0 70% 60% / 0.04)' : isNext ? 'hsl(var(--primary) / 0.035)' : 'hsl(var(--card))',
+                  opacity: driver.isMissing || driver.isPaused ? 0.7 : 1,
                 }}
                 onClick={() => setDetailDriverId(driver.id)}
               >
@@ -794,9 +827,10 @@ export default function DriversKPI() {
                       {driver.isActive
                         ? <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">Aktiv</span>
                         : <span className="text-[10px] font-bold text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">Jo aktiv</span>}
+                      {driver.isMissing && <span className="text-[10px] font-bold text-red-600 bg-red-500/10 px-1.5 py-0.5 rounded-full">🚫 Mungon</span>}
                       {driver.isPendingPause && <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><AlertCircle className="w-2.5 h-2.5" /> Kërkon pauzë</span>}
                       {driver.isPaused && <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Coffee className="w-2.5 h-2.5" /> Pauzë</span>}
-                      {isNext && <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Zap className="w-2.5 h-2.5" /> Tjetri</span>}
+                      {isNext && !driver.isMissing && <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Zap className="w-2.5 h-2.5" /> Tjetri</span>}
                     </div>
                   </div>
                   <div className="text-right shrink-0">

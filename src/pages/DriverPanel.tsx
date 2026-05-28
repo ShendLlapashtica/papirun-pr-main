@@ -14,6 +14,7 @@ import {
   updateDriver,
   setDriverPause,
   setDriverReturning,
+  setDriverMissing,
   requestDriverPause,
   driverShortCode,
   type DeliveryDriver,
@@ -511,6 +512,19 @@ const DriverPanel = () => {
     catch { setDriver((d) => d ? { ...d, isPaused: true } : d); toast.error('Gabim'); }
   };
 
+  const handleToggleMissing = async () => {
+    if (!driver) return;
+    const nowMissing = !driver.isMissing;
+    setDriver((d) => d ? { ...d, isMissing: nowMissing } : d);
+    try {
+      await setDriverMissing(driver.id, nowMissing);
+      toast.success(nowMissing ? '🚫 Shënuar si mungues' : '✅ Rikthyer në punë');
+    } catch {
+      setDriver((d) => d ? { ...d, isMissing: !nowMissing } : d);
+      toast.error('Gabim');
+    }
+  };
+
   const handlePinChange = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinError('');
@@ -669,6 +683,16 @@ const DriverPanel = () => {
                 </button>
               </>
             )}
+            <button
+              onClick={handleToggleMissing}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition-colors ${
+                driver.isMissing
+                  ? 'bg-red-500/15 text-red-600 ring-1 ring-red-500/30'
+                  : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+              }`}
+            >
+              🚫 {driver.isMissing ? 'Mungon' : 'MUNGON'}
+            </button>
             {(() => {
               const delivering = orders.some((o) => o.status === 'out_for_delivery');
               return (

@@ -11,6 +11,7 @@ export interface DeliveryDriver {
   isPaused: boolean;
   isPendingPause: boolean;   // requested pause, waiting for admin approval
   isReturning: boolean;      // completed all orders, returning to base (not yet disponueshëm)
+  isMissing: boolean;        // driver marked themselves absent for the day
   pausedAt: number | null;   // timestamp when pause started
   availableSince: number | null; // timestamp when became available (unpaused / app load)
   createdAt: string;
@@ -99,6 +100,7 @@ interface PauseEntry {
   paused: boolean;
   pendingApproval?: boolean;
   isReturning?: boolean;
+  isMissing?: boolean;
   pausedAt?: number;
   availableSince?: number;
 }
@@ -136,6 +138,7 @@ async function fetchPauseMap(): Promise<PauseMap> {
       paused: Boolean(v.paused),
       pendingApproval: Boolean(v.pendingApproval),
       isReturning: Boolean(v.isReturning),
+      isMissing: Boolean(v.isMissing),
       pausedAt: v.pausedAt ? Number(v.pausedAt) : undefined,
       availableSince: v.availableSince ? Number(v.availableSince) : undefined,
     };
@@ -158,6 +161,7 @@ const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 
     isPaused: Boolean(pause.paused),
     isPendingPause: Boolean(pause.pendingApproval),
     isReturning: Boolean(pause.isReturning),
+    isMissing: Boolean(pause.isMissing),
     pausedAt: pause.pausedAt ?? null,
     availableSince: pause.availableSince ?? null,
     createdAt: row.created_at,
@@ -266,6 +270,18 @@ export const setDriverReturning = async (id: string, val: boolean) => {
     .maybeSingle();
   const current: PauseEntry = data?.value_json ?? { paused: false };
   await _upsertPause(id, { ...current, isReturning: val });
+};
+
+/** Driver: toggle absent-for-the-day status */
+export const setDriverMissing = async (id: string, missing: boolean) => {
+  const client = supabase as any;
+  const { data } = await client
+    .from('storefront_settings')
+    .select('value_json')
+    .eq('key', `${PAUSE_PREFIX}${id}`)
+    .maybeSingle();
+  const current: PauseEntry = data?.value_json ?? { paused: false };
+  await _upsertPause(id, { ...current, isMissing: missing });
 };
 
 /** Admin: approve a pending pause request */
