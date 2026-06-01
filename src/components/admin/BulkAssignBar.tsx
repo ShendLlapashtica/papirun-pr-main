@@ -2,16 +2,17 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
 import { type OrderRecord } from '@/lib/ordersApi';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 
 interface Props {
   selectedIds: Set<string>;
   orders: OrderRecord[];
   drivers: DeliveryDriver[];
   onDone: () => void;
+  onSoftDelete?: () => void;
 }
 
-export default function BulkAssignBar({ selectedIds, orders, drivers, onDone }: Props) {
+export default function BulkAssignBar({ selectedIds, orders, drivers, onDone, onSoftDelete }: Props) {
   const [assigning, setAssigning] = useState(false);
 
   if (selectedIds.size === 0) return null;
@@ -60,6 +61,15 @@ export default function BulkAssignBar({ selectedIds, orders, drivers, onDone }: 
               </button>
             );
           })}
+          {onSoftDelete && (
+            <button
+              disabled={assigning}
+              onClick={onSoftDelete}
+              className="flex items-center gap-1 text-xs px-3 py-2 rounded-xl font-bold bg-destructive/15 text-destructive hover:bg-destructive/25 disabled:opacity-50 transition-colors shadow-sm ml-auto"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Fshi → Histori
+            </button>
+          )}
         </div>
       </div>
     </div>

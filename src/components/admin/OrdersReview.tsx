@@ -239,9 +239,11 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   const driversRef = useRef<DeliveryDriver[]>([]);
   const [assignTimes, setAssignTimes] = useState<Record<string, number>>({});
   const assignAlarmFiredRef = useRef<Set<string>>(new Set());
+  const lastArchiveDateRef = useRef('');
   const [massSelectMode, setMassSelectMode] = useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [showClientsMap, setShowClientsMap] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
@@ -307,6 +309,43 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
       if (!o || o.status !== 'approved') assignAlarmFiredRef.current.delete(id);
     }
   }, [orders, assignTimes, now]);
+
+  // Midnight auto-archive — orders from before today that are not pending go to history
+  useEffect(() => {
+    if (orders.length === 0) return;
+    const todayStr = new Date().toLocaleDateString();
+    if (lastArchiveDateRef.current === todayStr) return; // already ran today
+    lastArchiveDateRef.current = todayStr;
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const stale = orders.filter(
+      (o) =>
+        o.isVisible !== false &&
+        (o.status as string) !== 'histori' &&
+        o.status !== 'pending' &&
+        new Date(o.createdAt).getTime() < todayStart.getTime()
+    );
+    if (stale.length === 0) return;
+
+    setArchivedIds((prev) => {
+      const next = new Set(prev);
+      stale.forEach((o) => next.add(o.id));
+      saveArchive(next);
+      return next;
+    });
+    stale.forEach((o) => softDeleteOrder(o.id).catch(() => {}));
+
+    // Re-run at next midnight (reset guard so tomorrow's archive fires)
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setDate(nextMidnight.getDate() + 1);
+    nextMidnight.setHours(0, 0, 0, 0);
+    const t = setTimeout(() => { lastArchiveDateRef.current = ''; }, nextMidnight.getTime() - now.getTime());
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
 
   const archiveOrder = (id: string) => {
     setArchivedIds((prev) => {
@@ -525,6 +564,22 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
     } catch { toast.error('Gabim'); }
   };
 
+  const handleBulkSoftDelete = async () => {
+    const ids = Array.from(selectedOrderIds);
+    await Promise.all(ids.map((id) => softDeleteOrder(id).catch(() => {})));
+    setArchivedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      saveArchive(next);
+      return next;
+    });
+    if (ids.includes(selectedId ?? '')) setSelectedId(null);
+    toast.success(`${ids.length} porosi → Histori`);
+    setMassSelectMode(false);
+    setSelectedOrderIds(new Set());
+    setShowBulkDeleteConfirm(false);
+  };
+
   const handleEta = async (o: OrderRecord, minutes: number) => {
     try { await setOrderEta(o.id, minutes); toast.success(`ETA: ${minutes} min`); }
     catch { toast.error('Gabim'); }
@@ -608,6 +663,16 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk soft-delete confirm */}
+      {showBulkDeleteConfirm && (
+        <ConfirmDeleteDialog
+          title={`Fshi ${selectedOrderIds.size} porosi → Histori`}
+          description={`${selectedOrderIds.size} porosi të zgjedhura do të lëvizen në histori (mund të rikthehen). Ky veprim nuk fshi të dhënat përfundimisht.`}
+          onConfirm={handleBulkSoftDelete}
+          onCancel={() => setShowBulkDeleteConfirm(false)}
+        />
       )}
 
       {/* Confirm-delete dialog */}
@@ -890,6 +955,20 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
             }
           </p>
           <div className="flex items-center gap-2">
+            {massSelectMode && filtered.length > 0 && (
+              <button
+                onClick={() => {
+                  if (selectedOrderIds.size === filtered.length) {
+                    setSelectedOrderIds(new Set());
+                  } else {
+                    setSelectedOrderIds(new Set(filtered.map((o) => o.id)));
+                  }
+                }}
+                className="text-[11px] font-bold text-primary hover:underline"
+              >
+                {selectedOrderIds.size === filtered.length ? 'Hiq të gjitha' : 'Zgjidhni të gjitha'}
+              </button>
+            )}
             {(statusFilter === 'approved' || statusFilter === 'pending' || statusFilter === 'active') && (
               <button
                 onClick={() => { setMassSelectMode((v) => !v); setSelectedOrderIds(new Set()); }}
@@ -1747,6 +1826,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
           orders={orders}
           drivers={drivers}
           onDone={() => { setMassSelectMode(false); setSelectedOrderIds(new Set()); }}
+          onSoftDelete={() => setShowBulkDeleteConfirm(true)}
         />
       )}
     </div>
