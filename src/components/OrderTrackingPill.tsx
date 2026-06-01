@@ -274,11 +274,11 @@ const OrderTrackingPill = () => {
     if (prev === 'pending' && order?.status === 'approved') {
       haptic('success');
       setOpen(true);
-      if (wasOnCart) navigate('/', { replace: true });
+      if (wasOnCart) navigate('/home', { replace: true });
     } else if (prev === 'pending' && order?.status === 'rejected') {
       haptic('error');
       setOpen(true);
-      if (wasOnCart) navigate('/', { replace: true });
+      if (wasOnCart) navigate('/home', { replace: true });
     }
   }, [order?.status]);
 
@@ -681,19 +681,16 @@ const OrderTrackingPill = () => {
               order.deliveryLat != null &&
               order.deliveryLng != null && (
                 <div className="border-b border-border/30">
-                  {/* Driver assigned banner */}
+                  {/* Driver ETA banner */}
                   {driverInfo && (
-                    <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/30 flex items-center gap-2 text-xs">
-                      <span style={{ fontSize: '15px' }}>🏍️</span>
-                      <span className="font-bold" style={{ color: driverInfo.color }}>
-                        Shoferi {driverInfo.code}
-                      </span>
-                      <span className="text-muted-foreground">është caktuar për porosinë tuaj</span>
-                      {etaMinutes !== null && (
-                        <span className="ml-auto font-bold" style={{ color: driverInfo.color }}>
-                          ~{etaMinutes} min
-                        </span>
-                      )}
+                    <div className="px-4 py-2.5 bg-primary/8 border-b border-primary/15 flex items-start gap-2 text-xs">
+                      <span style={{ fontSize: '15px', lineHeight: 1 }}>🏍️</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-foreground leading-snug">
+                          Shoferi yt{etaMinutes !== null ? ` është ~${etaMinutes} minuta larg teje` : ' është në rrugë'}.
+                        </p>
+                        <p className="text-muted-foreground mt-0.5">Ju lutem jini në dispozicion për dërgesen!</p>
+                      </div>
                     </div>
                   )}
                   <CustomerDriverMap
@@ -704,6 +701,7 @@ const OrderTrackingPill = () => {
                     etaMinutes={etaMinutes}
                     driverCode={driverInfo?.code}
                     driverColor={driverInfo?.color}
+                    allowFullscreen
                     onRouteLoaded={(durationSec) =>
                       setEtaMinutes(Math.max(1, Math.ceil((durationSec / 60) * 1.2)))
                     }

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, haversineKm, RESTAURANT_COORDS, subscribeAllDriverStates, type DeliveryDriver } from '@/lib/driversApi';
 import { fetchAllOrders, hardDeleteAllOrders, type OrderRecord } from '@/lib/ordersApi';
 import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle, Trash2, Loader2, Phone } from 'lucide-react';
+import DriverLocationMap from '@/components/DriverLocationMap';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, CartesianGrid,
@@ -664,6 +665,8 @@ export default function DriversKPI() {
 
   // ── render ───────────────────────────────────────────────────────────────────
 
+  const activeWithGps = cols.filter((c) => !c.driver.isMissing && c.driver.lat != null && c.driver.lng != null);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 px-1">
@@ -701,6 +704,26 @@ export default function DriversKPI() {
           )}
         </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          LIVE MAP — all active motorcycles with names
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {activeWithGps.length > 0 && (
+        <div className="rounded-2xl border border-border/40 overflow-hidden shadow-sm">
+          <div className="px-4 py-2.5 bg-secondary/30 border-b border-border/30 flex items-center gap-2">
+            <span className="text-base leading-none">🏍️</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              Pozicionet live · {activeWithGps.length} shofer
+            </span>
+          </div>
+          <DriverLocationMap
+            drivers={activeWithGps.map((c) => c.driver)}
+            height="280px"
+            showRestaurant
+            allowFullscreen
+          />
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════════════
           RRADHITJA — top, largest, most prominent

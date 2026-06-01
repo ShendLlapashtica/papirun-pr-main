@@ -24,6 +24,7 @@ import { generateInvoice } from '@/lib/invoiceGenerator';
 import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllDriverLocations, driverShortCode, haversineKm, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import DriverLocationMap from '@/components/DriverLocationMap';
+import CustomerDriverMap from '@/components/CustomerDriverMap';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
 
 const statusColor = (s: string) => {
@@ -1245,6 +1246,29 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                         />
                       )}
 
+                      {/* Driver→Destination map (user-facing view) */}
+                      {selected.assignedDriverId && selected.deliveryLat != null && selected.deliveryLng != null && (() => {
+                        const drv = drivers.find((d) => d.id === selected.assignedDriverId);
+                        if (!drv || drv.lat == null || drv.lng == null) return null;
+                        return (
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground flex items-center gap-1">
+                              <Bike className="w-3 h-3" /> Harta e shoferit · pamja e klientit
+                            </p>
+                            <CustomerDriverMap
+                              driverLat={drv.lat}
+                              driverLng={drv.lng}
+                              customerLat={selected.deliveryLat}
+                              customerLng={selected.deliveryLng}
+                              etaMinutes={null}
+                              driverCode={driverShortCode(drv)}
+                              driverColor={drv.color || '#3b82f6'}
+                              allowFullscreen
+                            />
+                          </div>
+                        );
+                      })()}
+
                       {selected.notes && (
                         <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 dark:border-amber-500/30 rounded-xl px-3 py-2">
                           <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">Shënim klienti</p>
@@ -1490,6 +1514,29 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                   customerLabel={selected.customerName}
                 />
               )}
+
+              {/* Driver→Destination map (user-facing view) */}
+              {selected.assignedDriverId && selected.deliveryLat != null && selected.deliveryLng != null && (() => {
+                const drv = drivers.find((d) => d.id === selected.assignedDriverId);
+                if (!drv || drv.lat == null || drv.lng == null) return null;
+                return (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground flex items-center gap-1">
+                      <Bike className="w-3 h-3" /> Harta e shoferit · pamja e klientit
+                    </p>
+                    <CustomerDriverMap
+                      driverLat={drv.lat}
+                      driverLng={drv.lng}
+                      customerLat={selected.deliveryLat}
+                      customerLng={selected.deliveryLng}
+                      etaMinutes={null}
+                      driverCode={driverShortCode(drv)}
+                      driverColor={drv.color || '#3b82f6'}
+                      allowFullscreen
+                    />
+                  </div>
+                );
+              })()}
 
               {selected.notes && (
                 <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 dark:border-amber-500/30 rounded-xl px-3 py-2">
