@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, Component, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map } from 'lucide-react';
+import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchDrivers, createDriver, updateDriver, deleteDriver, ensureRealDrivers, subscribeAllDriverLocations, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
 import DriverLocationMap from '@/components/DriverLocationMap';
@@ -458,6 +458,7 @@ const Admin = () => {
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [error, setError] = useState('');
+  const [loginChecking, setLoginChecking] = useState(false);
   const [items, setItems] = useState<MenuItem[]>(initialMenuItems);
   const [menuExtras, setMenuExtras] = useState<MenuExtra[]>(defaultMenuExtras);
   const [editingItem, setEditingItem] = useState<string | null>(null);
@@ -480,6 +481,14 @@ const Admin = () => {
   const [deletingOfferImageKey, setDeletingOfferImageKey] = useState<string | null>(null);
   const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(null);
   const [confirmDeleteOfferId, setConfirmDeleteOfferId] = useState<string | null>(null);
+
+  // Change-password modal
+  const [showChangePw, setShowChangePw] = useState(false);
+  const [changePwCurrent, setChangePwCurrent] = useState('');
+  const [changePwNew, setChangePwNew] = useState('');
+  const [changePwConfirm, setChangePwConfirm] = useState('');
+  const [changePwError, setChangePwError] = useState('');
+  const [changePwLoading, setChangePwLoading] = useState(false);
 
   // Harta tab — live driver list
   const [hartaDrivers, setHartaDrivers] = useState<DeliveryDriver[]>([]);
@@ -566,16 +575,63 @@ const Admin = () => {
     };
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const key = adminUsername.trim().toLowerCase();
     const match = ADMIN_CREDENTIALS[key];
-    if (match && adminPassword === match.password) {
-      setProfile(match.profile);
-      try { localStorage.setItem(ADMIN_AUTH_KEY, match.profile); } catch {}
-      setError('');
-    } else {
-      setError('Username ose fjalëkalim i gabuar');
+    if (!match) { setError('Username ose fjalëkalim i gabuar'); return; }
+
+    setLoginChecking(true);
+    try {
+      const dbPw = await fetchStorefrontSetting<string | null>(`admin_pw_${key}`, null);
+      const effectivePw = dbPw ?? match.password;
+      if (adminPassword === effectivePw) {
+        setProfile(match.profile);
+        try { localStorage.setItem(ADMIN_AUTH_KEY, match.profile); } catch {}
+        setError('');
+      } else {
+        setError('Username ose fjalëkalim i gabuar');
+      }
+    } catch {
+      // DB unreachable — fall back to hardcoded
+      if (adminPassword === match.password) {
+        setProfile(match.profile);
+        try { localStorage.setItem(ADMIN_AUTH_KEY, match.profile); } catch {}
+        setError('');
+      } else {
+        setError('Username ose fjalëkalim i gabuar');
+      }
+    } finally {
+      setLoginChecking(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!profile) return;
+    if (!changePwNew || changePwNew.length < 6) {
+      setChangePwError('Fjalëkalimi duhet të jetë të paktën 6 karaktere');
+      return;
+    }
+    if (changePwNew !== changePwConfirm) {
+      setChangePwError('Fjalëkalimet e reja nuk përputhen');
+      return;
+    }
+    setChangePwLoading(true);
+    try {
+      const dbPw = await fetchStorefrontSetting<string | null>(`admin_pw_${profile}`, null);
+      const effectivePw = dbPw ?? (ADMIN_CREDENTIALS[profile]?.password ?? '');
+      if (changePwCurrent !== effectivePw) {
+        setChangePwError('Fjalëkalimi aktual është i gabuar');
+        return;
+      }
+      await upsertStorefrontSetting(`admin_pw_${profile}`, changePwNew);
+      setShowChangePw(false);
+      setChangePwCurrent(''); setChangePwNew(''); setChangePwConfirm(''); setChangePwError('');
+      toast.success('Fjalëkalimi u ndryshua');
+    } catch {
+      setChangePwError('Gabim gjatë ruajtjes, provo përsëri');
+    } finally {
+      setChangePwLoading(false);
     }
   };
 
@@ -896,8 +952,8 @@ const Admin = () => {
               />
               {error && <p className="text-destructive text-xs mt-1">{error}</p>}
             </div>
-            <button type="submit" className="btn-sage w-full">
-              {language === 'sq' ? 'Hyr' : 'Login'}
+            <button type="submit" disabled={loginChecking} className="btn-sage w-full disabled:opacity-50">
+              {loginChecking ? 'Duke u kyçur...' : (language === 'sq' ? 'Hyr' : 'Login')}
             </button>
           </form>
         </div>
@@ -931,18 +987,75 @@ const Admin = () => {
               <p className="text-xs text-muted-foreground capitalize">{profile ?? 'Dashboard'}</p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              setProfile(null);
-              try { localStorage.removeItem(ADMIN_AUTH_KEY); } catch {}
-            }}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
-          >
-            <LogOut className="w-4 h-4" />
-            {language === 'sq' ? 'Dil' : 'Logout'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setShowChangePw(true); setChangePwError(''); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
+              title="Ndrysho Fjalëkalimin"
+            >
+              <KeyRound className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                setProfile(null);
+                try { localStorage.removeItem(ADMIN_AUTH_KEY); } catch {}
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
+            >
+              <LogOut className="w-4 h-4" />
+              {language === 'sq' ? 'Dil' : 'Logout'}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      {showChangePw && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-background rounded-2xl shadow-xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display font-bold text-lg">Ndrysho Fjalëkalimin</h2>
+              <button onClick={() => { setShowChangePw(false); setChangePwCurrent(''); setChangePwNew(''); setChangePwConfirm(''); setChangePwError(''); }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="password"
+                value={changePwCurrent}
+                onChange={(e) => setChangePwCurrent(e.target.value)}
+                placeholder="Fjalëkalimi aktual"
+                autoComplete="current-password"
+                className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+              <input
+                type="password"
+                value={changePwNew}
+                onChange={(e) => setChangePwNew(e.target.value)}
+                placeholder="Fjalëkalimi i ri (min. 6 karaktere)"
+                autoComplete="new-password"
+                className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+              <input
+                type="password"
+                value={changePwConfirm}
+                onChange={(e) => setChangePwConfirm(e.target.value)}
+                placeholder="Konfirmo fjalëkalimin e ri"
+                autoComplete="new-password"
+                className="w-full px-4 py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+              {changePwError && <p className="text-destructive text-xs">{changePwError}</p>}
+            </div>
+            <button
+              onClick={handleChangePassword}
+              disabled={changePwLoading}
+              className="btn-sage w-full disabled:opacity-50"
+            >
+              {changePwLoading ? 'Duke ruajtur...' : 'Ruaj Fjalëkalimin'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="container mx-auto px-4 py-6">
         {/* Main tabs (big navbar) */}
