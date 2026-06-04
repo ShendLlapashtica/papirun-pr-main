@@ -8,6 +8,7 @@ import {
   subscribeOrderMessages,
   deleteOrderMessages,
   broadcastTyping,
+  initTypingHub,
   type OrderMessage,
   type MessageSender,
 } from '@/lib/orderMessagesApi';
@@ -46,6 +47,9 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
   const [showReplies, setShowReplies] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Pre-warm hub so first keystroke is instant, not dropped
+  useEffect(() => { initTypingHub(); }, []);
 
   useEffect(() => {
     let active = true;

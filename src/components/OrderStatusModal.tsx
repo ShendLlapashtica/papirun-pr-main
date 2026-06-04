@@ -209,7 +209,7 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
             </button>
           )}
 
-          {status === 'completed' && order?.assignedDriverId && !ratingSubmitted && !thankYouVisible && (
+          {status === 'completed' && !ratingSubmitted && !thankYouVisible && (
             <div className="bg-secondary/30 p-4 rounded-xl border border-border/50">
               <p className="text-xs font-semibold text-center mb-3">{language === 'sq' ? 'Si ishte dërgesa?' : 'How was the delivery?'}</p>
               <div className="mb-3">

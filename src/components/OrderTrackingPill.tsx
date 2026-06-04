@@ -208,7 +208,7 @@ const OrderTrackingPill = () => {
   // Trigger rating form when order completes and has a driver
   useEffect(() => {
     if (!order) return;
-    if (order.status === 'completed' && order.assignedDriverId && !ratingTriggeredRef.current) {
+    if (order.status === 'completed' && !ratingTriggeredRef.current) {
       const alreadyRated = localStorage.getItem(`papirun_rated_${order.id}`);
       if (!alreadyRated) {
         ratingTriggeredRef.current = true;

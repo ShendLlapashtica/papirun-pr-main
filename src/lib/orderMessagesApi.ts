@@ -140,11 +140,16 @@ export const subscribeOrderMessages = (
 };
 
 // ── Typing presence hub ────────────────────────────────────────────────────────
-// One persistent Supabase broadcast channel for ALL order typing events.
-// selfBroadcast:true so admin typing in OrderChat also reflects back to the
-// order-card list in the same session (staff typing banner).
+// Single persistent broadcast channel. selfBroadcast:true lets the admin see
+// their own typing reflected in the order-card list.
+// Sends are queued until SUBSCRIBED so the first keystroke is never dropped.
 let _typingHub: any = null;
+let _typingHubReady = false;
+const _pendingSends: Array<{ orderId: string; role: 'user' | 'admin' }> = [];
 const _typingHandlers = new Map<string, Set<(role: 'user' | 'admin') => void>>();
+
+const _hubSend = (orderId: string, role: 'user' | 'admin') =>
+  _typingHub?.send({ type: 'broadcast', event: 'typing', payload: { orderId, role } });
 
 const ensureTypingHub = (): any => {
   if (_typingHub) return _typingHub;
@@ -156,19 +161,33 @@ const ensureTypingHub = (): any => {
         if (!orderId || (role !== 'user' && role !== 'admin')) return;
         _typingHandlers.get(orderId)?.forEach((h) => h(role as 'user' | 'admin'));
       })
-      .subscribe();
-  } catch {
-    _typingHub = null;
-  }
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          _typingHubReady = true;
+          _pendingSends.splice(0).forEach(({ orderId, role }) => _hubSend(orderId, role));
+        }
+      });
+  } catch { _typingHub = null; }
   return _typingHub;
 };
 
-// Instant — hub is already subscribed, no per-call subscribe latency
+// Pre-warm the hub (call on component mount so hub is ready before first keystroke)
+export const initTypingHub = (): void => { ensureTypingHub(); };
+
+// Queue if hub not yet SUBSCRIBED — the flush above delivers it
 export const broadcastTyping = (orderId: string, role: 'user' | 'admin'): void => {
-  ensureTypingHub()?.send({ type: 'broadcast', event: 'typing', payload: { orderId, role } });
+  ensureTypingHub();
+  if (_typingHubReady) {
+    _hubSend(orderId, role);
+  } else {
+    // Keep only latest per orderId to avoid stale queue build-up
+    const i = _pendingSends.findIndex((p) => p.orderId === orderId);
+    if (i >= 0) _pendingSends[i] = { orderId, role };
+    else _pendingSends.push({ orderId, role });
+  }
 };
 
-// Returns unsubscribe; uses local JS routing (no new WebSocket channel per order)
+// Returns unsubscribe — uses local JS handler routing, zero extra WS channels
 export const subscribeOrderTyping = (
   orderId: string,
   onTyping: (role: 'user' | 'admin') => void,
