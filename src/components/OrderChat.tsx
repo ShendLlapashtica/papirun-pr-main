@@ -7,6 +7,7 @@ import {
   sendOrderMessage,
   subscribeOrderMessages,
   deleteOrderMessages,
+  broadcastTyping,
   type OrderMessage,
   type MessageSender,
 } from '@/lib/orderMessagesApi';
@@ -44,6 +45,7 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const [showReplies, setShowReplies] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const typingCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -303,7 +305,13 @@ const OrderChat = ({ orderId, viewerSide, disabled, maxHeightClass = 'max-h-64',
             <input
               type="text"
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                if (!typingCooldownRef.current) {
+                  broadcastTyping(orderId, viewerSide === 'user' ? 'user' : 'admin');
+                  typingCooldownRef.current = setTimeout(() => { typingCooldownRef.current = null; }, 3000);
+                }
+              }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               placeholder={placeholder}
               className="flex-1 bg-secondary rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"

@@ -25,7 +25,8 @@ import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllD
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import CustomerDriverMap from '@/components/CustomerDriverMap';
-import { sendOrderMessage } from '@/lib/orderMessagesApi';
+import { sendOrderMessage, subscribeOrderTyping } from '@/lib/orderMessagesApi';
+import { getOptimizedImage } from '@/lib/utils';
 
 const statusColor = (s: string) => {
   if (s === 'pending') return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30 animate-pulse';
@@ -100,6 +101,7 @@ interface GroupedOrderItem {
   id: string;
   name?: { sq: string; en: string };
   category?: string;
+  image?: string;
   totalQty: number;
   modifiedItems: Array<{
     qty: number;
@@ -112,7 +114,7 @@ function groupOrderItems(items: any[]): GroupedOrderItem[] {
   const map = new Map<string, GroupedOrderItem>();
   for (const it of items) {
     if (!map.has(it.id)) {
-      map.set(it.id, { id: it.id, name: it.name, category: it.category, totalQty: 0, modifiedItems: [] });
+      map.set(it.id, { id: it.id, name: it.name, category: it.category, image: it.image, totalQty: 0, modifiedItems: [] });
     }
     const entry = map.get(it.id)!;
     entry.totalQty += it.quantity ?? 1;
@@ -137,30 +139,36 @@ const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(
         <CopyButton text={listText} size="md" />
       </div>
       {grouped.map((g) => (
-        <div key={g.id}>
-          <div className="text-sm flex items-center gap-1 flex-wrap">
-            <span className="font-medium">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
-            {g.category && (
-              <span className="text-[11px] font-normal text-muted-foreground">
-                ({CATEGORY_LABEL[g.category] ?? g.category})
-              </span>
-            )}
-          </div>
-          {g.modifiedItems.map((m, mi) => (
-            <div key={mi} className="pl-4 mt-0.5 text-xs flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-              <span className="text-muted-foreground shrink-0">↳ {m.qty}x</span>
-              {m.removed.map((r, ri) => (
-                <span key={`r${ri}`} className="px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-semibold text-[10px] border border-red-500/20">
-                  Pa {r}
+        <div key={g.id} className="flex items-start gap-2">
+          {g.image
+            ? <img src={getOptimizedImage(g.image)} alt="" className="w-7 h-7 rounded-md object-cover shrink-0 mt-0.5 ring-1 ring-border/50" />
+            : <div className="w-7 h-7 rounded-md bg-secondary shrink-0 mt-0.5 ring-1 ring-border/30" />
+          }
+          <div className="flex-1 min-w-0">
+            <div className="text-sm flex items-center gap-1 flex-wrap">
+              <span className="font-medium">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
+              {g.category && (
+                <span className="text-[11px] font-normal text-muted-foreground">
+                  ({CATEGORY_LABEL[g.category] ?? g.category})
                 </span>
-              ))}
-              {m.extras.map((ex, ei) => (
-                <span key={`e${ei}`} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] border border-emerald-500/20">
-                  + {ex.name?.sq || ex.name?.en}
-                </span>
-              ))}
+              )}
             </div>
-          ))}
+            {g.modifiedItems.map((m, mi) => (
+              <div key={mi} className="mt-0.5 text-xs flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <span className="text-muted-foreground shrink-0">↳ {m.qty}x</span>
+                {m.removed.map((r, ri) => (
+                  <span key={`r${ri}`} className="px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-semibold text-[10px] border border-red-500/20">
+                    Pa {r}
+                  </span>
+                ))}
+                {m.extras.map((ex, ei) => (
+                  <span key={`e${ei}`} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] border border-emerald-500/20">
+                    + {ex.name?.sq || ex.name?.en}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       ))}
       <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
@@ -375,6 +383,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [showClientsMap, setShowClientsMap] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [typingMap, setTypingMap] = useState<Record<string, { client?: number; staff?: number }>>({});
 
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
@@ -638,6 +647,33 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
   }, [timeFiltered, statusFilter, archivedIds, priorityIds, searchQuery, caglOnly, locationFilter]);
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
+
+  // Subscribe to typing presence for all currently visible orders
+  const filteredIdKey = filtered.map((o) => o.id).join(',');
+  useEffect(() => {
+    const unsubs = filtered.map((o) =>
+      subscribeOrderTyping(o.id, (role) => {
+        setTypingMap((prev) => ({
+          ...prev,
+          [o.id]: { ...prev[o.id], ...(role === 'user' ? { client: Date.now() } : { staff: Date.now() }) },
+        }));
+      })
+    );
+    const tick = setInterval(() => {
+      setTypingMap((prev) => {
+        const now = Date.now();
+        const next = { ...prev };
+        for (const id of Object.keys(next)) {
+          if (next[id].client && now - next[id].client! > 3000) delete next[id].client;
+          if (next[id].staff && now - next[id].staff! > 3000) delete next[id].staff;
+          if (!next[id].client && !next[id].staff) delete next[id];
+        }
+        return next;
+      });
+    }, 1000);
+    return () => { unsubs.forEach((u) => u()); clearInterval(tick); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredIdKey]);
 
   const handleStatus = async (id: string, status: OrderStatus) => {
     try {
@@ -1157,6 +1193,9 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
             const ageMs = now - new Date(o.createdAt).getTime();
             const isOverdue = isPending && ageMs > 60_000;
             const isCagl = isCagllavice(o);
+            const clientTyping = !!(typingMap[o.id]?.client);
+            const staffTyping = !!(typingMap[o.id]?.staff);
+            const hasNote = !!(o.notes?.trim());
             return (
               <React.Fragment key={o.id}>
               <motion.div
@@ -1203,7 +1242,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                     {isMassSelected && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
                   </div>
                 )}
-                <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+                <div className="absolute top-2 right-2 z-10 flex items-center gap-3">
                   <button
                     onClick={(e) => { e.stopPropagation(); togglePriority(o.id); }}
                     className={`w-7 h-7 rounded-full flex items-center justify-center transition-all active:scale-90 ${
@@ -1265,49 +1304,113 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                   onClick={() => setSelectedId(o.id)}
                   className="w-full text-left space-y-2"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="font-semibold text-sm truncate">{o.customerName || 'Anonim'}</h3>
-                        <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                          {o.source === 'app' ? <><Smartphone className="w-2.5 h-2.5" /> App</> : <><Globe className="w-2.5 h-2.5" /> Web</>}
+                  {/* ── Row 1: Header ── */}
+                  <div className="flex items-center justify-between gap-2 pr-16">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <h3 className="font-semibold text-sm truncate">{o.customerName || 'Anonim'}</h3>
+                      <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground shrink-0">
+                        {o.source === 'app' ? <><Smartphone className="w-2.5 h-2.5" /> App</> : <><Globe className="w-2.5 h-2.5" /> Web</>}
+                      </span>
+                      {isCagl && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold border border-blue-400/30 shrink-0">
+                          C Çagllavicë
                         </span>
-                        {isCagl && (
-                          <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold border border-blue-400/30">
-                            C Çagllavicë
-                          </span>
-                        )}
-                        {isArchived && (
-                          <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-foreground/10 text-muted-foreground font-semibold uppercase tracking-wider">
-                            E fshirë
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Phone className="w-3 h-3" /> {o.customerPhone}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{new Date(o.createdAt).toLocaleString()}</p>
+                      )}
+                      {isArchived && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-foreground/10 text-muted-foreground font-semibold uppercase tracking-wider shrink-0">
+                          E fshirë
+                        </span>
+                      )}
                     </div>
-                    <span className={`text-[10px] px-2 py-1 rounded-full font-medium whitespace-nowrap ${statusColor(o.status)}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0 ${statusColor(o.status)}`}>
                       {STATUS_LABEL[o.status] ?? o.status}
                     </span>
                   </div>
 
-                  <div className="text-xs text-muted-foreground flex items-center justify-between gap-2">
-                    <span className="truncate flex-1 inline-flex items-center gap-1">
-                      <MapPin className="w-3 h-3 shrink-0 opacity-70" />
-                      {o.deliveryAddress}
+                  {/* ── Banner A: Client typing (blue) ── */}
+                  {clientTyping && (
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-blue-500/8 border border-blue-400/20 text-blue-700 dark:text-blue-300 text-[11px] font-medium">
+                      <span className="w-5 h-5 rounded-md bg-blue-500/15 flex items-center justify-center shrink-0">💬</span>
+                      <span>Klienti po shkruan</span>
+                      <span className="flex gap-0.5 ml-0.5">
+                        {[0, 1, 2].map((i) => (
+                          <span key={i} className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                        ))}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* ── Banner: Customer note (amber) ── */}
+                  {hasNote && (
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-amber-500/8 border border-amber-400/20 text-amber-800 dark:text-amber-200 text-[11px] font-medium">
+                      <span className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center shrink-0">📋</span>
+                      <span className="truncate italic">{o.notes}</span>
+                    </div>
+                  )}
+
+                  {/* ── Row 2: Phone + Time ── */}
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Phone className="w-3 h-3 opacity-60 shrink-0" />
+                      {o.customerPhone}
                     </span>
-                    <span className="text-primary font-semibold shrink-0">€{o.total.toFixed(2)}</span>
+                    <span className="opacity-40">·</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 opacity-60 shrink-0" />
+                      {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
 
+                  {/* ── Row 3: Address ── */}
+                  <div className="flex items-start gap-1 text-[11px] text-muted-foreground">
+                    <MapPin className="w-3 h-3 shrink-0 mt-0.5 opacity-60" />
+                    <span className="truncate">{o.deliveryAddress}</span>
+                  </div>
+
+                  {/* ── Porosia box ── */}
+                  <div className="bg-secondary/30 rounded-xl p-2.5 space-y-1.5 border border-border/30">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-0.5">Porosia</p>
+                    {groupOrderItems(o.items).map((g) => (
+                      <div key={g.id} className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          {g.image
+                            ? <img src={getOptimizedImage(g.image)} alt="" className="w-6 h-6 rounded object-cover shrink-0 ring-1 ring-border/40" />
+                            : <div className="w-6 h-6 rounded bg-muted shrink-0 ring-1 ring-border/30" />
+                          }
+                          <span className="text-xs font-medium">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
+                          {g.category && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">({CATEGORY_LABEL[g.category] ?? g.category})</span>
+                          )}
+                        </div>
+                        {g.modifiedItems.map((m, mi) => (
+                          <div key={mi} className="pl-8 flex flex-wrap gap-1">
+                            {m.removed.map((r, ri) => (
+                              <span key={`r${ri}`} className="px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-semibold border border-red-500/20">
+                                Pa {r}
+                              </span>
+                            ))}
+                            {m.extras.map((ex, ei) => (
+                              <span key={`e${ei}`} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-semibold border border-emerald-500/20">
+                                + {ex.name?.sq || ex.name?.en}
+                              </span>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    <div className="flex justify-end pt-1.5 border-t border-border/30 mt-0.5">
+                      <span className="text-primary font-bold text-sm">€{o.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* ── Driver row ── */}
                   {(() => {
                     const drv = o.assignedDriverId ? drivers.find((d) => d.id === o.assignedDriverId) : null;
                     if (!drv) return null;
                     const assignedMs = assignTimes[o.id];
                     const isLate = o.status === 'approved' && assignedMs && (now - assignedMs) > 60_000;
                     return (
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="flex items-center gap-1.5">
                         <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: drv.color || '#6b7280' }} />
                         <span className="text-[10px] font-bold" style={{ color: drv.color || undefined }}>
                           {driverShortCode(drv)}
@@ -1329,9 +1432,9 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                     );
                   })()}
 
-                  {/* Inline driver assign — shown on approved cards without a driver */}
+                  {/* ── Inline driver assign — approved, no driver ── */}
                   {o.status === 'approved' && !o.assignedDriverId && drivers.length > 0 && (
-                    <div className="flex items-center gap-1 flex-wrap mt-1.5 pt-1.5 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1 flex-wrap pt-1.5 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
                       <span className="text-[10px] text-muted-foreground font-medium shrink-0">Cakto →</span>
                       {drivers.filter((d) => d.isActive).map((d) => {
                         const emoji = d.isReturning ? '🏁' : d.isPaused ? '☕' : '✅';
@@ -1351,6 +1454,19 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                           </button>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {/* ── Banner B: Staff typing (amber) ── */}
+                  {staffTyping && (
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-amber-500/8 border border-amber-400/20 text-amber-800 dark:text-amber-200 text-[11px] font-medium">
+                      <span className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center shrink-0">🧑‍💼</span>
+                      <span>Stafi po shkruan</span>
+                      <span className="flex gap-0.5 ml-0.5">
+                        {[0, 1, 2].map((i) => (
+                          <span key={i} className="w-1 h-1 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                        ))}
+                      </span>
                     </div>
                   )}
                 </button>

@@ -138,3 +138,26 @@ export const subscribeOrderMessages = (
     supabase.removeChannel(channel);
   };
 };
+
+export const broadcastTyping = (orderId: string, role: 'user' | 'admin'): void => {
+  const ch = (supabase as any).channel(`typing-${orderId}-${Date.now()}`);
+  ch.subscribe((status: string) => {
+    if (status === 'SUBSCRIBED') {
+      ch.send({ type: 'broadcast', event: 'typing', payload: { role } });
+    }
+  });
+  setTimeout(() => (supabase as any).removeChannel(ch), 2000);
+};
+
+export const subscribeOrderTyping = (
+  orderId: string,
+  onTyping: (role: 'user' | 'admin') => void,
+): (() => void) => {
+  const ch = (supabase as any)
+    .channel(`typing-${orderId}-sub-${Date.now()}`)
+    .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { role: string } }) => {
+      if (payload?.role === 'user' || payload?.role === 'admin') onTyping(payload.role as 'user' | 'admin');
+    })
+    .subscribe();
+  return () => (supabase as any).removeChannel(ch);
+};
