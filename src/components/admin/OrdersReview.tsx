@@ -385,6 +385,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
   const [showClientsMap, setShowClientsMap] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [typingMap, setTypingMap] = useState<Record<string, { client?: number; staff?: number }>>({});
+  const [newMsgMap, setNewMsgMap] = useState<Record<string, number>>({});
 
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
@@ -684,10 +685,24 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredIdKey]);
 
+  // Clear unread badge when admin opens the order
   useEffect(() => {
-    const count = Object.keys(typingMap).length;
-    onTypingCount?.(count);
-  }, [typingMap, onTypingCount]);
+    if (selectedId) {
+      setNewMsgMap((prev) => {
+        if (!prev[selectedId]) return prev;
+        const next = { ...prev };
+        delete next[selectedId];
+        return next;
+      });
+    }
+  }, [selectedId]);
+
+  // Bell badge = unread messages + active typing orders
+  useEffect(() => {
+    const msgCount = Object.values(newMsgMap).reduce((s, v) => s + v, 0);
+    const typCount = Object.keys(typingMap).length;
+    onTypingCount?.(msgCount + typCount);
+  }, [newMsgMap, typingMap, onTypingCount]);
 
   // Global new-message SFX — play when a client/driver message arrives for any visible order
   const ordersRef = React.useRef(orders);
@@ -699,6 +714,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
         const { sender, order_id } = payload.new ?? {};
         if ((sender === 'user' || sender === 'driver') && ordersRef.current.some((o) => o.id === order_id)) {
           playMessageChime();
+          setNewMsgMap((prev) => ({ ...prev, [order_id]: (prev[order_id] ?? 0) + 1 }));
         }
       })
       .subscribe();
@@ -1213,30 +1229,46 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
         )}
 
         {/* ── Global typing strip — tap a name to jump to that card ── */}
-        {Object.keys(typingMap).length > 0 && (() => {
+        {(() => {
           const now3 = Date.now();
           const active = filtered.filter((o) => {
             const ca = typingMap[o.id]?.client;
             const sa = typingMap[o.id]?.staff;
-            return (ca && now3 - ca < 3000) || (sa && now3 - sa < 3000);
+            return (ca && now3 - ca < 3000) || (sa && now3 - sa < 3000) || (newMsgMap[o.id] ?? 0) > 0;
           });
           if (active.length === 0) return null;
+          const hasAnyTyping = active.some((o) => {
+            const ca = typingMap[o.id]?.client;
+            const sa = typingMap[o.id]?.staff;
+            return (ca && now3 - ca < 3000) || (sa && now3 - sa < 3000);
+          });
           return (
             <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-violet-500/10 border border-violet-400/25">
-              <span className="flex gap-[3px] shrink-0">
-                {[0, 1, 2].map((i) => (
-                  <span key={i} className="w-[5px] h-[5px] rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: `${i * 0.18}s` }} />
-                ))}
+              {hasAnyTyping ? (
+                <span className="flex gap-[3px] shrink-0">
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className="w-[5px] h-[5px] rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: `${i * 0.18}s` }} />
+                  ))}
+                </span>
+              ) : (
+                <span className="w-[5px] h-[5px] rounded-full bg-violet-500 shrink-0" />
+              )}
+              <span className="text-[10px] font-bold text-violet-600 dark:text-violet-300 shrink-0 uppercase tracking-wide">
+                {hasAnyTyping ? 'Po shkruajnë' : 'Mesazhe të reja'}
               </span>
-              <span className="text-[10px] font-bold text-violet-600 dark:text-violet-300 shrink-0 uppercase tracking-wide">Po shkruajnë</span>
               <div className="flex items-center gap-1.5 flex-wrap flex-1">
                 {active.map((o) => (
                   <button
                     key={o.id}
                     onClick={() => { setSelectedId(o.id); setStatusFilter('active'); }}
-                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 hover:bg-violet-500/25 text-violet-700 dark:text-violet-300 transition-colors"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 hover:bg-violet-500/25 text-violet-700 dark:text-violet-300 transition-colors"
                   >
                     {o.customerName || 'Anonim'}
+                    {(newMsgMap[o.id] ?? 0) > 0 && (
+                      <span className="min-w-[14px] h-[14px] rounded-full bg-violet-500 text-white text-[8px] font-bold flex items-center justify-center px-0.5">
+                        {newMsgMap[o.id]}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -1266,6 +1298,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
             const anyTypingBanner = anyTyping || clientRecent || staffRecent;
             const typingRole = clientTyping ? 'Klienti' : staffTyping ? 'Stafi' : clientRecent ? 'Klienti' : 'Stafi';
             const hasNote = !!(o.notes?.trim());
+            const hasNewMsg = (newMsgMap[o.id] ?? 0) > 0;
             return (
               <React.Fragment key={o.id}>
               <motion.div
@@ -1374,15 +1407,26 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
                   onClick={() => setSelectedId(o.id)}
                   className="w-full text-left space-y-2.5"
                 >
-                  {/* ── Typing banner — TOP of card, above name ── */}
-                  {anyTypingBanner && (
+                  {/* ── Notification banner — typing (broadcast) OR new message (DB-driven) ── */}
+                  {(anyTypingBanner || hasNewMsg) && (
                     <div className={`-mx-0.5 flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
                       anyTyping
                         ? 'bg-violet-500/10 border-violet-400/30 text-violet-700 dark:text-violet-300'
-                        : 'bg-violet-500/5 border-violet-400/15 text-violet-500/60 dark:text-violet-400/50'
+                        : 'bg-violet-500/8 border-violet-400/20 text-violet-600/80 dark:text-violet-300/80'
                     }`}>
                       <span className="w-5 h-5 rounded-md bg-violet-500/15 flex items-center justify-center shrink-0 text-[12px]">💬</span>
-                      <span>{typingRole} {anyTyping ? 'po shkruan' : 'ka shkruajtur'}</span>
+                      <span>
+                        {anyTyping
+                          ? `${typingRole} po shkruan`
+                          : anyTypingBanner
+                            ? `${typingRole} ka shkruajtur`
+                            : 'ka shkruajtur'}
+                      </span>
+                      {hasNewMsg && !anyTyping && (
+                        <span className="ml-auto shrink-0 min-w-[18px] h-[18px] rounded-full bg-violet-500 text-white text-[9px] font-bold flex items-center justify-center px-1">
+                          {newMsgMap[o.id]}
+                        </span>
+                      )}
                       {anyTyping && (
                         <span className="flex gap-[3px] ml-0.5">
                           {[0, 1, 2].map((i) => (
