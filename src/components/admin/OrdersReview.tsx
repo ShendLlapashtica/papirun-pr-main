@@ -135,7 +135,7 @@ const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(
   const listText = formatOrderListText(items);
   return (
     <div className="bg-secondary/40 rounded-2xl p-3.5 space-y-1.5">
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground dark:text-slate-400 mb-1.5">
         <span className="flex items-center gap-1.5"><Receipt className="w-3 h-3" /> Porosia</span>
         <CopyButton text={listText} size="md" />
       </div>
@@ -147,7 +147,7 @@ const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(
           }
           <div className="flex-1 min-w-0">
             <div className="text-sm flex items-center gap-1 flex-wrap">
-              <span className="font-medium">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
+              <span className="font-medium dark:text-white">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
               {g.category && (
                 <span className="text-[11px] font-normal text-muted-foreground">
                   ({CATEGORY_LABEL[g.category] ?? g.category})
@@ -173,8 +173,8 @@ const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(
         </div>
       ))}
       <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
-        <span className="text-sm">Totali</span>
-        <span className="text-primary text-lg">€{total.toFixed(2)}</span>
+        <span className="text-sm dark:text-slate-400">Totali</span>
+        <span className="text-primary text-lg dark:text-emerald-400">€{total.toFixed(2)}</span>
       </div>
     </div>
   );
@@ -1062,9 +1062,9 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
             )}
             <div className="flex items-center gap-1.5">
               <Hourglass className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-amber-700 dark:text-amber-300">Duke pritur</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-amber-700 dark:text-amber-400">Duke pritur</p>
             </div>
-            <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 mt-0.5">{counts.pending}</p>
+            <p className="text-2xl font-bold text-amber-700 dark:text-white mt-0.5">{counts.pending}</p>
           </button>
 
           <button
@@ -1077,9 +1077,9 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
           >
             <div className="flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-300">Konfirmuar</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-400">Konfirmuar</p>
             </div>
-            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">{counts.approved}</p>
+            <p className="text-2xl font-bold text-emerald-700 dark:text-white mt-0.5">{counts.approved}</p>
           </button>
 
           <button
@@ -1092,9 +1092,9 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
           >
             <div className="flex items-center gap-1.5">
               <X className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-red-700 dark:text-red-300">Anuluar</p>
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-red-700 dark:text-rose-400">Anuluar</p>
             </div>
-            <p className="text-2xl font-bold text-red-700 dark:text-red-300 mt-0.5">{counts.rejected}</p>
+            <p className="text-2xl font-bold text-red-700 dark:text-white mt-0.5">{counts.rejected}</p>
           </button>
 
           <button
@@ -1109,7 +1109,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
               <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
               <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Histori</p>
             </div>
-            <p className="text-2xl font-bold text-foreground mt-0.5">{counts.history}</p>
+            <p className="text-2xl font-bold text-foreground dark:text-white mt-0.5">{counts.history}</p>
           </button>
         </div>
 
@@ -1397,7 +1397,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
                   <div className="flex items-start justify-between gap-2 pr-16">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <h3 className="font-bold text-base leading-tight truncate">{o.customerName || 'Anonim'}</h3>
+                        <h3 className="font-bold text-base leading-tight truncate dark:text-white">{o.customerName || 'Anonim'}</h3>
                         <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground shrink-0">
                           {o.source === 'app' ? <><Smartphone className="w-2.5 h-2.5" /> App</> : <><Globe className="w-2.5 h-2.5" /> Web</>}
                         </span>
@@ -1412,7 +1412,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground dark:text-slate-300">
                         <span className="flex items-center gap-1"><Phone className="w-3 h-3 opacity-50 shrink-0" />{o.customerPhone}</span>
                         <span className="opacity-30">·</span>
                         <span>{new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -1424,7 +1424,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
                   </div>
 
                   {/* ── Address ── */}
-                  <div className="flex items-start gap-1 text-[11px] text-muted-foreground -mt-1">
+                  <div className="flex items-start gap-1 text-[11px] text-muted-foreground dark:text-slate-400 -mt-1">
                     <MapPin className="w-3 h-3 shrink-0 mt-0.5 opacity-50" />
                     <span className="truncate leading-snug">{o.deliveryAddress}</span>
                   </div>
@@ -1446,7 +1446,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
                             ? <img src={getOptimizedImage(g.image)} alt="" className="w-6 h-6 rounded object-cover shrink-0 ring-1 ring-border/40" />
                             : <div className="w-6 h-6 rounded bg-muted/80 shrink-0 ring-1 ring-border/30" />
                           }
-                          <span className="text-[12px] font-semibold leading-tight">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
+                          <span className="text-[12px] font-semibold leading-tight dark:text-white">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
                           {g.category && <span className="text-[10px] text-muted-foreground shrink-0">({CATEGORY_LABEL[g.category] ?? g.category})</span>}
                         </div>
                         {g.modifiedItems.map((m, mi) => (
@@ -1558,7 +1558,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
                   <div className="bg-card/90 backdrop-blur-xl rounded-3xl shadow-card overflow-hidden border border-border/40">
                     <div className="p-4 border-b border-border/50 flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="font-bold text-base flex items-center gap-2">
+                        <h3 className="font-bold text-base flex items-center gap-2 dark:text-white">
                           {selected.customerName}
                           <CopyButton text={selected.customerName} />
                           <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
@@ -1799,7 +1799,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
           <div className="bg-card/90 backdrop-blur-xl rounded-3xl shadow-card overflow-hidden border border-border/40">
             <div className="p-4 border-b border-border/50 flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="font-bold text-base flex items-center gap-2">
+                <h3 className="font-bold text-base flex items-center gap-2 dark:text-white">
                   {selected.customerName}
                   <CopyButton text={selected.customerName} />
                   <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
@@ -1871,7 +1871,7 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
               {/* Order receipt */}
               <OrderItemsReceipt items={selected.items} total={selected.total} />
 
-              <div className="flex items-start gap-2 text-muted-foreground">
+              <div className="flex items-start gap-2 text-muted-foreground dark:text-slate-400">
                 <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <p className="leading-snug flex-1">{selected.deliveryAddress}</p>
                 <CopyButton text={selected.deliveryAddress} />
