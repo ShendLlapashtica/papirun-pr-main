@@ -67,6 +67,82 @@ const isCagllavice = (o: OrderRecord): boolean => {
   return false;
 };
 
+const CATEGORY_LABEL: Record<string, string> = {
+  salad: 'Salad',
+  fajita: 'Fajita',
+  sandwich: 'Sandwich',
+  sides: 'Sides',
+};
+
+const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+  const [copied, setCopied] = React.useState(false);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        navigator.clipboard?.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+      title="Kopjo"
+      className="inline-flex items-center p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-secondary/80 transition-all shrink-0 ml-1"
+    >
+      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+    </button>
+  );
+};
+
+interface GroupedOrderItem {
+  id: string;
+  name?: { sq: string; en: string };
+  category?: string;
+  totalQty: number;
+  modifiedItems: Array<{
+    qty: number;
+    removed: string[];
+    extras: Array<{ name: { sq: string; en: string }; price: number }>;
+  }>;
+}
+
+function groupOrderItems(items: any[]): GroupedOrderItem[] {
+  const map = new Map<string, GroupedOrderItem>();
+  for (const it of items) {
+    if (!map.has(it.id)) {
+      map.set(it.id, { id: it.id, name: it.name, category: it.category, totalQty: 0, modifiedItems: [] });
+    }
+    const entry = map.get(it.id)!;
+    entry.totalQty += it.quantity ?? 1;
+    if ((it.removedIngredients?.length ?? 0) > 0 || (it.addedExtras?.length ?? 0) > 0) {
+      entry.modifiedItems.push({
+        qty: it.quantity ?? 1,
+        removed: it.removedIngredients ?? [],
+        extras: it.addedExtras ?? [],
+      });
+    }
+  }
+  return Array.from(map.values());
+}
+
+function formatOrderListText(items: any[]): string {
+  return groupOrderItems(items).map(g => {
+    const name = g.name?.sq || g.name?.en || g.id;
+    const cat = g.category ? ` (${CATEGORY_LABEL[g.category] ?? g.category})` : '';
+    let line = `${g.totalQty}x ${name}${cat}`;
+    if (g.modifiedItems.length > 0) {
+      const subs = g.modifiedItems.map(m => {
+        const parts = [
+          ...m.removed.map(r => `Pa ${r}`),
+          ...m.extras.map(e => `+ ${e.name?.sq || e.name?.en}`),
+        ];
+        return `  ↳ ${m.qty}x ${parts.join(' · ')}`;
+      });
+      line += '\n' + subs.join('\n');
+    }
+    return line;
+  }).join('\n');
+}
+
 const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const startOfWeek = (d: Date) => {
   const x = startOfDay(d);
@@ -1260,11 +1336,15 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                       <div className="min-w-0">
                         <h3 className="font-bold text-base flex items-center gap-2">
                           {selected.customerName}
+                          <CopyButton text={selected.customerName} />
                           <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
                             {selected.source === 'app' ? <><Smartphone className="w-2.5 h-2.5" /> App</> : <><Globe className="w-2.5 h-2.5" /> Web</>}
                           </span>
                         </h3>
-                        <a href={`tel:${selected.customerPhone}`} className="text-xs text-primary font-medium">{selected.customerPhone}</a>
+                        <span className="flex items-center gap-0.5">
+                          <a href={`tel:${selected.customerPhone}`} className="text-xs text-primary font-medium">{selected.customerPhone}</a>
+                          <CopyButton text={selected.customerPhone} />
+                        </span>
                       </div>
                       <div className="flex items-center gap-1">
                         <button onClick={() => handlePrint(selected)} className="p-2 rounded-full hover:bg-secondary" title="Print"><Printer className="w-4 h-4" /></button>
@@ -1300,11 +1380,37 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                       </div>
 
                       <div className="bg-secondary/40 rounded-2xl p-3.5 space-y-1">
-                        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">
-                          <Receipt className="w-3 h-3" /> Porosia
+                        <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">
+                          <span className="flex items-center gap-1.5"><Receipt className="w-3 h-3" /> Porosia</span>
+                          <CopyButton text={formatOrderListText(selected.items)} />
                         </div>
-                        {selected.items.map((it: any, i) => (
-                          <div key={i} className="text-sm">• {it.quantity}x {it.name?.sq || it.name?.en || it.id}</div>
+                        {groupOrderItems(selected.items).map((g) => (
+                          <div key={g.id}>
+                            <div className="text-sm flex items-baseline gap-1">
+                              <span>• {g.totalQty}x</span>
+                              <span className="font-medium">{g.name?.sq || g.name?.en || g.id}</span>
+                              {g.category && (
+                                <span className="text-[11px] font-normal text-muted-foreground">
+                                  ({CATEGORY_LABEL[g.category] ?? g.category})
+                                </span>
+                              )}
+                            </div>
+                            {g.modifiedItems.map((m, mi) => (
+                              <div key={mi} className="pl-5 mt-0.5 text-xs flex flex-wrap gap-x-2 gap-y-0.5">
+                                <span className="text-muted-foreground shrink-0">↳ {m.qty}x</span>
+                                {m.removed.map((r, ri) => (
+                                  <span key={`r${ri}`} className="px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-medium">
+                                    Pa {r}
+                                  </span>
+                                ))}
+                                {m.extras.map((ex, ei) => (
+                                  <span key={`e${ei}`} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+                                    + {ex.name?.sq || ex.name?.en}
+                                  </span>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
                         ))}
                         <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
                           <span className="text-sm">Totali</span>
@@ -1314,7 +1420,8 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
 
                       <div className="flex items-start gap-2 text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                        <p className="leading-snug">{selected.deliveryAddress}</p>
+                        <p className="leading-snug flex-1">{selected.deliveryAddress}</p>
+                        <CopyButton text={selected.deliveryAddress} />
                       </div>
 
                       {selected.deliveryLat !== null && selected.deliveryLng !== null && (
@@ -1504,11 +1611,15 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
               <div className="min-w-0">
                 <h3 className="font-bold text-base flex items-center gap-2">
                   {selected.customerName}
+                  <CopyButton text={selected.customerName} />
                   <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
                     {selected.source === 'app' ? <><Smartphone className="w-2.5 h-2.5" /> App</> : <><Globe className="w-2.5 h-2.5" /> Web</>}
                   </span>
                 </h3>
-                <a href={`tel:${selected.customerPhone}`} className="text-xs text-primary font-medium">{selected.customerPhone}</a>
+                <span className="flex items-center gap-0.5">
+                  <a href={`tel:${selected.customerPhone}`} className="text-xs text-primary font-medium">{selected.customerPhone}</a>
+                  <CopyButton text={selected.customerPhone} />
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => handlePrint(selected)} className="p-2 rounded-full hover:bg-secondary" title="Print"><Printer className="w-4 h-4" /></button>
@@ -1569,11 +1680,37 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
 
               {/* Order receipt */}
               <div className="bg-secondary/40 rounded-2xl p-3.5 space-y-1">
-                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">
-                  <Receipt className="w-3 h-3" /> Porosia
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">
+                  <span className="flex items-center gap-1.5"><Receipt className="w-3 h-3" /> Porosia</span>
+                  <CopyButton text={formatOrderListText(selected.items)} />
                 </div>
-                {selected.items.map((it: any, i) => (
-                  <div key={i} className="text-sm">• {it.quantity}x {it.name?.sq || it.name?.en || it.id}</div>
+                {groupOrderItems(selected.items).map((g) => (
+                  <div key={g.id}>
+                    <div className="text-sm flex items-baseline gap-1">
+                      <span>• {g.totalQty}x</span>
+                      <span className="font-medium">{g.name?.sq || g.name?.en || g.id}</span>
+                      {g.category && (
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          ({CATEGORY_LABEL[g.category] ?? g.category})
+                        </span>
+                      )}
+                    </div>
+                    {g.modifiedItems.map((m, mi) => (
+                      <div key={mi} className="pl-5 mt-0.5 text-xs flex flex-wrap gap-x-2 gap-y-0.5">
+                        <span className="text-muted-foreground shrink-0">↳ {m.qty}x</span>
+                        {m.removed.map((r, ri) => (
+                          <span key={`r${ri}`} className="px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-medium">
+                            Pa {r}
+                          </span>
+                        ))}
+                        {m.extras.map((ex, ei) => (
+                          <span key={`e${ei}`} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+                            + {ex.name?.sq || ex.name?.en}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 ))}
                 <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
                   <span className="text-sm">Totali</span>
@@ -1583,7 +1720,8 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
 
               <div className="flex items-start gap-2 text-muted-foreground">
                 <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <p className="leading-snug">{selected.deliveryAddress}</p>
+                <p className="leading-snug flex-1">{selected.deliveryAddress}</p>
+                <CopyButton text={selected.deliveryAddress} />
               </div>
 
               {selected.deliveryLat !== null && selected.deliveryLng !== null && (
