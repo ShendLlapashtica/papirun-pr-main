@@ -139,25 +139,83 @@ export const subscribeOrderMessages = (
   };
 };
 
-export const broadcastTyping = (orderId: string, role: 'user' | 'admin'): void => {
-  const ch = (supabase as any).channel(`typing-${orderId}-${Date.now()}`);
-  ch.subscribe((status: string) => {
-    if (status === 'SUBSCRIBED') {
-      ch.send({ type: 'broadcast', event: 'typing', payload: { role } });
-    }
-  });
-  setTimeout(() => (supabase as any).removeChannel(ch), 2000);
+// ── Typing presence hub ────────────────────────────────────────────────────────
+// One persistent Supabase broadcast channel for ALL order typing events.
+// selfBroadcast:true so admin typing in OrderChat also reflects back to the
+// order-card list in the same session (staff typing banner).
+let _typingHub: any = null;
+const _typingHandlers = new Map<string, Set<(role: 'user' | 'admin') => void>>();
+
+const ensureTypingHub = (): any => {
+  if (_typingHub) return _typingHub;
+  try {
+    _typingHub = (supabase as any)
+      .channel('papirun-typing-hub', { config: { broadcast: { self: true } } })
+      .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { orderId: string; role: string } }) => {
+        const { orderId, role } = payload ?? {};
+        if (!orderId || (role !== 'user' && role !== 'admin')) return;
+        _typingHandlers.get(orderId)?.forEach((h) => h(role as 'user' | 'admin'));
+      })
+      .subscribe();
+  } catch {
+    _typingHub = null;
+  }
+  return _typingHub;
 };
 
+// Instant — hub is already subscribed, no per-call subscribe latency
+export const broadcastTyping = (orderId: string, role: 'user' | 'admin'): void => {
+  ensureTypingHub()?.send({ type: 'broadcast', event: 'typing', payload: { orderId, role } });
+};
+
+// Returns unsubscribe; uses local JS routing (no new WebSocket channel per order)
 export const subscribeOrderTyping = (
   orderId: string,
   onTyping: (role: 'user' | 'admin') => void,
 ): (() => void) => {
-  const ch = (supabase as any)
-    .channel(`typing-${orderId}-sub-${Date.now()}`)
-    .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { role: string } }) => {
-      if (payload?.role === 'user' || payload?.role === 'admin') onTyping(payload.role as 'user' | 'admin');
-    })
-    .subscribe();
-  return () => (supabase as any).removeChannel(ch);
+  ensureTypingHub();
+  if (!_typingHandlers.has(orderId)) _typingHandlers.set(orderId, new Set());
+  _typingHandlers.get(orderId)!.add(onTyping);
+  return () => {
+    _typingHandlers.get(orderId)?.delete(onTyping);
+    if (_typingHandlers.get(orderId)?.size === 0) _typingHandlers.delete(orderId);
+  };
+};
+
+// ── SFX ────────────────────────────────────────────────────────────────────────
+let _sfxCtx: AudioContext | null = null;
+const _sfx = (): AudioContext | null => {
+  try {
+    if (!_sfxCtx) _sfxCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    return _sfxCtx;
+  } catch { return null; }
+};
+
+export const playTypingChime = (): void => {
+  const ctx = _sfx(); if (!ctx) return;
+  try {
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(540, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(680, ctx.currentTime + 0.07);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.06, ctx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+    o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.25);
+  } catch {}
+};
+
+export const playMessageChime = (): void => {
+  const ctx = _sfx(); if (!ctx) return;
+  try {
+    [[880, 0], [1100, 0.13]].forEach(([freq, delay]) => {
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + delay);
+      g.gain.exponentialRampToValueAtTime(0.14, ctx.currentTime + delay + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + 0.28);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime + delay); o.stop(ctx.currentTime + delay + 0.32);
+    });
+  } catch {}
 };

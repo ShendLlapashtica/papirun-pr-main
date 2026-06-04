@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, Component, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map, KeyRound, Bell } from 'lucide-react';
+import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map, KeyRound, Bell, Moon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchDrivers, createDriver, updateDriver, deleteDriver, ensureRealDrivers, subscribeAllDriverLocations, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
 import DriverLocationMap from '@/components/DriverLocationMap';
@@ -464,6 +464,9 @@ const Admin = () => {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'harta' | 'databaze'>('orders');
   const [typingCount, setTypingCount] = useState(0);
+  const [adminTheme, setAdminTheme] = useState<'light' | 'dim' | 'dark'>(() => {
+    try { return (localStorage.getItem('papirun_admin_theme') as 'light' | 'dim' | 'dark') || 'light'; } catch { return 'light'; }
+  });
   const [contentSubTab, setContentSubTab] = useState<'texts' | 'locations' | 'replies'>('texts');
   const [ofertaEnabled, setOfertaEnabled] = useState(true);
   const [whatsappFallbackEnabled, setWhatsappFallbackEnabled] = useState(true);
@@ -964,8 +967,39 @@ const Admin = () => {
 
   
 
+  const ADMIN_THEMES = {
+    light: {},
+    dim: {
+      '--background': '220 14% 15%', '--foreground': '220 10% 91%',
+      '--card': '220 14% 19%', '--card-foreground': '220 10% 91%',
+      '--popover': '220 14% 17%', '--popover-foreground': '220 10% 91%',
+      '--secondary': '220 14% 24%', '--secondary-foreground': '220 10% 80%',
+      '--muted': '220 14% 22%', '--muted-foreground': '220 10% 54%',
+      '--border': '220 14% 27%', '--input': '220 14% 27%',
+      '--primary': '124 22% 58%', '--primary-foreground': '0 0% 100%',
+    },
+    dark: {
+      '--background': '222 20% 9%', '--foreground': '220 10% 88%',
+      '--card': '222 20% 12%', '--card-foreground': '220 10% 88%',
+      '--popover': '222 20% 11%', '--popover-foreground': '220 10% 88%',
+      '--secondary': '222 20% 17%', '--secondary-foreground': '220 10% 75%',
+      '--muted': '222 20% 14%', '--muted-foreground': '220 10% 46%',
+      '--border': '222 20% 19%', '--input': '222 20% 19%',
+      '--primary': '124 22% 52%', '--primary-foreground': '0 0% 100%',
+    },
+  } as const;
+
+  const themeVars = ADMIN_THEMES[adminTheme] as Record<string, string>;
+  const applyTheme = (t: 'light' | 'dim' | 'dark') => {
+    setAdminTheme(t);
+    try { localStorage.setItem('papirun_admin_theme', t); } catch {}
+  };
+
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      className={`min-h-screen bg-background${adminTheme !== 'light' ? ' dark' : ''}`}
+      style={themeVars as React.CSSProperties}
+    >
       <input
         ref={fileInputRef}
         type="file"
@@ -989,6 +1023,26 @@ const Admin = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* 3-moon theme switcher */}
+            <div className="flex items-center gap-0.5 bg-secondary rounded-full p-1">
+              {(['light', 'dim', 'dark'] as const).map((t, idx) => (
+                <button
+                  key={t}
+                  onClick={() => applyTheme(t)}
+                  title={t === 'light' ? 'Ndriçim' : t === 'dim' ? 'Errët (i butë)' : 'Errët (i thellë)'}
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                    adminTheme === t ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Moon
+                    className="w-3.5 h-3.5"
+                    fill={idx === 0 ? 'none' : idx === 1 ? 'currentColor' : 'currentColor'}
+                    style={{ opacity: idx === 0 ? 0.5 : idx === 1 ? 0.75 : 1 }}
+                    strokeWidth={2}
+                  />
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => setActiveTab('orders')}
               className="relative flex items-center justify-center w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"

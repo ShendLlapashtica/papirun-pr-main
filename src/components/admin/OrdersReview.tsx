@@ -25,7 +25,8 @@ import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllD
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import CustomerDriverMap from '@/components/CustomerDriverMap';
-import { sendOrderMessage, subscribeOrderTyping } from '@/lib/orderMessagesApi';
+import { sendOrderMessage, subscribeOrderTyping, playTypingChime, playMessageChime } from '@/lib/orderMessagesApi';
+import { supabase } from '@/integrations/supabase/client';
 import { getOptimizedImage } from '@/lib/utils';
 
 const statusColor = (s: string) => {
@@ -648,14 +649,22 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
 
-  // Subscribe to typing presence for all currently visible orders
+  // Track last typing timestamp per order to gate SFX to first event only
+  const typingMapRef = React.useRef<Record<string, { client?: number; staff?: number }>>({});
+  typingMapRef.current = typingMap;
+
+  // Subscribe to typing presence — hub-based, instant delivery
   const filteredIdKey = filtered.map((o) => o.id).join(',');
   useEffect(() => {
     const unsubs = filtered.map((o) =>
       subscribeOrderTyping(o.id, (role) => {
-        setTypingMap((prev) => ({
-          ...prev,
-          [o.id]: { ...prev[o.id], ...(role === 'user' ? { client: Date.now() } : { staff: Date.now() }) },
+        const key = role === 'user' ? 'client' : 'staff';
+        const prev = typingMapRef.current[o.id]?.[key];
+        // Play chime only on fresh start (no recent event in last 7s)
+        if (!prev || Date.now() - prev > 7000) playTypingChime();
+        setTypingMap((pm) => ({
+          ...pm,
+          [o.id]: { ...pm[o.id], ...(role === 'user' ? { client: Date.now() } : { staff: Date.now() }) },
         }));
       })
     );
@@ -679,6 +688,22 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
     const count = Object.keys(typingMap).length;
     onTypingCount?.(count);
   }, [typingMap, onTypingCount]);
+
+  // Global new-message SFX — play when a client/driver message arrives for any visible order
+  const ordersRef = React.useRef(orders);
+  ordersRef.current = orders;
+  useEffect(() => {
+    const ch = (supabase as any)
+      .channel(`admin-msg-sfx-${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_messages' }, (payload: any) => {
+        const { sender, order_id } = payload.new ?? {};
+        if ((sender === 'user' || sender === 'driver') && ordersRef.current.some((o) => o.id === order_id)) {
+          playMessageChime();
+        }
+      })
+      .subscribe();
+    return () => (supabase as any).removeChannel(ch);
+  }, []);
 
   const handleStatus = async (id: string, status: OrderStatus) => {
     try {
@@ -1187,6 +1212,38 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
           </p>
         )}
 
+        {/* ── Global typing strip — tap a name to jump to that card ── */}
+        {Object.keys(typingMap).length > 0 && (() => {
+          const now3 = Date.now();
+          const active = filtered.filter((o) => {
+            const ca = typingMap[o.id]?.client;
+            const sa = typingMap[o.id]?.staff;
+            return (ca && now3 - ca < 3000) || (sa && now3 - sa < 3000);
+          });
+          if (active.length === 0) return null;
+          return (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-violet-500/10 border border-violet-400/25">
+              <span className="flex gap-[3px] shrink-0">
+                {[0, 1, 2].map((i) => (
+                  <span key={i} className="w-[5px] h-[5px] rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: `${i * 0.18}s` }} />
+                ))}
+              </span>
+              <span className="text-[10px] font-bold text-violet-600 dark:text-violet-300 shrink-0 uppercase tracking-wide">Po shkruajnë</span>
+              <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                {active.map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => { setSelectedId(o.id); setStatusFilter('active'); }}
+                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-500/15 hover:bg-violet-500/25 text-violet-700 dark:text-violet-300 transition-colors"
+                  >
+                    {o.customerName || 'Anonim'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         <AnimatePresence initial={false}>
           {filtered.map((o) => {
             const isSelected = o.id === selectedId;
@@ -1317,6 +1374,25 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
                   onClick={() => setSelectedId(o.id)}
                   className="w-full text-left space-y-2.5"
                 >
+                  {/* ── Typing banner — TOP of card, above name ── */}
+                  {anyTypingBanner && (
+                    <div className={`-mx-0.5 flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+                      anyTyping
+                        ? 'bg-violet-500/10 border-violet-400/30 text-violet-700 dark:text-violet-300'
+                        : 'bg-violet-500/5 border-violet-400/15 text-violet-500/60 dark:text-violet-400/50'
+                    }`}>
+                      <span className="w-5 h-5 rounded-md bg-violet-500/15 flex items-center justify-center shrink-0 text-[12px]">💬</span>
+                      <span>{typingRole} {anyTyping ? 'po shkruan' : 'ka shkruajtur'}</span>
+                      {anyTyping && (
+                        <span className="flex gap-[3px] ml-0.5">
+                          {[0, 1, 2].map((i) => (
+                            <span key={i} className="w-[5px] h-[5px] rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: `${i * 0.18}s` }} />
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* ── Row 1: Name + status ── */}
                   <div className="flex items-start justify-between gap-2 pr-16">
                     <div className="min-w-0 flex-1">
@@ -1352,25 +1428,6 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
                     <MapPin className="w-3 h-3 shrink-0 mt-0.5 opacity-50" />
                     <span className="truncate leading-snug">{o.deliveryAddress}</span>
                   </div>
-
-                  {/* ── Purple typing banner ── */}
-                  {anyTypingBanner && (
-                    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
-                      anyTyping
-                        ? 'bg-violet-500/10 border-violet-400/30 text-violet-700 dark:text-violet-300'
-                        : 'bg-violet-500/5 border-violet-400/15 text-violet-500/60 dark:text-violet-400/50'
-                    }`}>
-                      <span className="w-5 h-5 rounded-md bg-violet-500/15 flex items-center justify-center shrink-0 text-[12px]">💬</span>
-                      <span>{typingRole} {anyTyping ? 'po shkruan' : 'ka shkruajtur'}</span>
-                      {anyTyping && (
-                        <span className="flex gap-[3px] ml-0.5">
-                          {[0, 1, 2].map((i) => (
-                            <span key={i} className="w-[5px] h-[5px] rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: `${i * 0.18}s` }} />
-                          ))}
-                        </span>
-                      )}
-                    </div>
-                  )}
 
                   {/* ── Customer note banner ── */}
                   {hasNote && (
