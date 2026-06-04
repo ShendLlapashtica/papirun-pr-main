@@ -353,7 +353,7 @@ const ConfirmDeleteDialog = ({ title, description, onConfirm, onCancel }: Confir
   );
 };
 
-const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
+const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean; onTypingCount?: (n: number) => void } = {}) => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [filter, setFilter] = useState<FilterKey>('month');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
@@ -664,8 +664,8 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
         const now = Date.now();
         const next = { ...prev };
         for (const id of Object.keys(next)) {
-          if (next[id].client && now - next[id].client! > 3000) delete next[id].client;
-          if (next[id].staff && now - next[id].staff! > 3000) delete next[id].staff;
+          if (next[id].client && now - next[id].client! > 7000) delete next[id].client;
+          if (next[id].staff && now - next[id].staff! > 7000) delete next[id].staff;
           if (!next[id].client && !next[id].staff) delete next[id];
         }
         return next;
@@ -674,6 +674,11 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
     return () => { unsubs.forEach((u) => u()); clearInterval(tick); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredIdKey]);
+
+  useEffect(() => {
+    const count = Object.keys(typingMap).length;
+    onTypingCount?.(count);
+  }, [typingMap, onTypingCount]);
 
   const handleStatus = async (id: string, status: OrderStatus) => {
     try {
@@ -1193,8 +1198,16 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
             const ageMs = now - new Date(o.createdAt).getTime();
             const isOverdue = isPending && ageMs > 60_000;
             const isCagl = isCagllavice(o);
-            const clientTyping = !!(typingMap[o.id]?.client);
-            const staffTyping = !!(typingMap[o.id]?.staff);
+            const now2 = Date.now();
+            const clientAge = typingMap[o.id]?.client != null ? now2 - typingMap[o.id].client! : null;
+            const staffAge = typingMap[o.id]?.staff != null ? now2 - typingMap[o.id].staff! : null;
+            const clientTyping = clientAge !== null && clientAge < 3000;
+            const clientRecent = clientAge !== null && clientAge >= 3000 && clientAge < 7000;
+            const staffTyping = staffAge !== null && staffAge < 3000;
+            const staffRecent = staffAge !== null && staffAge >= 3000 && staffAge < 7000;
+            const anyTyping = clientTyping || staffTyping;
+            const anyTypingBanner = anyTyping || clientRecent || staffRecent;
+            const typingRole = clientTyping ? 'Klienti' : staffTyping ? 'Stafi' : clientRecent ? 'Klienti' : 'Stafi';
             const hasNote = !!(o.notes?.trim());
             return (
               <React.Fragment key={o.id}>
@@ -1302,88 +1315,86 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                 )}
                 <button
                   onClick={() => setSelectedId(o.id)}
-                  className="w-full text-left space-y-2"
+                  className="w-full text-left space-y-2.5"
                 >
-                  {/* ── Row 1: Header ── */}
-                  <div className="flex items-center justify-between gap-2 pr-16">
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <h3 className="font-semibold text-sm truncate">{o.customerName || 'Anonim'}</h3>
-                      <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground shrink-0">
-                        {o.source === 'app' ? <><Smartphone className="w-2.5 h-2.5" /> App</> : <><Globe className="w-2.5 h-2.5" /> Web</>}
-                      </span>
-                      {isCagl && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold border border-blue-400/30 shrink-0">
-                          C Çagllavicë
+                  {/* ── Row 1: Name + status ── */}
+                  <div className="flex items-start justify-between gap-2 pr-16">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-bold text-base leading-tight truncate">{o.customerName || 'Anonim'}</h3>
+                        <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground shrink-0">
+                          {o.source === 'app' ? <><Smartphone className="w-2.5 h-2.5" /> App</> : <><Globe className="w-2.5 h-2.5" /> Web</>}
                         </span>
-                      )}
-                      {isArchived && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-foreground/10 text-muted-foreground font-semibold uppercase tracking-wider shrink-0">
-                          E fshirë
-                        </span>
-                      )}
+                        {isCagl && (
+                          <span className="inline-flex text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-semibold border border-blue-400/30 shrink-0">
+                            C Çagllavicë
+                          </span>
+                        )}
+                        {isArchived && (
+                          <span className="inline-flex text-[9px] px-1.5 py-0.5 rounded-full bg-foreground/10 text-muted-foreground font-semibold uppercase tracking-wider shrink-0">
+                            E fshirë
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1"><Phone className="w-3 h-3 opacity-50 shrink-0" />{o.customerPhone}</span>
+                        <span className="opacity-30">·</span>
+                        <span>{new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
                     </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0 ${statusColor(o.status)}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0 mt-0.5 ${statusColor(o.status)}`}>
                       {STATUS_LABEL[o.status] ?? o.status}
                     </span>
                   </div>
 
-                  {/* ── Banner A: Client typing (blue) ── */}
-                  {clientTyping && (
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-blue-500/8 border border-blue-400/20 text-blue-700 dark:text-blue-300 text-[11px] font-medium">
-                      <span className="w-5 h-5 rounded-md bg-blue-500/15 flex items-center justify-center shrink-0">💬</span>
-                      <span>Klienti po shkruan</span>
-                      <span className="flex gap-0.5 ml-0.5">
-                        {[0, 1, 2].map((i) => (
-                          <span key={i} className="w-1 h-1 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                        ))}
-                      </span>
+                  {/* ── Address ── */}
+                  <div className="flex items-start gap-1 text-[11px] text-muted-foreground -mt-1">
+                    <MapPin className="w-3 h-3 shrink-0 mt-0.5 opacity-50" />
+                    <span className="truncate leading-snug">{o.deliveryAddress}</span>
+                  </div>
+
+                  {/* ── Purple typing banner ── */}
+                  {anyTypingBanner && (
+                    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+                      anyTyping
+                        ? 'bg-violet-500/10 border-violet-400/30 text-violet-700 dark:text-violet-300'
+                        : 'bg-violet-500/5 border-violet-400/15 text-violet-500/60 dark:text-violet-400/50'
+                    }`}>
+                      <span className="w-5 h-5 rounded-md bg-violet-500/15 flex items-center justify-center shrink-0 text-[12px]">💬</span>
+                      <span>{typingRole} {anyTyping ? 'po shkruan' : 'ka shkruajtur'}</span>
+                      {anyTyping && (
+                        <span className="flex gap-[3px] ml-0.5">
+                          {[0, 1, 2].map((i) => (
+                            <span key={i} className="w-[5px] h-[5px] rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: `${i * 0.18}s` }} />
+                          ))}
+                        </span>
+                      )}
                     </div>
                   )}
 
-                  {/* ── Banner: Customer note (amber) ── */}
+                  {/* ── Customer note banner ── */}
                   {hasNote && (
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-amber-500/8 border border-amber-400/20 text-amber-800 dark:text-amber-200 text-[11px] font-medium">
-                      <span className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center shrink-0">📋</span>
-                      <span className="truncate italic">{o.notes}</span>
+                    <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/8 border border-amber-400/20 text-amber-900 dark:text-amber-100 text-[11px]">
+                      <span className="w-4 h-4 rounded bg-amber-500/20 flex items-center justify-center shrink-0 mt-px text-[10px]">📋</span>
+                      <span className="italic leading-snug line-clamp-2">{o.notes}</span>
                     </div>
                   )}
 
-                  {/* ── Row 2: Phone + Time ── */}
-                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-3 h-3 opacity-60 shrink-0" />
-                      {o.customerPhone}
-                    </span>
-                    <span className="opacity-40">·</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 opacity-60 shrink-0" />
-                      {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-
-                  {/* ── Row 3: Address ── */}
-                  <div className="flex items-start gap-1 text-[11px] text-muted-foreground">
-                    <MapPin className="w-3 h-3 shrink-0 mt-0.5 opacity-60" />
-                    <span className="truncate">{o.deliveryAddress}</span>
-                  </div>
-
-                  {/* ── Porosia box ── */}
-                  <div className="bg-secondary/30 rounded-xl p-2.5 space-y-1.5 border border-border/30">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-0.5">Porosia</p>
+                  {/* ── Order items (inline, receipt style) ── */}
+                  <div className="space-y-1 border-t border-border/30 pt-2">
                     {groupOrderItems(o.items).map((g) => (
-                      <div key={g.id} className="space-y-0.5">
+                      <div key={g.id}>
                         <div className="flex items-center gap-1.5">
                           {g.image
                             ? <img src={getOptimizedImage(g.image)} alt="" className="w-6 h-6 rounded object-cover shrink-0 ring-1 ring-border/40" />
-                            : <div className="w-6 h-6 rounded bg-muted shrink-0 ring-1 ring-border/30" />
+                            : <div className="w-6 h-6 rounded bg-muted/80 shrink-0 ring-1 ring-border/30" />
                           }
-                          <span className="text-xs font-medium">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
-                          {g.category && (
-                            <span className="text-[10px] text-muted-foreground shrink-0">({CATEGORY_LABEL[g.category] ?? g.category})</span>
-                          )}
+                          <span className="text-[12px] font-semibold leading-tight">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
+                          {g.category && <span className="text-[10px] text-muted-foreground shrink-0">({CATEGORY_LABEL[g.category] ?? g.category})</span>}
                         </div>
                         {g.modifiedItems.map((m, mi) => (
-                          <div key={mi} className="pl-8 flex flex-wrap gap-1">
+                          <div key={mi} className="pl-8 flex items-center flex-wrap gap-x-1 gap-y-0.5 mt-0.5">
+                            <span className="text-[10px] text-muted-foreground shrink-0 font-medium">↳ {m.qty}x</span>
                             {m.removed.map((r, ri) => (
                               <span key={`r${ri}`} className="px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-semibold border border-red-500/20">
                                 Pa {r}
@@ -1398,8 +1409,8 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                         ))}
                       </div>
                     ))}
-                    <div className="flex justify-end pt-1.5 border-t border-border/30 mt-0.5">
-                      <span className="text-primary font-bold text-sm">€{o.total.toFixed(2)}</span>
+                    <div className="flex justify-end pt-1 border-t border-border/20 mt-1">
+                      <span className="text-primary font-bold text-[13px]">€{o.total.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -1411,10 +1422,8 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                     const isLate = o.status === 'approved' && assignedMs && (now - assignedMs) > 60_000;
                     return (
                       <div className="flex items-center gap-1.5">
-                        <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: drv.color || '#6b7280' }} />
-                        <span className="text-[10px] font-bold" style={{ color: drv.color || undefined }}>
-                          {driverShortCode(drv)}
-                        </span>
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ background: drv.color || '#6b7280' }} />
+                        <span className="text-[10px] font-bold" style={{ color: drv.color || undefined }}>{driverShortCode(drv)}</span>
                         <span className="text-[10px] text-muted-foreground truncate flex-1">{drv.name}</span>
                         {isLate && drv.phone && (
                           <a
@@ -1454,19 +1463,6 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                           </button>
                         );
                       })}
-                    </div>
-                  )}
-
-                  {/* ── Banner B: Staff typing (amber) ── */}
-                  {staffTyping && (
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-amber-500/8 border border-amber-400/20 text-amber-800 dark:text-amber-200 text-[11px] font-medium">
-                      <span className="w-5 h-5 rounded-md bg-amber-500/15 flex items-center justify-center shrink-0">🧑‍💼</span>
-                      <span>Stafi po shkruan</span>
-                      <span className="flex gap-0.5 ml-0.5">
-                        {[0, 1, 2].map((i) => (
-                          <span key={i} className="w-1 h-1 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                        ))}
-                      </span>
                     </div>
                   )}
                 </button>

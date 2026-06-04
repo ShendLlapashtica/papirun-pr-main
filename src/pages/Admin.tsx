@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, Component, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map, KeyRound } from 'lucide-react';
+import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map, KeyRound, Bell } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchDrivers, createDriver, updateDriver, deleteDriver, ensureRealDrivers, subscribeAllDriverLocations, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
 import DriverLocationMap from '@/components/DriverLocationMap';
@@ -463,6 +463,7 @@ const Admin = () => {
   const [menuExtras, setMenuExtras] = useState<MenuExtra[]>(defaultMenuExtras);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'harta' | 'databaze'>('orders');
+  const [typingCount, setTypingCount] = useState(0);
   const [contentSubTab, setContentSubTab] = useState<'texts' | 'locations' | 'replies'>('texts');
   const [ofertaEnabled, setOfertaEnabled] = useState(true);
   const [whatsappFallbackEnabled, setWhatsappFallbackEnabled] = useState(true);
@@ -989,6 +990,18 @@ const Admin = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setActiveTab('orders')}
+              className="relative flex items-center justify-center w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
+              title="Njoftime"
+            >
+              <Bell className="w-4 h-4" />
+              {typingCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-violet-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                  {typingCount}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => { setShowChangePw(true); setChangePwError(''); }}
               className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
               title="Ndrysho Fjalëkalimin"
@@ -1106,7 +1119,7 @@ const Admin = () => {
           </div>
         )}
 
-        {activeTab === 'orders' && <TabErrorBoundary><OrdersReview /></TabErrorBoundary>}
+        {activeTab === 'orders' && <TabErrorBoundary><OrdersReview onTypingCount={setTypingCount} /></TabErrorBoundary>}
         {activeTab === 'users' && <SubscribersList />}
         {activeTab === 'drivers' && (
           <div className="space-y-8">
