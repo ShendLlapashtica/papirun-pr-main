@@ -708,7 +708,7 @@ export default function DriversKPI() {
       {/* ═══════════════════════════════════════════════════════════════════════
           LIVE MAP — all active motorcycles with names
       ═══════════════════════════════════════════════════════════════════════ */}
-      {activeWithGps.length > 0 && (
+      {activeWithGps.length > 0 && !detailDriverId && (
         <div className="rounded-2xl border border-border/40 overflow-hidden shadow-sm">
           <div className="px-4 py-2.5 bg-secondary/30 border-b border-border/30 flex items-center gap-2">
             <span className="text-base leading-none">🏍️</span>

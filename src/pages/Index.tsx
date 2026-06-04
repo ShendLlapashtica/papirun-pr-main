@@ -66,7 +66,6 @@ const Index = () => {
 
       <main>
         <HeroSection onViewMenu={scrollToMenu} />
-        {isOfertaEnabled && <OfertaRamazani />}
 
         <section ref={menuRef} className="py-8 sm:py-12 lg:py-16 relative">
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at center, rgba(157,192,160,0.12) 0%, transparent 70%)' }} />
@@ -120,6 +119,8 @@ const Index = () => {
             )}
           </div>
         </section>
+
+        {isOfertaEnabled && <OfertaRamazani />}
 
         <section className="py-12 sm:py-16 bg-secondary/30">
           <div className="container mx-auto px-4">

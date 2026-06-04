@@ -89,7 +89,7 @@ const OfertaRamazani = () => {
         </div>
 
         {/* Offer grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 max-w-6xl mx-auto">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 max-w-6xl mx-auto">
           {offers.map((offer) => {
             const hasImage = !!offer.image;
             return (
