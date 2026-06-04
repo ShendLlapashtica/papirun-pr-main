@@ -164,14 +164,14 @@ const SiteTextsEditor = ({ language }: { language: Language }) => {
             const isOverridden = `${editLang}.${key}` in overrides;
             return (
               <div key={key}>
-                <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <label className="text-xs text-muted-foreground dark:text-slate-400 flex items-center gap-1.5">
                   {textLabels[key]}
                   {isOverridden && <span className="text-[10px] text-primary font-medium">(ndryshuar)</span>}
                 </label>
                 <input
                   value={getValue(key)}
                   onChange={(e) => handleChange(key, e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border-0 text-sm focus:ring-2 focus:ring-primary/20 transition-all ${
+                  className={`w-full px-3 py-2 rounded-lg border-0 text-sm focus:ring-2 focus:ring-primary/20 transition-all dark:text-white dark:placeholder:text-slate-500 ${
                     isOverridden ? 'bg-primary/5 ring-1 ring-primary/20' : 'bg-secondary'
                   }`}
                 />
@@ -464,6 +464,9 @@ const Admin = () => {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'harta' | 'databaze'>('orders');
   const [typingCount, setTypingCount] = useState(0);
+  const [unreadOrders, setUnreadOrders] = useState<Array<{ id: string; name: string; count: number; urgent: boolean }>>([]);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [adminTheme, setAdminTheme] = useState<'light' | 'dim' | 'dark'>(() => {
     try { return (localStorage.getItem('papirun_admin_theme') as 'light' | 'dim' | 'dark') || 'light'; } catch { return 'light'; }
   });
@@ -1043,18 +1046,68 @@ const Admin = () => {
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setActiveTab('orders')}
-              className="relative flex items-center justify-center w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
-              title="Njoftime"
-            >
-              <Bell className="w-4 h-4" />
-              {typingCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-violet-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                  {typingCount}
-                </span>
+            <div className="relative">
+              <button
+                onClick={() => { setShowNotifPanel((v) => !v); setActiveTab('orders'); }}
+                className="relative flex items-center justify-center w-9 h-9 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
+                title="Njoftime"
+              >
+                <Bell className="w-4 h-4" />
+                {typingCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-violet-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                    {typingCount}
+                  </span>
+                )}
+              </button>
+              {showNotifPanel && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifPanel(false)} />
+                  <div className="absolute right-0 top-11 z-50 w-72 bg-card border border-border/50 rounded-2xl shadow-xl overflow-hidden">
+                    <div className="px-3 py-2 border-b border-border/40 flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground dark:text-slate-400">
+                        Pa përgjigje
+                      </span>
+                      {unreadOrders.length === 0 && (
+                        <span className="text-[11px] text-muted-foreground dark:text-slate-500">Asnjë</span>
+                      )}
+                    </div>
+                    {unreadOrders.length > 0 ? (
+                      <div className="max-h-80 overflow-y-auto">
+                        {unreadOrders.map((o) => (
+                          <button
+                            key={o.id}
+                            onClick={() => {
+                              setHighlightId(o.id);
+                              setActiveTab('orders');
+                              setShowNotifPanel(false);
+                              setTimeout(() => setHighlightId(null), 500);
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-secondary/60 transition-colors text-left border-b border-border/20 last:border-0 ${
+                              o.urgent ? 'bg-red-500/5' : ''
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${o.urgent ? 'bg-red-500 animate-pulse' : 'bg-violet-500'}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold truncate dark:text-white">{o.name}</p>
+                              <p className={`text-[11px] ${o.urgent ? 'text-red-500 font-bold' : 'text-muted-foreground dark:text-slate-400'}`}>
+                                {o.count} mesazh{o.count !== 1 ? 'e' : ''} {o.urgent ? '— pa përgjigje !!!' : 'i ri'}
+                              </p>
+                            </div>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${o.urgent ? 'bg-red-500/15 text-red-600' : 'bg-violet-500/15 text-violet-600 dark:text-violet-300'}`}>
+                              {o.count}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="px-3 py-6 text-center text-sm text-muted-foreground dark:text-slate-500">
+                        Të gjithë janë përgjigjur ✓
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
-            </button>
+            </div>
             <button
               onClick={() => { setShowChangePw(true); setChangePwError(''); }}
               className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
@@ -1137,7 +1190,7 @@ const Admin = () => {
               className={`px-6 py-3 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${
                 activeTab === tab
                   ? 'bg-primary text-primary-foreground shadow-glow'
-                  : 'bg-secondary hover:bg-secondary/80'
+                  : 'bg-secondary hover:bg-secondary/80 text-foreground dark:text-slate-300 dark:hover:text-white'
               }`}
             >
               {tab === 'orders' ? (language === 'sq' ? 'Porositë' : 'Orders')
@@ -1173,7 +1226,7 @@ const Admin = () => {
           </div>
         )}
 
-        {activeTab === 'orders' && <TabErrorBoundary><OrdersReview onTypingCount={setTypingCount} /></TabErrorBoundary>}
+        {activeTab === 'orders' && <TabErrorBoundary><OrdersReview onTypingCount={setTypingCount} onUnreadChange={setUnreadOrders} highlightId={highlightId} /></TabErrorBoundary>}
         {activeTab === 'users' && <SubscribersList />}
         {activeTab === 'drivers' && (
           <div className="space-y-8">
@@ -1644,10 +1697,10 @@ const Admin = () => {
             <div className="bg-card rounded-2xl p-5 shadow-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-display font-semibold text-lg">
+                  <h3 className="font-display font-semibold text-lg dark:text-white">
                     🌙 {language === 'sq' ? 'Seksioni i Ofertave' : 'Offers Section'}
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground dark:text-slate-400 mt-1">
                     {language === 'sq' ? 'Aktivizo ose çaktivizo të gjithë seksionin' : 'Toggle entire offers section'}
                   </p>
                 </div>
@@ -1666,10 +1719,10 @@ const Admin = () => {
             <div className="bg-card rounded-2xl p-5 shadow-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-display font-semibold text-lg">
+                  <h3 className="font-display font-semibold text-lg dark:text-white">
                     💬 Butoni "Backup WhatsApp"
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground dark:text-slate-400 mt-1">
                     Shfaq ose fsheh butonin "Backup: dërgo në WhatsApp" te checkout
                   </p>
                 </div>

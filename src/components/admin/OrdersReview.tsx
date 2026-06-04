@@ -354,7 +354,19 @@ const ConfirmDeleteDialog = ({ title, description, onConfirm, onCancel }: Confir
   );
 };
 
-const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean; onTypingCount?: (n: number) => void } = {}) => {
+type UnreadEntry = { count: number; firstMsgTs: number; sender: 'user' | 'driver' };
+
+const OrdersReview = ({
+  caglOnly = false,
+  onTypingCount,
+  onUnreadChange,
+  highlightId,
+}: {
+  caglOnly?: boolean;
+  onTypingCount?: (n: number) => void;
+  onUnreadChange?: (list: Array<{ id: string; name: string; count: number; urgent: boolean }>) => void;
+  highlightId?: string | null;
+} = {}) => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [filter, setFilter] = useState<FilterKey>('month');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
@@ -692,42 +704,67 @@ const OrdersReview = ({ caglOnly = false, onTypingCount }: { caglOnly?: boolean;
     onTypingCount?.(msgCount + typCount);
   }, [newMsgMap, typingMap, onTypingCount]);
 
-  // Global new-message SFX — play when a client/driver message arrives for any visible order
-  const ordersRef = React.useRef(orders);
-  ordersRef.current = orders;
+  // Emit unread list for the bell dropdown
   useEffect(() => {
-    const ch = (supabase as any)
-      .channel(`admin-msg-sfx-${Date.now()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_messages' }, (payload: any) => {
-        const { sender, order_id } = payload.new ?? {};
-        if (!order_id) return;
-        if ((sender === 'user' || sender === 'driver') && ordersRef.current.some((o) => o.id === order_id)) {
-          playMessageChime();
-          setNewMsgMap((prev) => {
-            const existing = prev[order_id];
-            return {
-              ...prev,
-              [order_id]: {
-                count: (existing?.count ?? 0) + 1,
-                firstMsgTs: existing?.firstMsgTs ?? Date.now(),
-                sender: sender as 'user' | 'driver',
-              },
-            };
-          });
-        }
-        // Admin replies → clear the notification for this order
-        if (sender === 'admin') {
-          setNewMsgMap((prev) => {
-            if (!prev[order_id]) return prev;
-            const next = { ...prev };
-            delete next[order_id];
-            return next;
-          });
-        }
-      })
-      .subscribe();
-    return () => (supabase as any).removeChannel(ch);
-  }, []);
+    const now = Date.now();
+    const list = orders
+      .filter((o) => newMsgMap[o.id])
+      .map((o) => ({
+        id: o.id,
+        name: o.customerName || 'Anonim',
+        count: newMsgMap[o.id].count,
+        urgent: now - newMsgMap[o.id].firstMsgTs > 3 * 60 * 1000,
+      }));
+    onUnreadChange?.(list);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newMsgMap, orders]);
+
+  // Jump to order when highlightId changes (triggered from bell dropdown)
+  useEffect(() => {
+    if (!highlightId) return;
+    const target = orders.find((o) => o.id === highlightId);
+    if (!target) return;
+    setSelectedId(highlightId);
+    if (isInHistory(target)) setStatusFilter('history');
+    else setStatusFilter('active');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightId]);
+
+  // Per-order message subscriptions — filtered postgres_changes (same pattern as subscribeOrderMessages,
+  // which is proven to work). Re-subscribe when the orders list changes.
+  const ordersIdKey = orders.map((o) => o.id).join(',');
+  useEffect(() => {
+    if (orders.length === 0) return;
+    const unsubs = orders.map((o) => {
+      const ch = (supabase as any)
+        .channel(`admin-msg-${o.id}-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'order_messages', filter: `order_id=eq.${o.id}` },
+          (payload: any) => {
+            const { sender } = payload.new ?? {};
+            if (sender === 'user' || sender === 'driver') {
+              playMessageChime();
+              setNewMsgMap((prev) => {
+                const ex = prev[o.id];
+                return { ...prev, [o.id]: { count: (ex?.count ?? 0) + 1, firstMsgTs: ex?.firstMsgTs ?? Date.now(), sender: sender as 'user' | 'driver' } };
+              });
+            }
+            if (sender === 'admin') {
+              setNewMsgMap((prev) => {
+                if (!prev[o.id]) return prev;
+                const { [o.id]: _, ...rest } = prev;
+                return rest;
+              });
+            }
+          },
+        )
+        .subscribe();
+      return () => (supabase as any).removeChannel(ch);
+    });
+    return () => unsubs.forEach((u) => u());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordersIdKey]);
 
   const handleStatus = async (id: string, status: OrderStatus) => {
     try {
