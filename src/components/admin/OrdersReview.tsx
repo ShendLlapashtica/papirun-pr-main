@@ -74,8 +74,9 @@ const CATEGORY_LABEL: Record<string, string> = {
   sides: 'Sides',
 };
 
-const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+const CopyButton: React.FC<{ text: string; size?: 'sm' | 'md' }> = ({ text, size = 'sm' }) => {
   const [copied, setCopied] = React.useState(false);
+  const iconCls = size === 'md' ? 'w-3.5 h-3.5' : 'w-3 h-3';
   return (
     <button
       onClick={(e) => {
@@ -86,9 +87,11 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
         });
       }}
       title="Kopjo"
-      className="inline-flex items-center p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-secondary/80 transition-all shrink-0 ml-1"
+      className="inline-flex items-center justify-center p-1 rounded-md bg-secondary/60 border border-border/40 text-muted-foreground hover:text-foreground hover:bg-secondary hover:border-border transition-colors shrink-0 ml-1"
     >
-      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+      {copied
+        ? <Check className={`${iconCls} text-emerald-500`} />
+        : <Copy className={iconCls} />}
     </button>
   );
 };
@@ -123,6 +126,58 @@ function groupOrderItems(items: any[]): GroupedOrderItem[] {
   }
   return Array.from(map.values());
 }
+
+const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(({ items, total }) => {
+  const grouped = groupOrderItems(items);
+  const listText = formatOrderListText(items);
+  return (
+    <div className="bg-secondary/40 rounded-2xl p-3.5 space-y-1.5">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">
+        <span className="flex items-center gap-1.5"><Receipt className="w-3 h-3" /> Porosia</span>
+        <CopyButton text={listText} size="md" />
+      </div>
+      {grouped.map((g) => (
+        <div key={g.id}>
+          <div className="text-sm flex items-center gap-1 flex-wrap">
+            <span className="font-medium">{g.totalQty}x {g.name?.sq || g.name?.en || g.id}</span>
+            {g.category && (
+              <span className="text-[11px] font-normal text-muted-foreground">
+                ({CATEGORY_LABEL[g.category] ?? g.category})
+              </span>
+            )}
+          </div>
+          {g.modifiedItems.map((m, mi) => (
+            <div key={mi} className="pl-4 mt-0.5 text-xs flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <span className="text-muted-foreground shrink-0">↳ {m.qty}x</span>
+              {m.removed.map((r, ri) => (
+                <span key={`r${ri}`} className="px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-semibold text-[10px] border border-red-500/20">
+                  Pa {r}
+                </span>
+              ))}
+              {m.extras.map((ex, ei) => (
+                <span key={`e${ei}`} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] border border-emerald-500/20">
+                  + {ex.name?.sq || ex.name?.en}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+      <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
+        <span className="text-sm">Totali</span>
+        <span className="text-primary text-lg">€{total.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  if (prev.items.length !== next.items.length) return false;
+  return prev.items.every((it, i) =>
+    it.id === next.items[i]?.id &&
+    it.quantity === next.items[i]?.quantity &&
+    (it.removedIngredients?.length ?? 0) === (next.items[i]?.removedIngredients?.length ?? 0) &&
+    (it.addedExtras?.length ?? 0) === (next.items[i]?.addedExtras?.length ?? 0)
+  );
+});
 
 function formatOrderListText(items: any[]): string {
   return groupOrderItems(items).map(g => {
@@ -1379,44 +1434,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
                         </button>
                       </div>
 
-                      <div className="bg-secondary/40 rounded-2xl p-3.5 space-y-1">
-                        <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">
-                          <span className="flex items-center gap-1.5"><Receipt className="w-3 h-3" /> Porosia</span>
-                          <CopyButton text={formatOrderListText(selected.items)} />
-                        </div>
-                        {groupOrderItems(selected.items).map((g) => (
-                          <div key={g.id}>
-                            <div className="text-sm flex items-baseline gap-1">
-                              <span>• {g.totalQty}x</span>
-                              <span className="font-medium">{g.name?.sq || g.name?.en || g.id}</span>
-                              {g.category && (
-                                <span className="text-[11px] font-normal text-muted-foreground">
-                                  ({CATEGORY_LABEL[g.category] ?? g.category})
-                                </span>
-                              )}
-                            </div>
-                            {g.modifiedItems.map((m, mi) => (
-                              <div key={mi} className="pl-5 mt-0.5 text-xs flex flex-wrap gap-x-2 gap-y-0.5">
-                                <span className="text-muted-foreground shrink-0">↳ {m.qty}x</span>
-                                {m.removed.map((r, ri) => (
-                                  <span key={`r${ri}`} className="px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-medium">
-                                    Pa {r}
-                                  </span>
-                                ))}
-                                {m.extras.map((ex, ei) => (
-                                  <span key={`e${ei}`} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-                                    + {ex.name?.sq || ex.name?.en}
-                                  </span>
-                                ))}
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                        <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
-                          <span className="text-sm">Totali</span>
-                          <span className="text-primary text-lg">€{selected.total.toFixed(2)}</span>
-                        </div>
-                      </div>
+                      <OrderItemsReceipt items={selected.items} total={selected.total} />
 
                       <div className="flex items-start gap-2 text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -1457,7 +1475,10 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
 
                       {selected.notes && (
                         <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 dark:border-amber-500/30 rounded-xl px-3 py-2">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">Shënim klienti</p>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Shënim klienti</p>
+                            <CopyButton text={selected.notes!} />
+                          </div>
                           <p className="italic text-foreground/90 text-xs">{selected.notes}</p>
                         </div>
                       )}
@@ -1679,44 +1700,7 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
               </div>
 
               {/* Order receipt */}
-              <div className="bg-secondary/40 rounded-2xl p-3.5 space-y-1">
-                <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">
-                  <span className="flex items-center gap-1.5"><Receipt className="w-3 h-3" /> Porosia</span>
-                  <CopyButton text={formatOrderListText(selected.items)} />
-                </div>
-                {groupOrderItems(selected.items).map((g) => (
-                  <div key={g.id}>
-                    <div className="text-sm flex items-baseline gap-1">
-                      <span>• {g.totalQty}x</span>
-                      <span className="font-medium">{g.name?.sq || g.name?.en || g.id}</span>
-                      {g.category && (
-                        <span className="text-[11px] font-normal text-muted-foreground">
-                          ({CATEGORY_LABEL[g.category] ?? g.category})
-                        </span>
-                      )}
-                    </div>
-                    {g.modifiedItems.map((m, mi) => (
-                      <div key={mi} className="pl-5 mt-0.5 text-xs flex flex-wrap gap-x-2 gap-y-0.5">
-                        <span className="text-muted-foreground shrink-0">↳ {m.qty}x</span>
-                        {m.removed.map((r, ri) => (
-                          <span key={`r${ri}`} className="px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 font-medium">
-                            Pa {r}
-                          </span>
-                        ))}
-                        {m.extras.map((ex, ei) => (
-                          <span key={`e${ei}`} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-                            + {ex.name?.sq || ex.name?.en}
-                          </span>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-                <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
-                  <span className="text-sm">Totali</span>
-                  <span className="text-primary text-lg">€{selected.total.toFixed(2)}</span>
-                </div>
-              </div>
+              <OrderItemsReceipt items={selected.items} total={selected.total} />
 
               <div className="flex items-start gap-2 text-muted-foreground">
                 <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -1757,7 +1741,10 @@ const OrdersReview = ({ caglOnly = false }: { caglOnly?: boolean } = {}) => {
 
               {selected.notes && (
                 <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 dark:border-amber-500/30 rounded-xl px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-0.5">Shënim klienti</p>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Shënim klienti</p>
+                    <CopyButton text={selected.notes!} />
+                  </div>
                   <p className="italic text-foreground/90 text-xs">{selected.notes}</p>
                 </div>
               )}
