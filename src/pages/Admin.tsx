@@ -1182,7 +1182,7 @@ const Admin = () => {
         <div className="flex gap-2 mb-4 overflow-x-auto -mx-1 px-1">
           {(profile === 'cagllavice'
             ? ['orders', 'drivers', 'harta'] as const
-            : ['orders', 'users', 'drivers', 'harta', 'menu', 'offers', 'content', 'databaze'] as const
+            : ['orders', 'drivers', 'harta', 'menu', 'offers', 'content', 'databaze', 'users'] as const
           ).map((tab) => (
             <button
               key={tab}
