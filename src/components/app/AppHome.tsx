@@ -21,24 +21,31 @@ const AppHome = () => {
   const { addToCart } = useCart();
 
   const search = params.get('search') ?? '';
-  const [activeCategory, setActiveCategory] = useState('all');
+  // Category is driven entirely by the URL — no state variable, no stale default.
+  // No `cat` param (or unknown value) → 'all' is always the default.
+  const VALID_CATS = new Set(['salad', 'fajita', 'sandwich']);
+  const catParam = params.get('cat') ?? '';
+  const activeCategory = VALID_CATS.has(catParam) ? catParam : 'all';
+
+  const setActiveCategory = (id: string) => {
+    const sp = new URLSearchParams(params as any);
+    if (id === 'all') sp.delete('cat');
+    else sp.set('cat', id);
+    // Also clear search when switching categories
+    navigate(`?${sp.toString()}`, { replace: true });
+  };
+
   const [visibleCount, setVisibleCount] = useState(8);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const categoryScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Force 'all' on every mount — belt-and-suspenders against any stale state
   useEffect(() => {
-    setActiveCategory('all');
     if (categoryScrollRef.current) categoryScrollRef.current.scrollLeft = 0;
   }, []);
 
   const openProduct = (id: string) => {
     navigate(`/app/product/${id}`);
   };
-
-  useEffect(() => {
-    if (search.trim()) setActiveCategory('all');
-  }, [search]);
 
   const visibleItems = useMemo(() => menuItems.filter((i) => i.category !== 'sides'), [menuItems]);
 
