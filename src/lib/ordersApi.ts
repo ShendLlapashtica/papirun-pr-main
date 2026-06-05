@@ -137,24 +137,27 @@ export const detectOrderSource = (): OrderSource => {
   } catch { return 'web'; }
 };
 
-const getNextRenditja = async (): Promise<number> => {
-  const client = supabase as any;
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const { data } = await client
-    .from(TABLE)
-    .select('renditja')
-    .gte('created_at', todayStart.toISOString())
-    .order('renditja', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (data?.renditja ?? 0) + 1;
+const getNextRenditja = async (): Promise<number | null> => {
+  try {
+    const client = supabase as any;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const { data, error } = await client
+      .from(TABLE)
+      .select('renditja')
+      .gte('created_at', todayStart.toISOString())
+      .order('renditja', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error?.code === '42703') return null; // column doesn't exist yet
+    return (data?.renditja ?? 0) + 1;
+  } catch { return null; }
 };
 
 export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord> => {
   const client = supabase as any;
   const renditja = await getNextRenditja();
-  const payload = {
+  const payload: Record<string, unknown> = {
     user_id: input.userId ?? null,
     customer_name: input.customerName,
     customer_phone: input.customerPhone,
@@ -169,8 +172,8 @@ export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord>
     notes: input.notes ?? '',
     status: 'pending',
     source: input.source ?? detectOrderSource(),
-    renditja,
   };
+  if (renditja !== null) payload.renditja = renditja;
   const { data, error } = await client.from(TABLE).insert(payload).select('*').single();
   if (error) throw error;
   return mapRow(data as Row);
