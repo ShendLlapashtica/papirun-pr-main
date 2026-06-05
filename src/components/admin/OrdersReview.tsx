@@ -1528,7 +1528,7 @@ const OrdersReview = ({
           );
         })()}
 
-        <div className="xl:grid xl:grid-cols-2 xl:gap-3 xl:items-start">
+        <div className="xl:grid xl:grid-cols-2 xl:gap-3">
         <AnimatePresence initial={false}>
           {filtered.map((o) => {
             const isSelected = o.id === selectedId;
@@ -1572,7 +1572,7 @@ const OrdersReview = ({
                     else archiveOrder(o.id);
                   }
                 }}
-                className={`relative rounded-3xl p-4 shadow-card transition-all ${
+                className={`relative rounded-3xl p-4 shadow-card transition-all xl:h-full ${
                   o.status === 'out_for_delivery'
                   ? 'bg-sky-50 dark:bg-sky-950/30 border border-sky-200/50 dark:border-sky-700/30'
                   : isCagl
