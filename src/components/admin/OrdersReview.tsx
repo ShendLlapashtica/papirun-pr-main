@@ -1120,7 +1120,7 @@ const OrdersReview = ({
       )}
 
       {/* List */}
-      <div className="space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100svh - 160px)' }}>
+      <div className="space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100svh - 160px)', scrollbarGutter: 'stable' }}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <input
@@ -1528,7 +1528,7 @@ const OrdersReview = ({
           );
         })()}
 
-        <div className="xl:grid xl:grid-cols-2 xl:gap-3">
+        <div className="flex flex-col gap-3 xl:grid xl:grid-cols-2">
         <AnimatePresence initial={false}>
           {filtered.map((o) => {
             const isSelected = o.id === selectedId;
@@ -1564,8 +1564,8 @@ const OrdersReview = ({
                 transition={{ duration: 0.15 }}
                 drag={!isLg && !isPending && !isDeleting ? 'x' : false}
                 dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.4}
-                style={{ touchAction: 'pan-y' }}
+                dragElastic={isLg ? 0 : 0.4}
+                style={{ touchAction: isLg ? 'auto' : 'pan-y' }}
                 onDragEnd={(_, info) => {
                   if (!isPending && Math.abs(info.offset.x) > 120) {
                     if (isArchived) unarchiveOrder(o.id);
