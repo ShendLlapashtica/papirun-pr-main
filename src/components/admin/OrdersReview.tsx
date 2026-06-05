@@ -750,7 +750,7 @@ const OrdersReview = ({
                 return { ...prev, [o.id]: { count: (ex?.count ?? 0) + 1, firstMsgTs: ex?.firstMsgTs ?? Date.now(), sender: sender as 'user' | 'driver' } };
               });
             }
-            if (sender === 'admin') {
+            if (sender === 'admin' || sender === 'driver') {
               setNewMsgMap((prev) => {
                 if (!prev[o.id]) return prev;
                 const { [o.id]: _, ...rest } = prev;
@@ -763,6 +763,52 @@ const OrdersReview = ({
       return () => (supabase as any).removeChannel(ch);
     });
     return () => unsubs.forEach((u) => u());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordersIdKey]);
+
+  // Restore unread notification state from DB on mount/reload so notifications survive page refresh.
+  // An order has ClientGotHisAnswer=false when its newest messages are all from 'user' with no
+  // subsequent admin or driver reply.
+  useEffect(() => {
+    if (orders.length === 0) return;
+    const orderIds = orders.map((o) => o.id);
+    let cancelled = false;
+
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('order_messages')
+        .select('order_id, sender, created_at')
+        .in('order_id', orderIds)
+        .order('created_at', { ascending: false });
+
+      if (cancelled || !data?.length) return;
+
+      const byOrder = new Map<string, Array<{ sender: string; created_at: string }>>();
+      for (const row of data) {
+        if (!byOrder.has(row.order_id)) byOrder.set(row.order_id, []);
+        byOrder.get(row.order_id)!.push(row);
+      }
+
+      const hydrated: Record<string, { count: number; firstMsgTs: number; sender: 'user' | 'driver' }> = {};
+      for (const [orderId, msgs] of byOrder.entries()) {
+        let count = 0;
+        let firstTs = Date.now();
+        for (const msg of msgs) {
+          if (msg.sender === 'admin' || msg.sender === 'driver') break;
+          if (msg.sender === 'user') {
+            count++;
+            firstTs = new Date(msg.created_at).getTime();
+          }
+        }
+        if (count > 0) {
+          hydrated[orderId] = { count, firstMsgTs: firstTs, sender: 'user' };
+        }
+      }
+
+      setNewMsgMap(hydrated);
+    })();
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordersIdKey]);
 

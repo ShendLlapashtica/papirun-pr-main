@@ -276,9 +276,9 @@ const DriversManager = () => {
         <form onSubmit={handleAdd} className="bg-card rounded-2xl p-4 shadow-card space-y-3 border border-blue-500/20">
           <p className="text-sm font-semibold text-blue-600">Shofer i Ri</p>
           <div className="grid grid-cols-3 gap-2">
-            <input value={newForm.name} onChange={(e) => setNewForm((p) => ({ ...p, name: e.target.value }))} placeholder="Emri (Delivery4)" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
-            <input value={newForm.phone} onChange={(e) => setNewForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Telefon (opsional)" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
-            <input value={newForm.pin} onChange={(e) => setNewForm((p) => ({ ...p, pin: e.target.value }))} placeholder="Fjalëkalimi" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+            <input value={newForm.name} onChange={(e) => setNewForm((p) => ({ ...p, name: e.target.value }))} placeholder="Emri (Delivery4)" className="px-3 py-2 rounded-lg bg-secondary text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+            <input value={newForm.phone} onChange={(e) => setNewForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Telefon (opsional)" className="px-3 py-2 rounded-lg bg-secondary text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+            <input value={newForm.pin} onChange={(e) => setNewForm((p) => ({ ...p, pin: e.target.value }))} placeholder="Fjalëkalimi" className="px-3 py-2 rounded-lg bg-secondary text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none" />
           </div>
           <div className="flex gap-2">
             <button type="submit" className="px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Shto</button>
@@ -298,9 +298,9 @@ const DriversManager = () => {
               {editingId === d.id ? (
                 <div className="space-y-2">
                   <div className="grid grid-cols-3 gap-2">
-                    <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} placeholder="Emri" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
-                    <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Telefon" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
-                    <input value={editForm.pin} onChange={(e) => setEditForm((p) => ({ ...p, pin: e.target.value }))} placeholder="Fjalëkalimi" className="px-3 py-2 rounded-lg bg-secondary text-sm focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+                    <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} placeholder="Emri" className="px-3 py-2 rounded-lg bg-secondary text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+                    <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Telefon" className="px-3 py-2 rounded-lg bg-secondary text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none" />
+                    <input value={editForm.pin} onChange={(e) => setEditForm((p) => ({ ...p, pin: e.target.value }))} placeholder="Fjalëkalimi" className="px-3 py-2 rounded-lg bg-secondary text-foreground text-sm placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 focus:outline-none" />
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => saveEdit(d.id)} className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center gap-1"><Save className="w-3.5 h-3.5" /> Ruaj</button>
@@ -986,7 +986,7 @@ const Admin = () => {
       '--card': '222 20% 12%', '--card-foreground': '220 10% 88%',
       '--popover': '222 20% 11%', '--popover-foreground': '220 10% 88%',
       '--secondary': '222 20% 17%', '--secondary-foreground': '220 10% 75%',
-      '--muted': '222 20% 14%', '--muted-foreground': '220 10% 46%',
+      '--muted': '222 20% 14%', '--muted-foreground': '220 10% 58%',
       '--border': '222 20% 19%', '--input': '222 20% 19%',
       '--primary': '124 22% 52%', '--primary-foreground': '0 0% 100%',
     },
@@ -1064,11 +1064,11 @@ const Admin = () => {
                   <div className="fixed inset-0 z-40" onClick={() => setShowNotifPanel(false)} />
                   <div className="absolute right-0 top-11 z-50 w-72 bg-card border border-border/50 rounded-2xl shadow-xl overflow-hidden">
                     <div className="px-3 py-2 border-b border-border/40 flex items-center justify-between">
-                      <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground dark:text-slate-400">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground dark:text-muted-foreground">
                         Pa përgjigje
                       </span>
                       {unreadOrders.length === 0 && (
-                        <span className="text-[11px] text-muted-foreground dark:text-slate-500">Asnjë</span>
+                        <span className="text-[11px] text-muted-foreground dark:text-muted-foreground">Asnjë</span>
                       )}
                     </div>
                     {unreadOrders.length > 0 ? (
@@ -1089,7 +1089,7 @@ const Admin = () => {
                             <span className={`w-2 h-2 rounded-full shrink-0 ${o.urgent ? 'bg-red-500 animate-pulse' : 'bg-violet-500'}`} />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold truncate dark:text-white">{o.name}</p>
-                              <p className={`text-[11px] ${o.urgent ? 'text-red-500 font-bold' : 'text-muted-foreground dark:text-slate-400'}`}>
+                              <p className={`text-[11px] ${o.urgent ? 'text-red-500 font-bold' : 'text-muted-foreground dark:text-muted-foreground'}`}>
                                 {o.count} mesazh{o.count !== 1 ? 'e' : ''} {o.urgent ? '— pa përgjigje !!!' : 'i ri'}
                               </p>
                             </div>
@@ -1100,7 +1100,7 @@ const Admin = () => {
                         ))}
                       </div>
                     ) : (
-                      <div className="px-3 py-6 text-center text-sm text-muted-foreground dark:text-slate-500">
+                      <div className="px-3 py-6 text-center text-sm text-muted-foreground dark:text-muted-foreground">
                         Të gjithë janë përgjigjur ✓
                       </div>
                     )}
