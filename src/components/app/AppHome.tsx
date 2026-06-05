@@ -24,6 +24,13 @@ const AppHome = () => {
   const [activeCategory, setActiveCategory] = useState('all');
   const [visibleCount, setVisibleCount] = useState(8);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const categoryScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Force 'all' on every mount — belt-and-suspenders against any stale state
+  useEffect(() => {
+    setActiveCategory('all');
+    if (categoryScrollRef.current) categoryScrollRef.current.scrollLeft = 0;
+  }, []);
 
   const openProduct = (id: string) => {
     navigate(`/app/product/${id}`);
@@ -142,7 +149,7 @@ const AppHome = () => {
 
       {/* Premium sticky category selector */}
       <div className="sticky top-[env(safe-area-inset-top,0)] z-40 bg-background/80 backdrop-blur-xl border-b border-border/40 mb-4 px-4 py-3 -mx-0">
-        <div className="flex items-center gap-2.5 overflow-x-auto scrollbar-hide snap-x">
+        <div ref={categoryScrollRef} className="flex items-center gap-2.5 overflow-x-auto scrollbar-hide snap-x">
           {categories.map((c) => {
             const isActive = activeCategory === c.id;
             return (

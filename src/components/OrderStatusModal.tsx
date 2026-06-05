@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
-import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send, CheckCheck, Star } from 'lucide-react';
+import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send, CheckCheck, Star, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchOrder, subscribeOrderRealtime, softDeleteOrder, updateOrderStatus, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import { useLanguage } from '@/contexts/LanguageContext';
 import OrderChat from '@/components/OrderChat';
 import { clearActiveOrderId } from '@/components/OrderTrackingPill';
 import { rateDriver } from '@/lib/driversApi';
+import { generateInvoice } from '@/lib/invoiceGenerator';
 
 interface Props {
   orderId: string;
@@ -122,6 +123,15 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
             </h2>
             <p className="text-[11px] text-muted-foreground">{labels[status] ?? status}</p>
           </div>
+          {order && (
+            <button
+              onClick={() => generateInvoice(order)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 active:scale-95 transition-all mr-1"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              Shfaq Faturimin
+            </button>
+          )}
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-secondary">
             <X className="w-4 h-4" />
           </button>
