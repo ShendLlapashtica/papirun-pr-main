@@ -29,7 +29,7 @@ const OrdersView = () => {
     let mounted = true;
     const sync = async () => {
       try {
-        const all = await fetchAllOrders();
+        const all = await fetchAllOrders(true);
         if (mounted) setOrders(all.filter((o) => o.userId === user.id));
       } catch {} finally {
         if (mounted) setLoading(false);
@@ -86,6 +86,12 @@ const OrdersView = () => {
               const isActive = ACTIVE_STATUSES.has(o.status);
               return (
                 <div key={o.id} className="bg-card rounded-2xl p-4 shadow-sm border border-border/40">
+                  {o.renditja != null && (
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-[11px] font-black text-primary uppercase tracking-widest">RENDITJA</span>
+                      <span className="text-lg font-black text-primary leading-none">#{o.renditja}</span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-[11px] text-muted-foreground">

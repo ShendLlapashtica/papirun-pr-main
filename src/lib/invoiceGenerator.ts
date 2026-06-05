@@ -8,7 +8,9 @@ export const generateInvoice = (order: OrderRecord) => {
   const createdAt = new Date(order.createdAt);
   const dateStr = createdAt.toLocaleDateString('sq-AL', { day: '2-digit', month: 'long', year: 'numeric' });
   const timeStr = createdAt.toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' });
-  const invoiceNum = `PAP-${order.id.slice(0, 8).toUpperCase()}`;
+  const invoiceNum = order.renditja != null
+    ? `PAP-#${order.renditja}`
+    : `PAP-${order.id.slice(0, 8).toUpperCase()}`;
 
   // Vite may inline small assets as data: URLs or emit them as /assets/[hash].png
   const logoSrc = logo.startsWith('data:') ? logo : `${window.location.origin}${logo}`;
@@ -46,6 +48,7 @@ export const generateInvoice = (order: OrderRecord) => {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Faturë ${invoiceNum} · Papirun</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     *{margin:0;padding:0;box-sizing:border-box}
@@ -104,6 +107,8 @@ export const generateInvoice = (order: OrderRecord) => {
     .qr-block{margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:6px}
     .qr-block img{width:100px;height:100px;border-radius:8px;border:1px solid #e8e8e8}
     .qr-block span{font-size:10px;color:#aaa;letter-spacing:0.3px}
+    .barcode-wrap{margin-top:10px;display:flex;flex-direction:column;align-items:center;gap:4px}
+    .barcode-wrap svg{max-width:200px}
 
     /* Action buttons */
     .print-row{text-align:center;margin-top:20px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
@@ -135,7 +140,10 @@ export const generateInvoice = (order: OrderRecord) => {
         </div>
       </div>
       <div class="invoice-meta">
-        <div class="invoice-title">Faturë</div>
+        <div>
+          <div class="invoice-title">Faturë</div>
+          ${order.renditja != null ? `<div style="font-size:11px;opacity:0.75;font-weight:600;margin-top:4px;">RENDITJA #${order.renditja}</div>` : ''}
+        </div>
         <div class="invoice-num">${invoiceNum}</div>
       </div>
     </div>
@@ -222,18 +230,37 @@ export const generateInvoice = (order: OrderRecord) => {
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fpapirun.net%2Finvoice%2F${order.id}" alt="QR Fatura" crossorigin="anonymous">
         <span>Skanoni për të parë faturën</span>
       </div>
+      <div class="barcode-wrap">
+        <svg id="invoiceBarcode"></svg>
+        <span style="font-size:10px;color:#aaa;">${invoiceNum}</span>
+      </div>
     </div>
   </div>
 
   <div class="print-row">
     <button class="btn print-btn" onclick="window.print()">🖨 Printo Faturën</button>
-    <button class="btn copy-btn" id="copyBtn" onclick="copyInvoiceImage()">📷 Kopjo si Foto</button>
+    <button class="btn copy-btn" id="dlBtn" onclick="downloadInvoice()">⬇ Shkarko Faturimin</button>
   </div>
 </div>
 
 <script>
-function copyInvoiceImage() {
-  var btn = document.getElementById('copyBtn');
+// Render barcode once JsBarcode is loaded
+window.addEventListener('load', function() {
+  if (typeof JsBarcode !== 'undefined') {
+    JsBarcode('#invoiceBarcode', '${invoiceNum}', {
+      format: 'CODE128',
+      displayValue: false,
+      height: 48,
+      width: 1.6,
+      margin: 0,
+      lineColor: '#1a1a1a',
+      background: 'transparent'
+    });
+  }
+});
+
+function downloadInvoice() {
+  var btn = document.getElementById('dlBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Duke procesuar...';
 
@@ -243,40 +270,22 @@ function copyInvoiceImage() {
     backgroundColor: '#ffffff',
     logging: false
   }).then(function(canvas) {
-    canvas.toBlob(function(blob) {
-      if (!blob) { fallbackDownload(canvas, btn); return; }
-      var item = new ClipboardItem({ 'image/png': blob });
-      navigator.clipboard.write([item]).then(function() {
-        btn.textContent = '✓ Foto u kopjua!';
-        btn.classList.add('copied');
-        btn.disabled = false;
-        setTimeout(function() {
-          btn.textContent = '📷 Kopjo si Foto';
-          btn.classList.remove('copied');
-        }, 3000);
-      }).catch(function() {
-        fallbackDownload(canvas, btn);
-      });
-    }, 'image/png');
+    var link = document.createElement('a');
+    link.download = 'fature-papirun-${invoiceNum}.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    btn.textContent = '✓ Faturimi u shkarkua!';
+    btn.classList.add('copied');
+    btn.disabled = false;
+    setTimeout(function() {
+      btn.textContent = '⬇ Shkarko Faturimin';
+      btn.classList.remove('copied');
+    }, 3000);
   }).catch(function(err) {
     console.error(err);
-    btn.textContent = '📷 Kopjo si Foto';
+    btn.textContent = '⬇ Shkarko Faturimin';
     btn.disabled = false;
   });
-}
-
-function fallbackDownload(canvas, btn) {
-  var link = document.createElement('a');
-  link.download = 'fature-papirun-${invoiceNum}.png';
-  link.href = canvas.toDataURL('image/png');
-  link.click();
-  btn.textContent = '✓ Foto u shkarkua!';
-  btn.classList.add('copied');
-  btn.disabled = false;
-  setTimeout(function() {
-    btn.textContent = '📷 Kopjo si Foto';
-    btn.classList.remove('copied');
-  }, 3000);
 }
 <\/script>
 </body>

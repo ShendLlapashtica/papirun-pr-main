@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star } from 'lucide-react';
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
+import { generateInvoice } from '@/lib/invoiceGenerator';
 import { rateDriver, fetchDriverLocation, subscribeDriverLocation, fetchDriverById, driverShortCode } from '@/lib/driversApi';
 import OrderStatusModal from '@/components/OrderStatusModal';
 import OrderChat from '@/components/OrderChat';
@@ -217,15 +218,16 @@ const OrderTrackingPill = () => {
     }
   }, [order?.status, order?.id, order?.assignedDriverId]);
 
-  // Auto-dismiss terminal states after 8s (so user sees the result) — skip if rating form is showing
+  // Auto-dismiss terminal states — rejected waits 5 min so user can read; completed auto-closes after 8 s
   useEffect(() => {
     if (!order) return;
     if (TERMINAL.includes(order.status) && !showRating) {
+      const delay = order.status === 'rejected' ? 300_000 : 8_000;
       const t = setTimeout(() => {
         clearActiveId();
         setHidden(true);
         setOrderId(null);
-      }, 8000);
+      }, delay);
       return () => clearTimeout(t);
     }
   }, [order?.status, showRating]);
@@ -275,6 +277,8 @@ const OrderTrackingPill = () => {
       haptic('success');
       setOpen(true);
       if (wasOnCart) navigate('/home', { replace: true });
+      // Show invoice immediately when order is confirmed by admin
+      setTimeout(() => generateInvoice(order), 800);
     } else if (prev === 'pending' && order?.status === 'rejected') {
       haptic('error');
       setOpen(true);

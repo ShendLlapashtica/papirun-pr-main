@@ -21,7 +21,7 @@ const AppHome = () => {
   const { addToCart } = useCart();
 
   const search = params.get('search') ?? '';
-  const [activeCategory, setActiveCategory] = useState('sandwich');
+  const [activeCategory, setActiveCategory] = useState('all');
   const [visibleCount, setVisibleCount] = useState(8);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 

@@ -1703,6 +1703,14 @@ const OrdersReview = ({
                     </div>
                   )}
 
+                  {/* ── RENDITJA ── */}
+                  {o.renditja != null && (
+                    <div className="flex items-center gap-1.5 pb-1.5 border-b border-border/30 mb-1">
+                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">RENDITJA</span>
+                      <span className="text-2xl font-black text-primary leading-none">#{o.renditja}</span>
+                    </div>
+                  )}
+
                   {/* ── Row 1: Name + status ── */}
                   <div className="flex items-start justify-between gap-2 pr-16">
                     <div className="min-w-0 flex-1">
@@ -1868,6 +1876,12 @@ const OrdersReview = ({
                   <div className="bg-card/90 backdrop-blur-xl rounded-3xl shadow-card overflow-hidden border border-border/40">
                     <div className="p-4 border-b border-border/50 flex items-start justify-between gap-2">
                       <div className="min-w-0">
+                        {selected.renditja != null && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="text-[10px] font-black text-primary uppercase tracking-widest">RENDITJA</span>
+                            <span className="text-xl font-black text-primary leading-none">#{selected.renditja}</span>
+                          </div>
+                        )}
                         <h3 className="font-bold text-base flex items-center gap-2 dark:text-white">
                           {selected.customerName}
                           <CopyButton text={selected.customerName} />

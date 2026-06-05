@@ -44,6 +44,7 @@ export interface OrderRecord {
   assignedDriverId?: string | null;
   driverRating?: number | null;
   suggestedLocation: OrderLocation;
+  renditja: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,6 +72,7 @@ type Row = {
   assigned_driver_id?: string | null;
   driver_rating?: number | null;
   suggested_location?: string | null;
+  renditja?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -103,6 +105,7 @@ const mapRow = (row: Row): OrderRecord => ({
   suggestedLocation: (row.suggested_location === 'cagllavice' || row.suggested_location === 'qender')
     ? row.suggested_location as OrderLocation
     : suggestOrderLocation(row.delivery_lat ?? null, row.delivery_lng ?? null, row.delivery_address || ''),
+  renditja: row.renditja ?? null,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -134,8 +137,23 @@ export const detectOrderSource = (): OrderSource => {
   } catch { return 'web'; }
 };
 
+const getNextRenditja = async (): Promise<number> => {
+  const client = supabase as any;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const { data } = await client
+    .from(TABLE)
+    .select('renditja')
+    .gte('created_at', todayStart.toISOString())
+    .order('renditja', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data?.renditja ?? 0) + 1;
+};
+
 export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord> => {
   const client = supabase as any;
+  const renditja = await getNextRenditja();
   const payload = {
     user_id: input.userId ?? null,
     customer_name: input.customerName,
@@ -151,6 +169,7 @@ export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord>
     notes: input.notes ?? '',
     status: 'pending',
     source: input.source ?? detectOrderSource(),
+    renditja,
   };
   const { data, error } = await client.from(TABLE).insert(payload).select('*').single();
   if (error) throw error;
@@ -164,9 +183,9 @@ export const fetchOrder = async (id: string): Promise<OrderRecord | null> => {
   return data ? mapRow(data as Row) : null;
 };
 
-export const fetchAllOrders = async (): Promise<OrderRecord[]> => {
+export const fetchAllOrders = async (ascending = false): Promise<OrderRecord[]> => {
   const client = supabase as any;
-  const { data, error } = await client.from(TABLE).select('*').order('created_at', { ascending: false }).limit(500);
+  const { data, error } = await client.from(TABLE).select('*').order('created_at', { ascending }).limit(500);
   if (error) throw error;
   return (data as Row[]).map(mapRow);
 };
