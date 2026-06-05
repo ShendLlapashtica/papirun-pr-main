@@ -317,7 +317,7 @@ const DriversManager = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-sm">{d.name}</p>
+                      <p className="font-semibold text-sm text-foreground">{d.name}</p>
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${d.isActive ? 'bg-emerald-500/15 text-emerald-600' : 'bg-secondary text-muted-foreground'}`}>
                         {d.isActive ? 'Aktiv' : 'Jo aktiv'}
                       </span>
