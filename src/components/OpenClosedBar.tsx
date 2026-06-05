@@ -43,9 +43,10 @@ const OpenClosedBar = () => {
             <span className={cn('w-2 h-2 rounded-full animate-pulse shrink-0', open ? 'bg-primary' : 'bg-destructive')} />
             <Clock className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">
-              {statusText}
-              {' · '}
               <span className="font-bold">{language === 'sq' ? loc.nameSq : loc.nameEn}</span>
+              {loc.whatsappPhone ? ` - ${loc.whatsappPhone}` : ''}
+              {' - '}
+              {statusText}
             </span>
           </div>
         );

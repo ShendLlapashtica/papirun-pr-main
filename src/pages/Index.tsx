@@ -20,7 +20,7 @@ import { getCartTotal } from '@/lib/cartPricing';
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string>('sandwich');
+  const [activeCategory, setActiveCategory] = useState<string>('all');
   const [revealedCount, setRevealedCount] = useState(2);
   const { t, language } = useLanguage();
   const { items: menuItems, isLoading: isMenuLoading } = useLiveMenuItems();
