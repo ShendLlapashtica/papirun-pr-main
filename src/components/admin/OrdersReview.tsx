@@ -1528,6 +1528,7 @@ const OrdersReview = ({
           );
         })()}
 
+        <div className="xl:grid xl:grid-cols-2 xl:gap-3 xl:items-start">
         <AnimatePresence initial={false}>
           {filtered.map((o) => {
             const isSelected = o.id === selectedId;
@@ -1561,7 +1562,7 @@ const OrdersReview = ({
                 animate={{ opacity: isDeleting ? 0.45 : 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                drag={!isPending && !isDeleting ? 'x' : false}
+                drag={!isLg && !isPending && !isDeleting ? 'x' : false}
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.4}
                 style={{ touchAction: 'pan-y' }}
@@ -1584,7 +1585,7 @@ const OrdersReview = ({
                   isGlowing ? 'ring-2 ring-primary/60 shadow-[0_0_24px_-4px_hsl(var(--primary)/0.5)]' :
                   isCagl ? 'ring-1 ring-blue-400/40 shadow-[0_0_16px_-4px_rgba(59,130,246,0.25)]' :
                   'hover:shadow-md'
-                } ${!isPending && !isDeleting ? 'cursor-grab active:cursor-grabbing' : ''} ${isDeleting ? 'pointer-events-none grayscale' : ''}`}
+                } ${!isLg && !isPending && !isDeleting ? 'cursor-grab active:cursor-grabbing' : ''} ${isDeleting ? 'pointer-events-none grayscale' : ''}`}
                 onClick={() => {
                   if (massSelectMode) {
                     setSelectedOrderIds((prev) => {
@@ -2095,6 +2096,7 @@ const OrdersReview = ({
             );
           })}
         </AnimatePresence>
+        </div>
       </div>
 
       {/* Detail panel — desktop sidebar only; mobile version renders inline in the list */}
