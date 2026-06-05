@@ -4,7 +4,7 @@ import { Check, X, Clock, Loader2, Bike, Zap, Car } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchQuickReplies, type QuickReply } from '@/lib/quickRepliesApi';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
-import { updateOrderStatus, setOrderEta, fetchAllOrders, type OrderRecord } from '@/lib/ordersApi';
+import { updateOrderStatus, setOrderEta, fetchAllOrders, softDeleteOrder, type OrderRecord } from '@/lib/ordersApi';
 import { fetchDrivers, assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import { fetchLocations } from '@/lib/locationsApi';
@@ -114,6 +114,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
         const reason = trimmed || 'Porosia u refuzua';
         await updateOrderStatus(order.id, 'rejected', reason);
         await sendOrderMessage(order.id, 'admin', reason);
+        softDeleteOrder(order.id).catch(() => {});
         toast.success('Refuzuar');
       }
       onClose();

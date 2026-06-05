@@ -261,18 +261,22 @@ const AUTO_MODE_KEY = 'papirun_admin_auto_mode';
 const loadAutoMode = (): boolean => { try { return localStorage.getItem(AUTO_MODE_KEY) === 'true'; } catch { return false; } };
 const saveAutoMode = (v: boolean) => { try { localStorage.setItem(AUTO_MODE_KEY, v ? 'true' : 'false'); } catch {} };
 
-type PezullimReason = 'traffic' | 'sunday' | 'holiday';
+type PezullimReason = 'traffic' | 'holiday' | 'custom';
+const SUNDAY_MSG = 'Nuk punojme te dielen!';
 const PEZULLIM_MESSAGES: Record<PezullimReason, string> = {
   traffic: 'Kemi shume porosi, ju lutem provoni me vone',
-  sunday:  'Nuk punojme te dielen!',
   holiday: 'Nuk punojme ne kete dite feste!',
+  custom:  '',
 };
 const AUTO_PEZULLIM_KEY    = 'papirun_admin_auto_pezullim';
 const PEZULLIM_REASON_KEY  = 'papirun_admin_pezullim_reason';
+const CUSTOM_PEZULLIM_KEY  = 'papirun_admin_pezullim_custom';
 const loadAutoPezullim     = (): boolean => { try { return localStorage.getItem(AUTO_PEZULLIM_KEY) === 'true'; } catch { return false; } };
 const saveAutoPezullim     = (v: boolean) => { try { localStorage.setItem(AUTO_PEZULLIM_KEY, v ? 'true' : 'false'); } catch {} };
 const loadPezullimReason   = (): PezullimReason | null => { try { return (localStorage.getItem(PEZULLIM_REASON_KEY) as PezullimReason) || null; } catch { return null; } };
 const savePezullimReason   = (v: PezullimReason | null) => { try { v ? localStorage.setItem(PEZULLIM_REASON_KEY, v) : localStorage.removeItem(PEZULLIM_REASON_KEY); } catch {} };
+const loadCustomPezullim   = (): string => { try { return localStorage.getItem(CUSTOM_PEZULLIM_KEY) || ''; } catch { return ''; } };
+const saveCustomPezullim   = (v: string) => { try { localStorage.setItem(CUSTOM_PEZULLIM_KEY, v); } catch {} };
 
 // ---- CSV/JSON export helpers ----
 const exportOrdersCSV = (orders: OrderRecord[]) => {
@@ -401,12 +405,16 @@ const OrdersReview = ({
   const [autoMode, setAutoMode] = useState(() => loadAutoMode());
   const [showAutoModeConfirm, setShowAutoModeConfirm] = useState(false);
   const autoModeRef = useRef(false);
+  const isSunday = new Date().getDay() === 0;
   const [autoPezullim, setAutoPezullim] = useState(() => loadAutoPezullim());
   const [pezullimReason, setPezullimReason] = useState<PezullimReason | null>(() => loadPezullimReason());
+  const [customPezullimMsg, setCustomPezullimMsg] = useState(() => loadCustomPezullim());
   const [showPezullimModal, setShowPezullimModal] = useState(false);
   const [pendingReason, setPendingReason] = useState<PezullimReason | null>(null);
+  const [pendingCustomMsg, setPendingCustomMsg] = useState('');
   const autoPezullimRef = useRef(autoPezullim);
   const pezullimReasonRef = useRef(pezullimReason);
+  const customPezullimMsgRef = useRef(customPezullimMsg);
   const driversRef = useRef<DeliveryDriver[]>([]);
   const [assignTimes, setAssignTimes] = useState<Record<string, number>>({});
   const assignAlarmFiredRef = useRef<Set<string>>(new Set());
@@ -455,6 +463,20 @@ const OrdersReview = ({
   useEffect(() => { autoModeRef.current = autoMode; saveAutoMode(autoMode); }, [autoMode]);
   useEffect(() => { autoPezullimRef.current = autoPezullim; saveAutoPezullim(autoPezullim); }, [autoPezullim]);
   useEffect(() => { pezullimReasonRef.current = pezullimReason; savePezullimReason(pezullimReason); }, [pezullimReason]);
+  useEffect(() => { customPezullimMsgRef.current = customPezullimMsg; saveCustomPezullim(customPezullimMsg); }, [customPezullimMsg]);
+  // Auto-activate pezullim when both stations are inactive
+  useEffect(() => {
+    if (isSunday || autoPezullimRef.current) return;
+    import('@/lib/locationsApi').then(({ fetchLocations }) => {
+      fetchLocations().then((locs) => {
+        if (locs.length >= 2 && locs.every((l) => !l.isActive)) {
+          setAutoPezullim(true);
+          setPezullimReason('holiday');
+        }
+      }).catch(() => {});
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => { driversRef.current = drivers; }, [drivers]);
 
   // Fetch assignment timestamps when assigned orders change
@@ -570,10 +592,13 @@ const OrdersReview = ({
               });
             }, 10000);
 
-            const isSunday = new Date().getDay() === 0;
-            if (isSunday || autoPezullimRef.current) {
-              const reason: PezullimReason = isSunday ? 'sunday' : pezullimReasonRef.current!;
-              const msg = PEZULLIM_MESSAGES[reason];
+            const isSundayNow = new Date().getDay() === 0;
+            if (isSundayNow || autoPezullimRef.current) {
+              const msg = isSundayNow
+                ? SUNDAY_MSG
+                : pezullimReasonRef.current === 'custom'
+                  ? (customPezullimMsgRef.current || 'Aktualisht nuk pranojme porosi')
+                  : PEZULLIM_MESSAGES[pezullimReasonRef.current!];
               const pendingNew = newOnes.filter((o) => o.status === 'pending');
               for (const o of pendingNew) {
                 (async () => {
@@ -1010,22 +1035,45 @@ const OrdersReview = ({
           <div className="absolute inset-0 bg-foreground/50 backdrop-blur-sm" onClick={() => setShowPezullimModal(false)} />
           <div className="relative bg-card rounded-2xl p-5 w-full max-w-sm shadow-xl space-y-3 border border-border">
             <p className="font-bold text-sm text-foreground">Zgjidh arsyen e pezullimit</p>
-            {(['traffic', 'sunday', 'holiday'] as PezullimReason[]).map((r) => (
+            {(['traffic', 'holiday'] as PezullimReason[]).map((r) => (
               <button key={r} onClick={() => setPendingReason(r)}
                 className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
                   pendingReason === r ? 'bg-primary/10 border-primary' : 'bg-secondary border-transparent hover:border-border'
                 }`}
               >
                 <div className="font-bold text-xs text-foreground">
-                  {r === 'traffic' ? '🚦 Trafik i rëndë' : r === 'sunday' ? '🌅 E diela' : '🎉 Ditë feste'}
+                  {r === 'traffic' ? 'Trafik i rende' : 'Dite feste'}
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-0.5">{PEZULLIM_MESSAGES[r]}</div>
               </button>
             ))}
+            <button onClick={() => setPendingReason('custom')}
+              className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                pendingReason === 'custom' ? 'bg-primary/10 border-primary' : 'bg-secondary border-transparent hover:border-border'
+              }`}
+            >
+              <div className="font-bold text-xs text-foreground">Tjeter arsye</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Shkruaj arsyen vete</div>
+            </button>
+            {pendingReason === 'custom' && (
+              <textarea
+                autoFocus
+                value={pendingCustomMsg}
+                onChange={(e) => setPendingCustomMsg(e.target.value)}
+                placeholder="p.sh. Jemi ne pushim, hapemi neser..."
+                rows={2}
+                className="w-full px-3 py-2 rounded-xl bg-secondary text-foreground text-xs placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+              />
+            )}
             <div className="flex gap-2 pt-1">
               <button
-                disabled={!pendingReason}
-                onClick={() => { setPezullimReason(pendingReason!); setAutoPezullim(true); setShowPezullimModal(false); }}
+                disabled={!pendingReason || (pendingReason === 'custom' && !pendingCustomMsg.trim())}
+                onClick={() => {
+                  if (pendingReason === 'custom') setCustomPezullimMsg(pendingCustomMsg.trim());
+                  setPezullimReason(pendingReason!);
+                  setAutoPezullim(true);
+                  setShowPezullimModal(false);
+                }}
                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 active:scale-[0.98] transition-all disabled:opacity-40"
               >
                 Aktivizo Pezullimin
@@ -1211,18 +1259,20 @@ const OrdersReview = ({
           </button>
           <button
             onClick={() => {
+              if (isSunday) return;
               if (autoPezullim) { setAutoPezullim(false); setPezullimReason(null); }
-              else { setPendingReason(null); setShowPezullimModal(true); }
+              else { setPendingReason(null); setPendingCustomMsg(''); setShowPezullimModal(true); }
             }}
+            title={isSunday ? 'E Diele — refuzim automatik i pandryshueshem' : undefined}
             className={`relative flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all ${
-              autoPezullim
+              autoPezullim || isSunday
                 ? 'bg-red-500 text-white shadow-lg shadow-red-500/40 animate-pulse'
                 : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
             }`}
           >
             <Ban className="w-3.5 h-3.5" />
-            {autoPezullim ? `PEZULLIM · ${pezullimReason}` : 'Auto-Pezullim'}
-            {autoPezullim && (
+            {isSunday ? 'E Diele — Auto' : autoPezullim ? `PEZULLIM · ${pezullimReason === 'custom' ? 'Tjeter' : pezullimReason}` : 'Auto-Pezullim'}
+            {(autoPezullim || isSunday) && (
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-300 rounded-full animate-ping" />
             )}
           </button>
