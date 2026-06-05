@@ -1019,7 +1019,7 @@ const Admin = () => {
               <Package className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-display font-bold text-lg">
+              <h1 className="font-display font-bold text-lg text-foreground">
                 {profile === 'cagllavice' ? 'Cagllavice Admin' : 'Papirun Admin'}
               </h1>
               <p className="text-xs text-muted-foreground capitalize">{profile ?? 'Dashboard'}</p>

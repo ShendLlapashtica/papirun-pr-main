@@ -770,8 +770,9 @@ const OrdersReview = ({
   // An order has ClientGotHisAnswer=false when its newest messages are all from 'user' with no
   // subsequent admin or driver reply.
   useEffect(() => {
-    if (orders.length === 0) return;
-    const orderIds = orders.map((o) => o.id);
+    const activeOrders = orders.filter((o) => !isInHistory(o));
+    if (activeOrders.length === 0) return;
+    const orderIds = activeOrders.map((o) => o.id);
     let cancelled = false;
 
     (async () => {
@@ -810,7 +811,7 @@ const OrdersReview = ({
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordersIdKey]);
+  }, [ordersIdKey, archivedIds]);
 
   const handleStatus = async (id: string, status: OrderStatus) => {
     try {
@@ -1434,7 +1435,11 @@ const OrdersReview = ({
                   }
                 }}
                 className={`relative rounded-3xl p-4 shadow-card transition-all ${
-                  isCagl ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-400/30' : 'bg-card'
+                  o.status === 'out_for_delivery'
+                  ? 'bg-sky-50 dark:bg-sky-950/30 border border-sky-200/50 dark:border-sky-700/30'
+                  : isCagl
+                    ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-400/30'
+                    : 'bg-card'
                 } ${
                   isMassSelected ? 'ring-2 ring-primary bg-primary/5' :
                   isSelected ? 'ring-2 ring-primary' :
