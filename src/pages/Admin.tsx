@@ -1000,7 +1000,7 @@ const Admin = () => {
 
   return (
     <div
-      className={`min-h-screen bg-background${adminTheme !== 'light' ? ' dark' : ''}`}
+      className={`min-h-screen bg-background overflow-x-hidden${adminTheme !== 'light' ? ' dark' : ''}`}
       style={themeVars as React.CSSProperties}
     >
       <input

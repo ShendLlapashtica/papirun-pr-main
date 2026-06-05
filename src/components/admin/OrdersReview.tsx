@@ -996,7 +996,7 @@ const OrdersReview = ({
   );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-4 min-w-0 overflow-x-hidden w-full">
       {/* Auto-Mode confirmation dialog */}
       {showAutoModeConfirm && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
@@ -1120,7 +1120,7 @@ const OrdersReview = ({
       )}
 
       {/* List */}
-      <div className="space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100svh - 160px)', scrollbarGutter: 'stable' }}>
+      <div className="space-y-3 overflow-y-scroll overflow-x-hidden min-w-0" style={{ maxHeight: 'calc(100svh - 160px)' }}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <input
