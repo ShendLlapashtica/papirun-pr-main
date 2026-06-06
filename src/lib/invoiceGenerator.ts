@@ -46,7 +46,7 @@ export const generateInvoice = (order: OrderRecord, autoDownload = false) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Faturë NR${orderNum} · Papirun</title>
+  <title>Faturë ${order.renditja != null ? `NR${order.renditja}` : uniqueId} · Papirun</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
   <style>
@@ -143,7 +143,7 @@ export const generateInvoice = (order: OrderRecord, autoDownload = false) => {
         <div class="invoice-title">Faturë</div>
         <div style="text-align:right">
           <div style="font-size:11px;opacity:0.75;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Nr. Porosisë</div>
-          <div style="font-family:monospace;font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;">NR${orderNum}</div>
+          <div style="font-family:monospace;font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;">${order.renditja != null ? `NR${order.renditja}` : uniqueId}</div>
         </div>
       </div>
     </div>

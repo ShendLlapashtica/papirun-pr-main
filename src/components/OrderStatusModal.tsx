@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send, CheckCheck, Star, Receipt } from 'lucide-react';
+import { Loader2, X, MessageCircle, Trash2, Clock, CheckCircle2, XCircle, ChefHat, Bike, PartyPopper, Send, CheckCheck, Star, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchOrder, subscribeOrderRealtime, softDeleteOrder, updateOrderStatus, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -125,11 +125,11 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
           </div>
           {order && (
             <button
-              onClick={() => generateInvoice(order)}
+              onClick={() => generateInvoice(order, true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 active:scale-95 transition-all mr-1"
             >
-              <Receipt className="w-3.5 h-3.5" />
-              Shfaq Faturimin
+              <Download className="w-3.5 h-3.5" />
+              Shkarko Faturimin
             </button>
           )}
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-secondary">
