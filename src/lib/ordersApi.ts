@@ -137,20 +137,30 @@ export const detectOrderSource = (): OrderSource => {
   } catch { return 'web'; }
 };
 
+const toPristinaDay = (iso: string): string =>
+  new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Pristina' });
+
+const assignDailyRenditja = (orders: OrderRecord[]): OrderRecord[] => {
+  const asc = [...orders].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const counts: Record<string, number> = {};
+  const map: Record<string, number> = {};
+  for (const o of asc) {
+    const d = toPristinaDay(o.createdAt);
+    counts[d] = (counts[d] ?? 0) + 1;
+    map[o.id] = counts[d];
+  }
+  return orders.map(o => ({ ...o, renditja: o.renditja ?? map[o.id] ?? null }));
+};
+
 const getNextRenditja = async (): Promise<number | null> => {
   try {
-    const client = supabase as any;
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const { data, error } = await client
+    const today = toPristinaDay(new Date().toISOString());
+    const { count, error } = await (supabase as any)
       .from(TABLE)
-      .select('renditja')
-      .gte('created_at', todayStart.toISOString())
-      .order('renditja', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error?.code === '42703') return null; // column doesn't exist yet
-    return (data?.renditja ?? 0) + 1;
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', today + 'T00:00:00.000Z');
+    if (error) return null;
+    return (count ?? 0) + 1;
   } catch { return null; }
 };
 
@@ -183,14 +193,24 @@ export const fetchOrder = async (id: string): Promise<OrderRecord | null> => {
   const client = supabase as any;
   const { data, error } = await client.from(TABLE).select('*').eq('id', id).maybeSingle();
   if (error) throw error;
-  return data ? mapRow(data as Row) : null;
+  if (!data) return null;
+  const order = mapRow(data as Row);
+  if (order.renditja !== null) return order;
+  // Compute position: count orders from same Pristina day placed before this one
+  const today = toPristinaDay(order.createdAt);
+  const { count } = await client
+    .from(TABLE)
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', today + 'T00:00:00.000Z')
+    .lt('created_at', order.createdAt);
+  return { ...order, renditja: (count ?? 0) + 1 };
 };
 
 export const fetchAllOrders = async (ascending = false): Promise<OrderRecord[]> => {
   const client = supabase as any;
   const { data, error } = await client.from(TABLE).select('*').order('created_at', { ascending }).limit(500);
   if (error) throw error;
-  return (data as Row[]).map(mapRow);
+  return assignDailyRenditja((data as Row[]).map(mapRow));
 };
 
 export const updateOrderStatus = async (id: string, status: OrderStatus, adminNote = '') => {
