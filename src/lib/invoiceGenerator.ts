@@ -8,9 +8,9 @@ export const generateInvoice = (order: OrderRecord) => {
   const createdAt = new Date(order.createdAt);
   const dateStr = createdAt.toLocaleDateString('sq-AL', { day: '2-digit', month: 'long', year: 'numeric' });
   const timeStr = createdAt.toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' });
-  const invoiceNum = order.renditja != null
-    ? `PAP-#${order.renditja}`
-    : `PAP-${order.id.slice(0, 8).toUpperCase()}`;
+  const uniqueId = `PAP-${order.id.slice(0, 8).toUpperCase()}`;
+  const orderNum = order.renditja != null ? `${order.renditja}` : uniqueId;
+  const invoiceNum = uniqueId; // barcode always uses the unique ID
 
   // Vite may inline small assets as data: URLs or emit them as /assets/[hash].png
   const logoSrc = logo.startsWith('data:') ? logo : `${window.location.origin}${logo}`;
@@ -46,7 +46,7 @@ export const generateInvoice = (order: OrderRecord) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Faturë ${invoiceNum} · Papirun</title>
+  <title>Faturë #${orderNum} · Papirun</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
   <style>
@@ -140,11 +140,11 @@ export const generateInvoice = (order: OrderRecord) => {
         </div>
       </div>
       <div class="invoice-meta">
-        <div>
-          <div class="invoice-title">Faturë</div>
-          ${order.renditja != null ? `<div style="font-size:11px;opacity:0.75;font-weight:600;margin-top:4px;">RENDITJA #${order.renditja}</div>` : ''}
+        <div class="invoice-title">Faturë</div>
+        <div style="text-align:right">
+          <div style="font-size:11px;opacity:0.75;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Nr. Porosisë</div>
+          <div style="font-family:monospace;font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;">#${orderNum}</div>
         </div>
-        <div class="invoice-num">${invoiceNum}</div>
       </div>
     </div>
 
@@ -232,7 +232,8 @@ export const generateInvoice = (order: OrderRecord) => {
       </div>
       <div class="barcode-wrap">
         <svg id="invoiceBarcode"></svg>
-        <span style="font-size:10px;color:#aaa;">${invoiceNum}</span>
+        <span style="font-size:9px;color:#bbb;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Nr Unik Identifikues</span>
+        <span style="font-size:10px;color:#aaa;font-family:monospace;">${uniqueId}</span>
       </div>
     </div>
   </div>
