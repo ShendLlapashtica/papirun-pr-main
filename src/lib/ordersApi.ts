@@ -153,15 +153,9 @@ const assignDailyRenditja = (orders: OrderRecord[]): OrderRecord[] => {
 };
 
 const getNextRenditja = async (): Promise<number | null> => {
-  try {
-    const today = toPristinaDay(new Date().toISOString());
-    const { count, error } = await (supabase as any)
-      .from(TABLE)
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', today + 'T00:00:00.000Z');
-    if (error) return null;
-    return (count ?? 0) + 1;
-  } catch { return null; }
+  // renditja column not yet in DB — return null so createOrder doesn't include it.
+  // Display numbers come from assignDailyRenditja() counting created_at instead.
+  return null;
 };
 
 export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord> => {
