@@ -46,6 +46,7 @@ export interface OrderRecord {
   suggestedLocation: OrderLocation;
   createdAt: string;
   updatedAt: string;
+  renditja?: number | null;
 }
 
 type Row = {
@@ -73,6 +74,7 @@ type Row = {
   suggested_location?: string | null;
   created_at: string;
   updated_at: string;
+  renditja?: number | null;
 };
 
 const TABLE = 'orders';
@@ -105,6 +107,7 @@ const mapRow = (row: Row): OrderRecord => ({
     : suggestOrderLocation(row.delivery_lat ?? null, row.delivery_lng ?? null, row.delivery_address || ''),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  renditja: row.renditja ?? null,
 });
 
 export interface CreateOrderInput {
