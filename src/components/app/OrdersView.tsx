@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Loader2, ClipboardList, Package, ChefHat, Bike, CheckCheck, X as XIcon, Hourglass, MessageCircle, Archive } from 'lucide-react';
+import { Loader2, ClipboardList, Package, ChefHat, Bike, CheckCheck, X as XIcon, Hourglass, MessageCircle, Archive, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchAllOrders, subscribeAllOrdersRealtime, type OrderRecord } from '@/lib/ordersApi';
+import { generateInvoice } from '@/lib/invoiceGenerator';
 import { fetchArchivedOrderMessages, type ArchivedMessage } from '@/lib/orderMessagesApi';
 import OrderStatusModal from '@/components/OrderStatusModal';
 import { haptic } from '@/lib/native';
@@ -84,6 +85,7 @@ const OrdersView = () => {
               const s = STATUS[o.status as keyof typeof STATUS] ?? STATUS.pending;
               const Icon = s.icon;
               const isActive = ACTIVE_STATUSES.has(o.status);
+              const hasInvoice = o.status !== 'pending' && o.status !== 'rejected';
               return (
                 <div key={o.id} className="bg-card rounded-2xl p-4 shadow-sm border border-border/40">
                   {o.renditja != null && (
@@ -108,17 +110,28 @@ const OrdersView = () => {
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-2.5">
                     {o.items.map((i: any) => `${i.quantity}× ${i.name?.sq || i.name?.en || ''}`).join(' · ')}
                   </p>
-                  <button
-                    onClick={() => openChat(o.id)}
-                    className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold active:scale-95 transition-all ${
-                      isActive
-                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                        : 'bg-secondary/70 text-foreground hover:bg-secondary'
-                    }`}
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    PapirunChat{isActive && ' · LIVE'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openChat(o.id)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold active:scale-95 transition-all ${
+                        isActive
+                          ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                          : 'bg-secondary/70 text-foreground hover:bg-secondary'
+                      }`}
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      PapirunChat{isActive && ' · LIVE'}
+                    </button>
+                    {hasInvoice && (
+                      <button
+                        onClick={() => generateInvoice(o, true)}
+                        className="flex items-center justify-center gap-1 py-2 px-3 rounded-xl text-xs font-semibold bg-secondary/70 text-foreground hover:bg-secondary active:scale-95 transition-all"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Shkarko Faturën
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

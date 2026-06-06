@@ -1,7 +1,7 @@
 import type { OrderRecord } from '@/lib/ordersApi';
 import logo from '@/assets/logo.png';
 
-export const generateInvoice = (order: OrderRecord) => {
+export const generateInvoice = (order: OrderRecord, autoDownload = false) => {
   const w = window.open('', '_blank');
   if (!w) return;
 
@@ -46,7 +46,7 @@ export const generateInvoice = (order: OrderRecord) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Faturë #${orderNum} · Papirun</title>
+  <title>Faturë NR${orderNum} · Papirun</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
   <style>
@@ -143,7 +143,7 @@ export const generateInvoice = (order: OrderRecord) => {
         <div class="invoice-title">Faturë</div>
         <div style="text-align:right">
           <div style="font-size:11px;opacity:0.75;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Nr. Porosisë</div>
-          <div style="font-family:monospace;font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;">#${orderNum}</div>
+          <div style="font-family:monospace;font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;">NR${orderNum}</div>
         </div>
       </div>
     </div>
@@ -258,12 +258,12 @@ window.addEventListener('load', function() {
       background: 'transparent'
     });
   }
+  ${autoDownload ? `setTimeout(function() { downloadInvoice(function() { setTimeout(function() { window.close(); }, 400); }); }, 900);` : ''}
 });
 
-function downloadInvoice() {
+function downloadInvoice(onDone) {
   var btn = document.getElementById('dlBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Duke procesuar...';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Duke procesuar...'; }
 
   html2canvas(document.getElementById('invoiceCard'), {
     scale: 2,
@@ -275,17 +275,19 @@ function downloadInvoice() {
     link.download = 'fature-papirun-${invoiceNum}.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
-    btn.textContent = '✓ Faturimi u shkarkua!';
-    btn.classList.add('copied');
-    btn.disabled = false;
-    setTimeout(function() {
-      btn.textContent = '⬇ Shkarko Faturimin';
-      btn.classList.remove('copied');
-    }, 3000);
+    if (btn) {
+      btn.textContent = '✓ Faturimi u shkarkua!';
+      btn.classList.add('copied');
+      btn.disabled = false;
+      setTimeout(function() {
+        btn.textContent = '⬇ Shkarko Faturimin';
+        btn.classList.remove('copied');
+      }, 3000);
+    }
+    if (typeof onDone === 'function') onDone();
   }).catch(function(err) {
     console.error(err);
-    btn.textContent = '⬇ Shkarko Faturimin';
-    btn.disabled = false;
+    if (btn) { btn.textContent = '⬇ Shkarko Faturimin'; btn.disabled = false; }
   });
 }
 <\/script>

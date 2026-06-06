@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star } from 'lucide-react';
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
-import { generateInvoice } from '@/lib/invoiceGenerator';
 import { rateDriver, fetchDriverLocation, subscribeDriverLocation, fetchDriverById, driverShortCode } from '@/lib/driversApi';
 import OrderStatusModal from '@/components/OrderStatusModal';
 import OrderChat from '@/components/OrderChat';
@@ -277,8 +276,6 @@ const OrderTrackingPill = () => {
       haptic('success');
       setOpen(true);
       if (wasOnCart) navigate('/home', { replace: true });
-      // Show invoice immediately when order is confirmed by admin
-      setTimeout(() => generateInvoice(order), 800);
     } else if (prev === 'pending' && order?.status === 'rejected') {
       haptic('error');
       setOpen(true);
