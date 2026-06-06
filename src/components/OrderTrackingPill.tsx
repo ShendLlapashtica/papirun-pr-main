@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star } from 'lucide-react';
+import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star, Download } from 'lucide-react';
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import { rateDriver, fetchDriverLocation, subscribeDriverLocation, fetchDriverById, driverShortCode } from '@/lib/driversApi';
+import { generateInvoice } from '@/lib/invoiceGenerator';
 import OrderStatusModal from '@/components/OrderStatusModal';
 import OrderChat from '@/components/OrderChat';
 import CustomerDriverMap from '@/components/CustomerDriverMap';
@@ -660,9 +661,20 @@ const OrderTrackingPill = () => {
                 <MessageCircle className="w-3.5 h-3.5 text-primary" />
                 PapirunChat
               </span>
-              <button onClick={() => { setOpen(false); setAutoShowEnabled(false); }} className="p-1 rounded-full hover:bg-secondary">
-                <XIcon className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                {order && !isRejected && (
+                  <button
+                    onClick={() => generateInvoice(order, true)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-bold hover:bg-primary/20 active:scale-95 transition-all"
+                  >
+                    <Download className="w-3 h-3" />
+                    Shkarko Faturimin
+                  </button>
+                )}
+                <button onClick={() => { setOpen(false); setAutoShowEnabled(false); }} className="p-1 rounded-full hover:bg-secondary">
+                  <XIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             {/* Rejection banner with admin note */}
             {isRejected && (
