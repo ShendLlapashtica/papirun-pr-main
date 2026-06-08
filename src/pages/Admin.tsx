@@ -184,13 +184,11 @@ const SiteTextsEditor = ({ language }: { language: Language }) => {
   );
 };
 
-const ADMIN_AUTH_KEY = 'papirun_admin_authed';
-
 type AdminProfile = 'qendra' | 'cagllavice';
 
-const ADMIN_CREDENTIALS: Record<string, { password: string; profile: AdminProfile }> = {
-  qendra:     { password: 'Pass123', profile: 'qendra' },
-  cagllavice: { password: 'Pass123', profile: 'cagllavice' },
+const profileFromEmail = (email: string): AdminProfile => {
+  const username = email.split('@')[0].toLowerCase();
+  return username === 'cagllavice' ? 'cagllavice' : 'qendra';
 };
 
 // ---- Drivers Manager ----
@@ -446,14 +444,7 @@ class TabErrorBoundary extends Component<{ children: ReactNode }, { crashed: boo
 }
 
 const Admin = () => {
-  const [profile, setProfile] = useState<AdminProfile | null>(() => {
-    try {
-      const val = localStorage.getItem(ADMIN_AUTH_KEY);
-      if (val === 'qendra' || val === 'cagllavice') return val;
-      if (val === '1') return 'qendra'; // backward compat
-      return null;
-    } catch { return null; }
-  });
+  const [profile, setProfile] = useState<AdminProfile | null>(null);
   const isAuthenticated = profile !== null;
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -520,6 +511,21 @@ const Admin = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
 
+  // Sync profile from Supabase Auth session
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.email) setProfile(profileFromEmail(session.user.email));
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.email) {
+        setProfile(profileFromEmail(session.user.email));
+      } else {
+        setProfile(null);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const { items: liveItems } = useLiveMenuItems();
 
   useEffect(() => {
@@ -584,37 +590,22 @@ const Admin = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const key = adminUsername.trim().toLowerCase();
-    const match = ADMIN_CREDENTIALS[key];
-    if (!match) { setError('Username ose fjalëkalim i gabuar'); return; }
-
+    const username = adminUsername.trim().toLowerCase();
+    if (!username || !adminPassword) { setError('Plotëso të gjitha fushat'); return; }
     setLoginChecking(true);
+    setError('');
     try {
-      const dbPw = await fetchStorefrontSetting<string | null>(`admin_pw_${key}`, null);
-      const effectivePw = dbPw ?? match.password;
-      if (adminPassword === effectivePw) {
-        setProfile(match.profile);
-        try { localStorage.setItem(ADMIN_AUTH_KEY, match.profile); } catch {}
-        setError('');
-      } else {
-        setError('Username ose fjalëkalim i gabuar');
-      }
+      const email = `${username}@papirun.net`;
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password: adminPassword });
+      if (authError) setError('Username ose fjalëkalim i gabuar');
     } catch {
-      // DB unreachable — fall back to hardcoded
-      if (adminPassword === match.password) {
-        setProfile(match.profile);
-        try { localStorage.setItem(ADMIN_AUTH_KEY, match.profile); } catch {}
-        setError('');
-      } else {
-        setError('Username ose fjalëkalim i gabuar');
-      }
+      setError('Gabim gjatë kyçjes, provo përsëri');
     } finally {
       setLoginChecking(false);
     }
   };
 
   const handleChangePassword = async () => {
-    if (!profile) return;
     if (!changePwNew || changePwNew.length < 6) {
       setChangePwError('Fjalëkalimi duhet të jetë të paktën 6 karaktere');
       return;
@@ -625,13 +616,12 @@ const Admin = () => {
     }
     setChangePwLoading(true);
     try {
-      const dbPw = await fetchStorefrontSetting<string | null>(`admin_pw_${profile}`, null);
-      const effectivePw = dbPw ?? (ADMIN_CREDENTIALS[profile]?.password ?? '');
-      if (changePwCurrent !== effectivePw) {
-        setChangePwError('Fjalëkalimi aktual është i gabuar');
-        return;
-      }
-      await upsertStorefrontSetting(`admin_pw_${profile}`, changePwNew);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.email) { setChangePwError('Sesioni ka skaduar'); return; }
+      const { error: verifyError } = await supabase.auth.signInWithPassword({ email: session.user.email, password: changePwCurrent });
+      if (verifyError) { setChangePwError('Fjalëkalimi aktual është i gabuar'); return; }
+      const { error: updateError } = await supabase.auth.updateUser({ password: changePwNew });
+      if (updateError) throw updateError;
       setShowChangePw(false);
       setChangePwCurrent(''); setChangePwNew(''); setChangePwConfirm(''); setChangePwError('');
       toast.success('Fjalëkalimi u ndryshua');
@@ -1116,10 +1106,7 @@ const Admin = () => {
               <KeyRound className="w-4 h-4" />
             </button>
             <button
-              onClick={() => {
-                setProfile(null);
-                try { localStorage.removeItem(ADMIN_AUTH_KEY); } catch {}
-              }}
+              onClick={() => supabase.auth.signOut()}
               className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors text-sm"
             >
               <LogOut className="w-4 h-4" />

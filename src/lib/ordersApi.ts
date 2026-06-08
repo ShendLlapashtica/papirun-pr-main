@@ -162,7 +162,7 @@ export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord>
 
 export const fetchOrder = async (id: string): Promise<OrderRecord | null> => {
   const client = supabase as any;
-  const { data, error } = await client.from(TABLE).select('*').eq('id', id).maybeSingle();
+  const { data, error } = await client.rpc('get_order_by_id', { p_order_id: id }).maybeSingle();
   if (error) throw error;
   return data ? mapRow(data as Row) : null;
 };
