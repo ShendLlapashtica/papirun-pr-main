@@ -44,6 +44,7 @@ export interface OrderRecord {
   assignedDriverId?: string | null;
   driverRating?: number | null;
   suggestedLocation: OrderLocation;
+  nrPorosia: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,6 +72,7 @@ type Row = {
   assigned_driver_id?: string | null;
   driver_rating?: number | null;
   suggested_location?: string | null;
+  nr_porosia?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -103,6 +105,7 @@ const mapRow = (row: Row): OrderRecord => ({
   suggestedLocation: (row.suggested_location === 'cagllavice' || row.suggested_location === 'qender')
     ? row.suggested_location as OrderLocation
     : suggestOrderLocation(row.delivery_lat ?? null, row.delivery_lng ?? null, row.delivery_address || ''),
+  nrPorosia: row.nr_porosia ?? null,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });

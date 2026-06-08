@@ -127,6 +127,16 @@ const Index = () => {
             <div className="text-center mb-8 sm:mb-10">
               <h2 className="font-display font-bold text-2xl sm:text-3xl mb-2 sm:mb-3">{t.reviews.title}</h2>
               <p className="text-sm sm:text-base text-muted-foreground">{t.reviews.subtitle}</p>
+              <div className="mt-4 flex justify-center">
+                <a
+                  href="https://www.google.com/search?sca_esv=ec0135bcbec233e7&sxsrf=ANbL-n4O-4efsq65Q_2sLGmpC7A9iWk-dA:1780949741420&si=AL3DRZEsmMGCryMMFSHJ3StBhOdZ2-6yYkXd_doETEE1OR-qOdK7ma8r0EM4qQt8KHmI7e2WBGjeh5vl0amUAiU_o8ze_7tzBmmblN6QVhtoVW10aUULMtj3yl1GTO7ZTqOrWOFQ1rNz&q=Papirun+Reviews&sa=X&ved=2ahUKEwjF08zluviUAxVdhf0HHUS5PdsQ0bkNegQIORAH&biw=697&bih=663&dpr=1.38#lrd=0x13549ee685d7c721:0xff91baa797df481e,3,,,,"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold text-xs sm:text-sm hover:opacity-90 active:scale-[0.98] transition-all shadow-glow"
+                >
+                  Shkruaj një vlerësim
+                </a>
+              </div>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
               {reviews.map((review) => (

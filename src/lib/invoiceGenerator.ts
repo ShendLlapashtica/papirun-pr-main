@@ -143,7 +143,7 @@ export const generateInvoice = (order: OrderRecord, autoDownload = false) => {
         <div class="invoice-title">Faturë</div>
         <div style="text-align:right">
           <div style="font-size:11px;opacity:0.75;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Nr. Porosisë</div>
-          <div style="font-family:monospace;font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;">${order.renditja != null ? `NR${order.renditja}` : uniqueId}</div>
+          <div style="font-family:monospace;font-size:28px;font-weight:900;letter-spacing:-1px;line-height:1;">${order.nrPorosia != null ? `NR${order.nrPorosia}` : order.renditja != null ? `NR${order.renditja}` : uniqueId}</div>
         </div>
       </div>
     </div>

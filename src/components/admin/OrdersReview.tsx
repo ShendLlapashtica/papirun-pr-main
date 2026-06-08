@@ -164,7 +164,7 @@ const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(
                 ))}
                 {m.extras.map((ex, ei) => (
                   <span key={`e${ei}`} className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] border border-emerald-500/20">
-                    + {ex.name?.sq || ex.name?.en}
+                    + {ex.name?.sq || ex.name?.en} (+€{Number(ex.price || 0).toFixed(2)})
                   </span>
                 ))}
               </div>
@@ -663,7 +663,8 @@ const OrdersReview = ({
     });
   }, [orders, filter, customFrom, customTo]);
 
-  const isInHistory = (o: OrderRecord) => o.isVisible === false || archivedIds.has(o.id) || o.status === 'histori';
+  const isInHistory = (o: OrderRecord) =>
+    o.isVisible === false || archivedIds.has(o.id) || o.status === 'completed' || o.status === 'rejected';
 
   const counts = useMemo(() => {
     const visible = timeFiltered.filter((o) => !isInHistory(o));
@@ -1711,6 +1712,14 @@ const OrdersReview = ({
                     </div>
                   )}
 
+                  {/* ── NR POROSIA ── */}
+                  {o.nrPorosia != null && (
+                    <div className="flex items-center gap-1.5 pb-1.5 border-b border-border/30 mb-1">
+                      <span className="text-[10px] font-black text-primary uppercase tracking-widest">NR POROSIA</span>
+                      <span className="text-2xl font-black text-primary leading-none">#{o.nrPorosia}</span>
+                    </div>
+                  )}
+
                   {/* ── Row 1: Name + status ── */}
                   <div className="flex items-start justify-between gap-2 pr-16">
                     <div className="min-w-0 flex-1">
@@ -1745,6 +1754,14 @@ const OrdersReview = ({
                   <div className="flex items-start gap-1 text-[11px] text-muted-foreground dark:text-slate-400 -mt-1">
                     <MapPin className="w-3 h-3 shrink-0 mt-0.5 opacity-50" />
                     <span className="truncate leading-snug">{o.deliveryAddress}</span>
+                  </div>
+
+                  {/* ── Items + extras summary ── */}
+                  <div className="text-[11px] text-muted-foreground/80 mt-1">
+                    {o.items.map((it: any) => {
+                      const extras = it.addedExtras?.map((ext: any) => ext.name?.sq || ext.name?.en).join(', ');
+                      return `${it.quantity}x ${it.name?.sq || it.name?.en}${extras ? ` (${extras})` : ''}`;
+                    }).join(', ')}
                   </div>
 
                   {/* ── Customer note banner ── */}
@@ -1880,6 +1897,12 @@ const OrdersReview = ({
                           <div className="flex items-center gap-1 mb-1">
                             <span className="text-[10px] font-black text-primary uppercase tracking-widest">RENDITJA</span>
                             <span className="text-xl font-black text-primary leading-none">#{selected.renditja}</span>
+                          </div>
+                        )}
+                        {selected.nrPorosia != null && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="text-[10px] font-black text-primary uppercase tracking-widest">NR POROSIA</span>
+                            <span className="text-xl font-black text-primary leading-none">#{selected.nrPorosia}</span>
                           </div>
                         )}
                         <h3 className="font-bold text-base flex items-center gap-2 dark:text-white">
@@ -2300,6 +2323,12 @@ const OrdersReview = ({
                         <CheckCheck className="w-4 h-4" /> Përfundo
                       </button>
                     </div>
+                    <button
+                      onClick={() => handleStatus(selected.id, 'rejected')}
+                      className="text-xs px-2 py-2.5 rounded-xl font-semibold bg-destructive/10 text-destructive hover:bg-destructive/20 inline-flex flex-col items-center gap-1 active:scale-95 transition-all w-full mt-1"
+                    >
+                      <X className="w-4 h-4" /> Anulo
+                    </button>
                   </div>
                 </div>
               )}
