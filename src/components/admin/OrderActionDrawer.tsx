@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
-import { Check, X, Clock, Loader2, Bike, Zap, Car } from 'lucide-react';
+import { Check, X, Loader2, Bike, Zap, Car } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchQuickReplies, type QuickReply } from '@/lib/quickRepliesApi';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
-import { updateOrderStatus, setOrderEta, fetchAllOrders, softDeleteOrder, type OrderRecord } from '@/lib/ordersApi';
+import { updateOrderStatus, fetchAllOrders, softDeleteOrder, type OrderRecord } from '@/lib/ordersApi';
 import { fetchDrivers, assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import { fetchLocations } from '@/lib/locationsApi';
@@ -37,12 +37,9 @@ interface Props {
   onClose: () => void;
 }
 
-const ETA_OPTIONS = [15, 20, 30, 45];
-
 const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
   const [replies, setReplies] = useState<QuickReply[]>([]);
   const [note, setNote] = useState('');
-  const [eta, setEta] = useState<number | null>(20);
   const [submitting, setSubmitting] = useState(false);
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
@@ -55,7 +52,6 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
   useEffect(() => {
     if (!open) return;
     setNote(isApprove ? 'Porosia juaj eshte aprovuar !' : '');
-    setEta(isApprove ? 20 : null);
     setSelectedDriverId('none');
     setRouteSuggestions([]);
     fetchQuickReplies(mode!).then(setReplies).catch(() => setReplies([]));
@@ -92,7 +88,6 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
         const msg = trimmed || 'Porosia juaj eshte aprovuar !';
         await sendOrderMessage(order.id, 'admin', msg);
         await updateOrderStatus(order.id, 'approved', trimmed);
-        if (eta) await setOrderEta(order.id, eta);
 
         // Assign driver — skip if 'none' selected
         if (selectedDriverId !== 'none' && drivers.length > 0) {
@@ -153,35 +148,6 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
             <p className="text-xs text-muted-foreground mt-1 mb-4">
               {order?.customerName} · €{order?.total.toFixed(2)}
             </p>
-
-            {isApprove && (
-              <div className="mb-4">
-                <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> Koha e përgatitjes
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {ETA_OPTIONS.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setEta(m)}
-                      className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
-                        eta === m ? 'bg-primary text-primary-foreground shadow' : 'bg-secondary hover:bg-primary/10'
-                      }`}
-                    >
-                      {m} min
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setEta(null)}
-                    className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
-                      eta === null ? 'bg-foreground text-background' : 'bg-secondary hover:bg-foreground/10'
-                    }`}
-                  >
-                    Pa ETA
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Driver assignment — only shown when approving */}
             {isApprove && (
