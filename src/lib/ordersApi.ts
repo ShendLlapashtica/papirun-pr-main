@@ -228,6 +228,20 @@ export const archiveAllActiveOrders = async (): Promise<void> => {
   if (error) throw error;
 };
 
+/** Driver: update order status via RPC — bypasses RLS for PIN-authed drivers */
+export const driverUpdateOrderStatus = async (id: string, status: OrderStatus): Promise<void> => {
+  const client = supabase as any;
+  const { error } = await client.rpc('driver_update_order_status', { p_order_id: id, p_status: status });
+  if (error) throw error;
+};
+
+/** Driver: archive all active orders at midnight via RPC — bypasses RLS */
+export const driverArchiveActiveOrders = async (): Promise<void> => {
+  const client = supabase as any;
+  const { error } = await client.rpc('driver_archive_active_orders');
+  if (error) throw error;
+};
+
 /** Truncate — hard delete every order. For admin clean-slate button. */
 export const hardDeleteAllOrders = async (): Promise<void> => {
   const client = supabase as any;

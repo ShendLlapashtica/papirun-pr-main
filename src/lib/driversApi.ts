@@ -401,25 +401,22 @@ export const fetchOrderAssignTimes = async (orderIds: string[]): Promise<Record<
   return map;
 };
 
-/** Rate a driver for a specific order (1-5) */
+/** Rate a driver for a specific order (1-5) — uses RPC to bypass RLS for guest callers */
 export const rateDriver = async (orderId: string, rating: number, note?: string) => {
   if (rating < 1 || rating > 5) throw new Error('Rating must be 1-5');
   const client = supabase as any;
-  const payload: any = { driver_rating: rating };
-  if (note) payload.driver_rating_note = note;
-  const { error } = await client.from('orders').update(payload).eq('id', orderId);
+  const { error } = await client.rpc('guest_rate_driver', {
+    p_order_id: orderId,
+    p_rating: rating,
+    p_note: note ?? null,
+  });
   if (error) throw error;
 };
 
-/** Fetch orders assigned to a specific driver */
+/** Fetch orders assigned to a specific driver — uses RPC to bypass RLS for anon drivers */
 export const fetchDriverOrders = async (driverId: string) => {
   const client = supabase as any;
-  const { data, error } = await client
-    .from('orders')
-    .select('*')
-    .eq('assigned_driver_id', driverId)
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const { data, error } = await client.rpc('driver_fetch_orders', { p_driver_id: driverId });
   if (error) throw error;
   return data;
 };

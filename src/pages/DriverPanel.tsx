@@ -19,7 +19,7 @@ import {
   driverShortCode,
   type DeliveryDriver,
 } from '@/lib/driversApi';
-import { archiveAllActiveOrders } from '@/lib/ordersApi';
+import { driverArchiveActiveOrders } from '@/lib/ordersApi';
 import { playKrring } from '@/lib/sounds';
 
 const DRIVER_SESSION_KEY = 'papirun_driver_session';
@@ -31,7 +31,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const raw = atob(base64);
   return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
 }
-import { updateOrderStatus, suggestOrderLocation, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
+import { driverUpdateOrderStatus, suggestOrderLocation, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import OrderChat from '@/components/OrderChat';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import DriverManual from '@/components/DriverManual';
@@ -282,7 +282,7 @@ const DriverPanel = () => {
       const delay = next.getTime() - now.getTime();
       return setTimeout(async () => {
         try {
-          await archiveAllActiveOrders();
+          await driverArchiveActiveOrders();
           await syncOrders(driver.id);
           toast.success('Pasditja e mesnatës: porositë u arkivuan');
         } catch {}
@@ -455,7 +455,7 @@ const DriverPanel = () => {
       }
     }
     try {
-      await updateOrderStatus(id, status);
+      await driverUpdateOrderStatus(id, status);
       if (status !== 'out_for_delivery') toast.success(STATUS_LABEL[status] ?? status);
       // After completing an order, check if all orders are done → enter returning state
       if (status === 'completed' && driver) {
