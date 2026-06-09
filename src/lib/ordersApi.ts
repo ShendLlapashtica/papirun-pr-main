@@ -138,25 +138,30 @@ export const detectOrderSource = (): OrderSource => {
 };
 
 export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord> => {
-  const client = supabase as any;
-  const payload = {
-    user_id: input.userId ?? null,
-    customer_name: input.customerName,
-    customer_phone: input.customerPhone,
-    delivery_address: input.deliveryAddress,
-    delivery_lat: input.deliveryLat,
-    delivery_lng: input.deliveryLng,
-    location_id: input.locationId ?? null,
-    items: input.items,
-    subtotal: input.subtotal,
-    delivery_fee: input.deliveryFee ?? 0,
-    total: input.total,
-    notes: input.notes ?? '',
-    status: 'pending',
-    source: input.source ?? detectOrderSource(),
-  };
-  const { data, error } = await client.from(TABLE).insert(payload).select('*').single();
-  if (error) throw error;
+  const res = await fetch('/api/place-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId: input.userId ?? null,
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      deliveryAddress: input.deliveryAddress,
+      deliveryLat: input.deliveryLat,
+      deliveryLng: input.deliveryLng,
+      locationId: input.locationId ?? null,
+      items: input.items,
+      subtotal: input.subtotal,
+      deliveryFee: input.deliveryFee ?? 0,
+      total: input.total,
+      notes: input.notes ?? '',
+      source: input.source ?? detectOrderSource(),
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'unknown' }));
+    throw new Error(err.error ?? 'Order creation failed');
+  }
+  const data = await res.json();
   return mapRow(data as Row);
 };
 

@@ -8,6 +8,9 @@
   "functions": {
     "api/push.ts": {
       "memory": 128
+    },
+    "api/place-order.ts": {
+      "memory": 128
     }
   }
 }
