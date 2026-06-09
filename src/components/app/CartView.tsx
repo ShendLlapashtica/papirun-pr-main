@@ -263,7 +263,7 @@ const CartView = () => {
         onClose={() => setIsCheckoutOpen(false)}
         items={cart}
         total={total}
-        onSuccess={() => { clearCart(); setIsTrayOpen(false); }}
+        onSuccess={() => { clearCart(); setIsCheckoutOpen(false); }}
       />
     </div>
   );

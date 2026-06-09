@@ -153,7 +153,7 @@ const Index = () => {
 
       <Tray items={cart} isOpen={isTrayOpen} onClose={() => setIsTrayOpen(false)} onUpdateQuantity={updateQuantity} onRemove={removeFromCart} onCheckout={() => setIsCheckoutOpen(true)} onUpdateNote={updateNote} />
 
-      <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} items={cart} total={cartTotal} onSuccess={clearCart} />
+      <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} items={cart} total={cartTotal} onSuccess={() => { clearCart(); setIsCheckoutOpen(false); }} />
     </div>
   );
 };
