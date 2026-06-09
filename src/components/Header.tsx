@@ -89,14 +89,19 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
             </button>
 
             {/* Info - Hidden on mobile */}
-            <div className="hidden lg:flex items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-primary" />
-                <span>{t.header.phone}</span>
+            <div className="hidden lg:flex items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1 shrink-0">
+                <MapPin className="w-3.5 h-3.5 text-primary" />
+                <span className="font-medium">Çagllavicë</span>
+                <Phone className="w-3 h-3 text-primary ml-1" />
+                <span>+383 46 532 532</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-primary" />
-                <span>{t.header.hours}</span>
+              <span className="text-border/60">|</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <MapPin className="w-3.5 h-3.5 text-primary" />
+                <span className="font-medium">Qendër</span>
+                <Phone className="w-3 h-3 text-primary ml-1" />
+                <span>+383 45 262 323</span>
               </div>
             </div>
 
@@ -165,16 +170,20 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
             ))}
             <div className="pt-4 border-t border-border space-y-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-primary" />
-                <span>{t.header.phone}</span>
+                <MapPin className="w-4 h-4 text-primary shrink-0" />
+                <span className="font-medium">Çagllavicë</span>
+                <Phone className="w-4 h-4 text-primary ml-1 shrink-0" />
+                <span>+383 46 532 532</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-primary shrink-0" />
+                <span className="font-medium">Qendër</span>
+                <Phone className="w-4 h-4 text-primary ml-1 shrink-0" />
+                <span>+383 45 262 323</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-primary" />
                 <span>{t.header.hours}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-primary" />
-                <span>{t.header.address}</span>
               </div>
             </div>
           </nav>

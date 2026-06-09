@@ -11,7 +11,7 @@ import CustomerDriverMap from '@/components/CustomerDriverMap';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
 
-const GOOGLE_REVIEW_URL = 'https://www.google.com/search?q=papirun+reviews#lrd=0x13549ee685d7c721:0xff91baa797df481e,3,,,,';
+const GOOGLE_REVIEW_URL = 'https://search.google.com/local/writereview?placeid=ChIJIcfXheaeVBMRHkjfl6e6kf8';
 
 const STORAGE_KEY = 'papirun_active_order_id';
 

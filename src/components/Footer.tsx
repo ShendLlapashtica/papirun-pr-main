@@ -54,19 +54,35 @@ const Footer = () => {
             <h4 className="font-display font-semibold text-sm uppercase tracking-wider mb-4 text-background/40">
               {language === 'sq' ? 'Kontakti' : 'Contact'}
             </h4>
-            <ul className="space-y-3">
-              <li className="flex items-start gap-2.5">
-                <MapPin className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                <span className="text-sm text-background/70">
-                  Johan V. Hahn, Nr.14<br />Prishtine 10000
-                </span>
+            <ul className="space-y-4">
+              <li>
+                <p className="text-xs font-semibold text-background/50 uppercase tracking-wider mb-1.5">Papirun Qendër</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                    <span className="text-sm text-background/70">Johan V. Hahn, Nr.14<br />Prishtinë 10000</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="text-sm text-background/70">+383 45 262 323</span>
+                  </div>
+                </div>
               </li>
-              <li className="flex items-center gap-2.5">
-                <Phone className="w-4 h-4 text-primary shrink-0" />
-                <span className="text-sm text-background/70">{t.header.phone}</span>
+              <li>
+                <p className="text-xs font-semibold text-background/50 uppercase tracking-wider mb-1.5">Papirun Çagllavicë</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                    <span className="text-sm text-background/70">Çagllavicë<br />Prishtinë</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="text-sm text-background/70">+383 46 532 532</span>
+                  </div>
+                </div>
               </li>
               <li className="flex items-start gap-2.5">
-                <Clock className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                <Clock className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
                 <span className="text-sm text-background/70">
                   {t.header.hours}<br />{t.location.closed}
                 </span>
@@ -93,7 +109,7 @@ const Footer = () => {
               {language === 'sq' ? 'Thirr Direkt' : 'Call Direct'}
             </a>
             <a
-              href="https://www.google.com/search?q=Papirun+Reviews#lrd=0x13549ee685d7c721:0xff91baa797df481e,3,,,,"
+              href="https://search.google.com/local/writereview?placeid=ChIJIcfXheaeVBMRHkjfl6e6kf8"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-2 px-4 py-2.5 rounded-full border border-background/20 hover:border-yellow-400 hover:bg-yellow-400/10 transition-all text-sm text-background/70 hover:text-yellow-400"

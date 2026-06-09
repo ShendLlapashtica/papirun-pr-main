@@ -33,11 +33,23 @@ const Privacy = () => {
             <h2 className="font-display font-bold text-lg mb-2">
               {sq ? '1. Kush jemi ne' : '1. Who we are'}
             </h2>
-            <p className="text-sm">
+            <p className="text-sm mb-3">
               {sq
-                ? 'Papirun është një shërbim i porositjes dhe dorëzimit të ushqimit me bazë në Prishtinë, Kosovë. Adresa jonë: Johan V. Hahn, Nr.14, Prishtinë 10000. Kontakt: +38349644168.'
-                : 'Papirun is a food ordering and delivery service based in Pristina, Kosovo. Address: Johan V. Hahn, Nr.14, Pristina 10000. Contact: +38349644168.'}
+                ? 'Papirun është një shërbim i porositjes dhe dorëzimit të ushqimit me bazë në Prishtinë, Kosovë.'
+                : 'Papirun is a food ordering and delivery service based in Pristina, Kosovo.'}
             </p>
+            <div className="text-sm space-y-2 text-foreground/80">
+              <div>
+                <p className="font-semibold">Papirun Qendër</p>
+                <p>Johan V. Hahn, Nr.14, Prishtinë 10000</p>
+                <p>{sq ? 'Tel:' : 'Tel:'} +383 45 262 323</p>
+              </div>
+              <div>
+                <p className="font-semibold">Papirun Çagllavicë</p>
+                <p>{sq ? 'Çagllavicë, Prishtinë' : 'Çagllavicë, Pristina'}</p>
+                <p>{sq ? 'Tel:' : 'Tel:'} +383 46 532 532</p>
+              </div>
+            </div>
           </section>
 
           <section>
@@ -118,25 +130,86 @@ const Privacy = () => {
             </ul>
             <p className="text-sm mt-3 text-foreground/70">
               {sq
-                ? 'Për të ushtruar këto të drejta, na kontaktoni direkt: +38349644168'
-                : 'To exercise these rights, contact us directly: +38349644168'}
+                ? 'Për të ushtruar këto të drejta, na kontaktoni direkt në:'
+                : 'To exercise these rights, contact us directly at:'}
             </p>
+            <div className="mt-2 text-sm space-y-1 text-foreground/70">
+              <p>📧 <a href="mailto:info@shend.dev" className="text-primary hover:underline">info@shend.dev</a> {sq ? 'ose' : 'or'} 📞 <a href="tel:+38349644168" className="text-primary hover:underline">+383 49 644 168</a></p>
+              <p className="text-foreground/50 text-xs">{sq ? 'Udhëheqës Teknik dhe Inxhinier Përgjegjës i Projektit: Shend Llapashtica' : 'Technical Lead and Project Responsible Engineer: Shend Llapashtica'}</p>
+            </div>
           </section>
 
           <section>
             <h2 className="font-display font-bold text-lg mb-2">
-              {sq ? '7. Cookies dhe ruajtja lokale' : '7. Cookies & local storage'}
+              {sq ? '7. Siguria e të dhënave' : '7. Data Security'}
             </h2>
-            <p className="text-sm text-foreground/80">
+            <p className="text-sm text-foreground/80 mb-3">
               {sq
-                ? 'Aplikacioni përdor ruajtjen lokale (localStorage) vetëm për funksione esenciale: gjuha e preferuar, statusi i porosisë aktive dhe informacioni i adresës. Nuk përdorim cookies reklamuese ose ndjekëse.'
-                : 'The app uses localStorage only for essential functions: preferred language, active order status, and address info. We do not use advertising or tracking cookies.'}
+                ? 'Ne zbatojmë masa teknike dhe organizative të nivelit të lartë për të mbrojtur të dhënat tuaja personale nga qasja e paautorizuar, ndryshimi, zbulimi apo shkatërrimi i tyre.'
+                : 'We implement high-level technical and organizational measures to protect your personal data from unauthorized access, alteration, disclosure, or destruction.'}
+            </p>
+            <ul className="text-sm space-y-2 list-disc list-inside text-foreground/80">
+              <li>
+                <strong>{sq ? 'Enkriptimi:' : 'Encryption:'}</strong>{' '}
+                {sq
+                  ? 'Të gjitha të dhënat që transmetohen përmes aplikacionit janë të enkriptuara duke përdorur protokollin standard SSL/TLS.'
+                  : 'All data transmitted through the app is encrypted using the industry-standard SSL/TLS protocol.'}
+              </li>
+              <li>
+                <strong>{sq ? 'Kontrolli i qasjes:' : 'Access control:'}</strong>{' '}
+                {sq
+                  ? 'Qasja në të dhënat e përdoruesve është rreptësisht e kufizuar vetëm për stafin e autorizuar që ka nevojë imediate operacionale për to.'
+                  : 'Access to user data is strictly limited to authorized staff with an immediate operational need.'}
+              </li>
+              <li>
+                <strong>{sq ? 'Ruajtja e sigurt:' : 'Secure storage:'}</strong>{' '}
+                {sq
+                  ? 'Infrastruktura jonë cloud operon në qendra të dhënash të certifikuara në Bashkimin Evropian, të cilat monitorohen 24/7 për siguri fizike dhe kibernetike.'
+                  : 'Our cloud infrastructure operates in EU-certified data centers monitored 24/7 for physical and cybersecurity.'}
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="font-display font-bold text-lg mb-2">
+              {sq ? '8. Njoftimi për Cookies dhe Ruajtjen Lokale' : '8. Cookies & Local Storage'}
+            </h2>
+            <p className="text-sm text-foreground/80 mb-3">
+              {sq
+                ? 'Ky aplikacion nuk përdor cookies gjurmuese (tracking cookies) apo cookies për qëllime marketingu dhe reklamimi.'
+                : 'This application does not use tracking cookies or cookies for marketing and advertising purposes.'}
+            </p>
+            <p className="text-sm text-foreground/80 mb-2">
+              {sq
+                ? 'Ne përdorim vetëm teknologjinë e ruajtjes lokale (Technical/Essential LocalStorage) e cila është rreptësisht e nevojshme për funksionimin e platformës:'
+                : 'We use only Technical/Essential LocalStorage, which is strictly necessary for the platform to function:'}
+            </p>
+            <ul className="text-sm space-y-2 list-disc list-inside text-foreground/80">
+              <li>
+                <strong>{sq ? 'Autentikimi:' : 'Authentication:'}</strong>{' '}
+                {sq ? 'Për të mbajtur sesionin tuaj të hapur në mënyrë të sigurt.' : 'To securely maintain your session.'}
+              </li>
+              <li>
+                <strong>{sq ? 'Preferencat e përdoruesit:' : 'User preferences:'}</strong>{' '}
+                {sq ? 'Për të mbajtur mend gjuhën e përzgjedhur të ndërfaqes (SQ/EN).' : 'To remember the selected interface language (SQ/EN).'}
+              </li>
+              <li>
+                <strong>{sq ? 'Funksionaliteti bazë:' : 'Core functionality:'}</strong>{' '}
+                {sq
+                  ? 'Për të ruajtur përkohësisht të dhënat e porosisë aktuale ose adresës gjatë procesit të përdorimit, duke parandaluar humbjen e të dhënave në rast të rifreskimit të faqes.'
+                  : 'To temporarily store current order or address data during the ordering process, preventing data loss on page refresh.'}
+              </li>
+            </ul>
+            <p className="text-sm mt-3 text-foreground/70">
+              {sq
+                ? 'Ju mund t\'i fshini këto të dhëna në çdo kohë përmes opsioneve të shfletuesit tuaj (Clear Browser Data), por kjo mund të ndikojë në funksionet automatike të sesionit tuaj.'
+                : 'You can delete this data at any time via your browser options (Clear Browser Data), but this may affect your session\'s automatic functions.'}
             </p>
           </section>
 
           <section>
             <h2 className="font-display font-bold text-lg mb-2">
-              {sq ? '8. Ndryshimet e kësaj politike' : '8. Changes to this policy'}
+              {sq ? '9. Ndryshimet e kësaj politike' : '9. Changes to this policy'}
             </h2>
             <p className="text-sm text-foreground/80">
               {sq
@@ -147,19 +220,29 @@ const Privacy = () => {
 
           <section>
             <h2 className="font-display font-bold text-lg mb-2">
-              {sq ? '9. Kontakti' : '9. Contact'}
+              {sq ? '10. Kontakti' : '10. Contact'}
             </h2>
-            <p className="text-sm text-foreground/80">
+            <p className="text-sm text-foreground/80 mb-3">
               {sq
                 ? 'Nëse keni pyetje rreth kësaj politike ose mënyrës se si trajtojmë të dhënat tuaja:'
                 : 'If you have questions about this policy or how we handle your data:'}
             </p>
-            <div className="mt-2 text-sm space-y-1 text-foreground/70">
-              <p><strong>Papirun</strong></p>
-              <p>Johan V. Hahn, Nr.14, Prishtinë 10000</p>
-              <p>
-                <a href="tel:+38349644168" className="text-primary hover:underline">+38349644168</a>
-              </p>
+            <div className="text-sm space-y-3 text-foreground/70">
+              <div>
+                <p className="font-semibold text-foreground/90">Papirun Qendër</p>
+                <p>Johan V. Hahn, Nr.14, Prishtinë 10000</p>
+                <p><a href="tel:+38345262323" className="text-primary hover:underline">+383 45 262 323</a></p>
+              </div>
+              <div>
+                <p className="font-semibold text-foreground/90">Papirun Çagllavicë</p>
+                <p>{sq ? 'Çagllavicë, Prishtinë' : 'Çagllavicë, Pristina'}</p>
+                <p><a href="tel:+38346532532" className="text-primary hover:underline">+383 46 532 532</a></p>
+              </div>
+              <div className="pt-1 border-t border-border/30">
+                <p>📧 <a href="mailto:info@shend.dev" className="text-primary hover:underline">info@shend.dev</a></p>
+                <p>📞 <a href="tel:+38349644168" className="text-primary hover:underline">+383 49 644 168</a></p>
+                <p className="text-xs text-foreground/50 mt-1">{sq ? 'Udhëheqës Teknik dhe Inxhinier Përgjegjës i Projektit: Shend Llapashtica' : 'Technical Lead and Project Responsible Engineer: Shend Llapashtica'}</p>
+              </div>
             </div>
           </section>
 
