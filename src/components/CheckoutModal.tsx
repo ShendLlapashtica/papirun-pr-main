@@ -10,7 +10,7 @@ import AddressMapPicker from '@/components/checkout/AddressMapPicker';
 import { getCartLineTotal } from '@/lib/cartPricing';
 import { createOrder, detectOrderSource } from '@/lib/ordersApi';
 import { setActiveOrderId, clearActiveOrderId } from '@/components/OrderTrackingPill';
-import { fetchAddresses, saveAddress, deleteAddress, type SavedAddress } from '@/lib/addressesApi';
+import { fetchAddresses, deleteAddress, type SavedAddress } from '@/lib/addressesApi';
 import { fetchStorefrontSetting } from '@/lib/storefrontApi';
 import { WHATSAPP_FALLBACK_KEY } from '@/lib/storefrontApi';
 
@@ -36,10 +36,6 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   const [submitting, setSubmitting] = useState(false);
   const [trackingOrderId] = useState<string | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
-  // Default OFF — user must explicitly check the box to save.
-  // Empty label by default so the user types a meaningful name (no auto-"Shtëpia").
-  const [saveAddrFlag, setSaveAddrFlag] = useState(false);
-  const [saveAddrLabel, setSaveAddrLabel] = useState('');
   const [whatsappFallbackEnabled, setWhatsappFallbackEnabled] = useState(true);
 
   useEffect(() => {
@@ -158,20 +154,6 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
       try { localStorage.setItem(ORDER_STORAGE_KEY, order.id); } catch {}
       setActiveOrderId(order.id);
 
-      // Save address for logged-in users if requested
-      if (user && saveAddrFlag && savedPosition && saveAddrLabel.trim()) {
-        const exists = savedAddresses.some((a) => a.address.trim() === savedFormData.address.trim());
-        if (!exists) {
-          saveAddress({
-            userId: user.id,
-            label: saveAddrLabel.trim(),
-            address: savedFormData.address.trim(),
-            lat: savedPosition[0],
-            lng: savedPosition[1],
-            isDefault: savedAddresses.length === 0,
-          }).catch(() => {});
-        }
-      }
     } catch (e) {
       console.error(e);
       clearActiveOrderId();
@@ -340,29 +322,6 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
                   />
                   <AddressMapPicker selectedPosition={selectedPosition} onSelectAddress={handleMapSelect} />
 
-                  {/* Save address option for logged-in users */}
-                  {user && hasLocation && !savedAddresses.some((a) => a.address.trim() === formData.address.trim()) && (
-                    <div className="mt-2 flex items-center gap-2 bg-secondary/40 rounded-xl p-2.5">
-                      <input
-                        type="checkbox"
-                        id="saveAddr"
-                        checked={saveAddrFlag}
-                        onChange={(e) => setSaveAddrFlag(e.target.checked)}
-                        className="w-4 h-4 rounded accent-primary"
-                      />
-                      <label htmlFor="saveAddr" className="text-xs font-medium cursor-pointer flex-1">
-                        {language === 'sq' ? 'Ruaj me emër:' : 'Save as:'}
-                      </label>
-                      <input
-                        type="text"
-                        value={saveAddrLabel}
-                        onChange={(e) => setSaveAddrLabel(e.target.value)}
-                        disabled={!saveAddrFlag}
-                        className="flex-1 max-w-[130px] px-2 py-1 rounded-lg bg-background text-xs disabled:opacity-50"
-                        placeholder={language === 'sq' ? 'p.sh. Shtëpia, Puna' : 'e.g. Home, Work'}
-                      />
-                    </div>
-                  )}
                 </div>
 
                 <div>
