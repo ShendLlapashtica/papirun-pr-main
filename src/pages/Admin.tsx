@@ -470,9 +470,17 @@ const Admin = () => {
     initialOffers.map((offer, index) => ({ ...offer, isActive: true, sortOrder: index }))
   );
   const [editingOffer, setEditingOffer] = useState<string | null>(null);
-  const [newIngredient, setNewIngredient] = useState('');
-  const [newExtra, setNewExtra] = useState('');
+  const [newIngredients, setNewIngredients] = useState<Record<string, string>>({});
+  const [newExtras, setNewExtras] = useState<Record<string, string>>({});
+  const [newExtraPrices, setNewExtraPrices] = useState<Record<string, string>>({});
   const [editingExtraId, setEditingExtraId] = useState<string | null>(null);
+  // Wizard state for adding new products
+  const [showAddWizard, setShowAddWizard] = useState(false);
+  const [wizardStep, setWizardStep] = useState<1 | 2>(1);
+  const [wizardCategory, setWizardCategory] = useState<MenuItem['category']>('sandwich');
+  const [wizardNameSq, setWizardNameSq] = useState('');
+  const [wizardNameEn, setWizardNameEn] = useState('');
+  const [wizardPrice, setWizardPrice] = useState('');
   const offerFileRef = useRef<HTMLInputElement>(null);
   const [uploadingOfferId, setUploadingOfferId] = useState<string | null>(null);
   const [dragOverOfferId, setDragOverOfferId] = useState<string | null>(null);
@@ -531,6 +539,20 @@ const Admin = () => {
   useEffect(() => {
     setItems(liveItems);
   }, [liveItems]);
+
+  // Sync menuExtras from DB
+  useEffect(() => {
+    let isMounted = true;
+    const syncExtras = async () => {
+      try {
+        const liveExtras = await fetchMenuExtras();
+        if (isMounted) setMenuExtras(liveExtras);
+      } catch { /* keep defaults */ }
+    };
+    syncExtras();
+    const unsub = subscribeMenuExtrasRealtime(syncExtras);
+    return () => { isMounted = false; unsub(); };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -663,7 +685,7 @@ const Admin = () => {
     handleUpdate(id, { isAvailable: nextAvailability });
   };
 
-  const addNewItem = async () => {
+  const addNewItem = async (overrides?: Partial<MenuItem>) => {
     const newItem: MenuItem = {
       id: `new-${Date.now()}`,
       name: { sq: 'Produkt i Ri', en: 'New Product' },
@@ -678,6 +700,7 @@ const Admin = () => {
       rating: 0,
       reviewCount: 0,
       isAvailable: true,
+      ...overrides,
     };
     setItems((prev) => [newItem, ...prev]);
     setEditingItem(newItem.id);
@@ -686,6 +709,23 @@ const Admin = () => {
     } catch (err) {
       console.error('Failed to create new product in DB:', err);
     }
+  };
+
+  const handleWizardSubmit = async () => {
+    const nameSq = wizardNameSq.trim();
+    const nameEn = wizardNameEn.trim() || nameSq;
+    const price = parseFloat(wizardPrice) || 0;
+    if (!nameSq) return;
+    setShowAddWizard(false);
+    setWizardStep(1);
+    setWizardNameSq('');
+    setWizardNameEn('');
+    setWizardPrice('');
+    await addNewItem({
+      name: { sq: nameSq, en: nameEn },
+      category: wizardCategory,
+      price,
+    });
   };
 
   const deleteItem = async (id: string) => {
@@ -1279,12 +1319,115 @@ const Admin = () => {
         {activeTab === 'content' && contentSubTab === 'replies' && <QuickRepliesEditor />}
         {activeTab === 'content' && contentSubTab === 'texts' && <SiteTextsEditor language={language} />}
 
-        {/* Menu Manager */}
+          {/* Menu Manager */}
         {activeTab === 'menu' && (
           <div className="space-y-3">
+
+            {/* Add New Product Wizard Modal */}
+            {showAddWizard && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) { setShowAddWizard(false); setWizardStep(1); } }}>
+                <div className="w-full max-w-lg bg-background rounded-3xl shadow-2xl overflow-hidden">
+                  {/* Wizard header */}
+                  <div className="bg-primary/10 px-6 py-4 flex items-center justify-between border-b border-border/40">
+                    <div>
+                      <h2 className="font-display font-bold text-lg">{language === 'sq' ? 'Produkt i Ri' : 'New Product'}</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">{wizardStep === 1 ? (language === 'sq' ? 'Hapi 1 nga 2 — Zgjidh kategorinë' : 'Step 1 of 2 — Choose category') : (language === 'sq' ? 'Hapi 2 nga 2 — Emri & çmimi' : 'Step 2 of 2 — Name & price')}</p>
+                    </div>
+                    <button onClick={() => { setShowAddWizard(false); setWizardStep(1); }} className="p-2 rounded-full hover:bg-secondary transition-colors"><X className="w-5 h-5" /></button>
+                  </div>
+
+                  {wizardStep === 1 ? (
+                    <div className="p-6 space-y-4">
+                      <p className="text-sm text-muted-foreground">{language === 'sq' ? 'Çfarë lloji produkti po shton?' : 'What type of product are you adding?'}</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {([
+                          { value: 'sandwich', emoji: '🥪', label: language === 'sq' ? 'Sanduiç' : 'Sandwich' },
+                          { value: 'fajita',   emoji: '🌯', label: 'Fajita' },
+                          { value: 'salad',    emoji: '🥗', label: language === 'sq' ? 'Sallatë' : 'Salad' },
+                          { value: 'sides',    emoji: '🍲', label: language === 'sq' ? 'Supë / Ekstra' : 'Soup / Extra' },
+                        ] as const).map(({ value, emoji, label }) => (
+                          <button
+                            key={value}
+                            onClick={() => { setWizardCategory(value); setWizardStep(2); }}
+                            className={`flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 transition-all hover:scale-[1.02] ${
+                              wizardCategory === value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40 bg-card'
+                            }`}
+                          >
+                            <span className="text-4xl">{emoji}</span>
+                            <span className="font-semibold text-sm">{label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <button onClick={() => setWizardStep(1)} className="text-xs text-primary hover:underline flex items-center gap-1">
+                          ← {language === 'sq' ? 'Ndrysho kategorinë' : 'Change category'}
+                        </button>
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                          {wizardCategory === 'sandwich' ? '🥪 Sanduiç' : wizardCategory === 'fajita' ? '🌯 Fajita' : wizardCategory === 'salad' ? '🥗 Sallatë' : '🍲 Supë/Ekstra'}
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground font-medium">{language === 'sq' ? 'Emri shqip *' : 'Albanian name *'}</label>
+                          <input
+                            autoFocus
+                            value={wizardNameSq}
+                            onChange={(e) => setWizardNameSq(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && wizardNameSq.trim()) handleWizardSubmit(); }}
+                            placeholder={language === 'sq' ? 'p.sh. Supë Pule' : 'e.g. Chicken Soup'}
+                            className="w-full mt-1 px-4 py-2.5 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground font-medium">{language === 'sq' ? 'Emri anglisht (opsional)' : 'English name (optional)'}</label>
+                          <input
+                            value={wizardNameEn}
+                            onChange={(e) => setWizardNameEn(e.target.value)}
+                            placeholder={language === 'sq' ? 'Plotësohet automatikisht' : 'Auto-filled if empty'}
+                            className="w-full mt-1 px-4 py-2.5 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground font-medium">{language === 'sq' ? 'Çmimi (€)' : 'Price (€)'}</label>
+                          <div className="relative mt-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">€</span>
+                            <input
+                              type="number"
+                              step="0.10"
+                              min="0"
+                              value={wizardPrice}
+                              onChange={(e) => setWizardPrice(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' && wizardNameSq.trim()) handleWizardSubmit(); }}
+                              placeholder="0.00"
+                              className="w-full pl-7 pr-4 py-2.5 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={handleWizardSubmit}
+                          disabled={!wizardNameSq.trim()}
+                          className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm disabled:opacity-40 hover:opacity-90 transition-all"
+                        >
+                          {language === 'sq' ? 'Krijo Produktin' : 'Create Product'} →
+                        </button>
+                        <button onClick={() => { setShowAddWizard(false); setWizardStep(1); }} className="px-4 py-3 rounded-xl bg-secondary text-sm font-medium">
+                          {language === 'sq' ? 'Anulo' : 'Cancel'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Add New Button */}
             <button
-              onClick={addNewItem}
+              onClick={() => { setShowAddWizard(true); setWizardStep(1); }}
               className="w-full py-4 rounded-2xl border-2 border-dashed border-primary/30 text-primary hover:border-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 text-sm font-medium"
             >
               <Plus className="w-5 h-5" />
@@ -1488,7 +1631,7 @@ const Admin = () => {
                         {/* Ingredients Management */}
                         <div>
                           <label className="text-xs text-muted-foreground font-medium">
-                            {language === 'sq' ? 'Përberësit' : 'Ingredients'}
+                            {language === 'sq' ? 'Përbërësit' : 'Ingredients'}
                           </label>
                           <div className="flex flex-wrap gap-1.5 mt-1.5">
                             {item.ingredients.map((ing, idx) => (
@@ -1505,12 +1648,13 @@ const Admin = () => {
                           </div>
                           <div className="flex gap-2 mt-2">
                             <input
-                              value={editingItem === item.id ? newIngredient : ''}
-                              onChange={(e) => setNewIngredient(e.target.value)}
+                              value={newIngredients[item.id] ?? ''}
+                              onChange={(e) => setNewIngredients(prev => ({ ...prev, [item.id]: e.target.value }))}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && newIngredient.trim()) {
-                                  updateItem(item.id, { ingredients: [...item.ingredients, newIngredient.trim().toLowerCase()] });
-                                  setNewIngredient('');
+                                const val = newIngredients[item.id]?.trim();
+                                if (e.key === 'Enter' && val) {
+                                  updateItem(item.id, { ingredients: [...item.ingredients, val.toLowerCase()] });
+                                  setNewIngredients(prev => ({ ...prev, [item.id]: '' }));
                                 }
                               }}
                               placeholder={language === 'sq' ? 'Shto përbërës...' : 'Add ingredient...'}
@@ -1518,9 +1662,10 @@ const Admin = () => {
                             />
                             <button
                               onClick={() => {
-                                if (newIngredient.trim()) {
-                                  updateItem(item.id, { ingredients: [...item.ingredients, newIngredient.trim().toLowerCase()] });
-                                  setNewIngredient('');
+                                const val = newIngredients[item.id]?.trim();
+                                if (val) {
+                                  updateItem(item.id, { ingredients: [...item.ingredients, val.toLowerCase()] });
+                                  setNewIngredients(prev => ({ ...prev, [item.id]: '' }));
                                 }
                               }}
                               className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium"
@@ -1536,36 +1681,62 @@ const Admin = () => {
                             {language === 'sq' ? 'Ekstra (opsionale)' : 'Extras (optional)'}
                           </label>
                           <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {(item.extras || []).map((ext, idx) => (
-                              <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent text-accent-foreground text-xs font-medium">
-                                + {getIngredientName(ext, language)} <span className="text-muted-foreground/60 text-[10px]">({ext})</span>
-                                <button
-                                  onClick={() => updateItem(item.id, { extras: (item.extras || []).filter((_, i) => i !== idx) })}
-                                  className="hover:text-destructive"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </span>
-                            ))}
+                            {(item.extras || []).map((ext, idx) => {
+                              const catalogExtra = menuExtras.find(e => e.id === ext || e.name.sq.toLowerCase() === ext);
+                              return (
+                                <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent text-accent-foreground text-xs font-medium">
+                                  + {getIngredientName(ext, language)}
+                                  {catalogExtra && <span className="text-muted-foreground/70 text-[10px] font-semibold">€{catalogExtra.price.toFixed(2)}</span>}
+                                  <button
+                                    onClick={() => updateItem(item.id, { extras: (item.extras || []).filter((_, i) => i !== idx) })}
+                                    className="hover:text-destructive"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              );
+                            })}
                           </div>
+                          {/* Catalog picker */}
+                          {menuExtras.filter(e => e.isActive).length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-[10px] text-muted-foreground mb-1">{language === 'sq' ? 'Zgjidh nga katallogu:' : 'Pick from catalog:'}</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {menuExtras.filter(e => e.isActive && !(item.extras || []).includes(e.id)).map(extra => (
+                                  <button
+                                    key={extra.id}
+                                    onClick={() => updateItem(item.id, { extras: [...(item.extras || []), extra.id] })}
+                                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary hover:bg-primary/10 border border-border/40 hover:border-primary/30 text-xs transition-all"
+                                  >
+                                    <Plus className="w-3 h-3 text-primary" />
+                                    <span>{extra.name[language]}</span>
+                                    <span className="text-primary font-semibold">€{extra.price.toFixed(2)}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {/* Manual entry */}
                           <div className="flex gap-2 mt-2">
                             <input
-                              value={editingItem === item.id ? newExtra : ''}
-                              onChange={(e) => setNewExtra(e.target.value)}
+                              value={newExtras[item.id] ?? ''}
+                              onChange={(e) => setNewExtras(prev => ({ ...prev, [item.id]: e.target.value }))}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && newExtra.trim()) {
-                                  updateItem(item.id, { extras: [...(item.extras || []), newExtra.trim().toLowerCase()] });
-                                  setNewExtra('');
+                                const val = newExtras[item.id]?.trim();
+                                if (e.key === 'Enter' && val) {
+                                  updateItem(item.id, { extras: [...(item.extras || []), val.toLowerCase()] });
+                                  setNewExtras(prev => ({ ...prev, [item.id]: '' }));
                                 }
                               }}
-                              placeholder={language === 'sq' ? 'Shto ekstra...' : 'Add extra...'}
+                              placeholder={language === 'sq' ? 'Ose shto manual...' : 'Or add manually...'}
                               className="flex-1 px-3 py-1.5 rounded-lg bg-secondary border-0 text-xs focus:ring-2 focus:ring-primary/20"
                             />
                             <button
                               onClick={() => {
-                                if (newExtra.trim()) {
-                                  updateItem(item.id, { extras: [...(item.extras || []), newExtra.trim().toLowerCase()] });
-                                  setNewExtra('');
+                                const val = newExtras[item.id]?.trim();
+                                if (val) {
+                                  updateItem(item.id, { extras: [...(item.extras || []), val.toLowerCase()] });
+                                  setNewExtras(prev => ({ ...prev, [item.id]: '' }));
                                 }
                               }}
                               className="px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-xs font-medium"

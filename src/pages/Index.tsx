@@ -30,7 +30,7 @@ const Index = () => {
 
   const cartTotal = getCartTotal(cart);
 
-  const visibleItems = useMemo(() => menuItems.filter((item) => item.category !== 'sides'), [menuItems]);
+  const visibleItems = useMemo(() => menuItems, [menuItems]);
 
   const filteredItems = useMemo(() => {
     let items = visibleItems;
@@ -53,6 +53,7 @@ const Index = () => {
     { id: 'salad', label: t.categories.salads },
     { id: 'fajita', label: t.categories.fajitas },
     { id: 'sandwich', label: t.categories.sandwiches },
+    { id: 'sides', label: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras' },
   ];
 
   return (
