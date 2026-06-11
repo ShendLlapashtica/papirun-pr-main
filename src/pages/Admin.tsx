@@ -474,6 +474,8 @@ const Admin = () => {
   const [newExtras, setNewExtras] = useState<Record<string, string>>({});
   const [newExtraPrices, setNewExtraPrices] = useState<Record<string, string>>({});
   const [editingExtraId, setEditingExtraId] = useState<string | null>(null);
+  const [newCatalogExtraNameSq, setNewCatalogExtraNameSq] = useState('');
+  const [newCatalogExtraPrice, setNewCatalogExtraPrice] = useState('');
   // Wizard state for adding new products
   const [showAddWizard, setShowAddWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
@@ -1424,6 +1426,98 @@ const Admin = () => {
                 </div>
               </div>
             )}
+
+            {/* Extras Catalog Manager */}
+            <div className="bg-card rounded-2xl p-4 shadow-card">
+              <h2 className="text-sm font-display font-bold mb-3 flex items-center gap-2">
+                <span className="text-base">🧂</span>
+                {language === 'sq' ? 'Katalogu i Ekstrave' : 'Extras Catalog'}
+                <span className="text-[10px] text-muted-foreground font-normal">{language === 'sq' ? '— çmimet e ekstrave' : '— extra prices'}</span>
+              </h2>
+
+              {/* Existing extras list */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {menuExtras.length === 0 && (
+                  <p className="text-xs text-muted-foreground">{language === 'sq' ? 'Nuk ka ekstra ende.' : 'No extras yet.'}</p>
+                )}
+                {menuExtras.map((extra) => (
+                  <div key={extra.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all ${extra.isActive ? 'bg-accent border-accent-foreground/10' : 'bg-secondary border-border/40 opacity-60'}`}>
+                    <span className="text-xs font-medium">{extra.name[language]}</span>
+                    <span className="text-xs font-bold text-primary">€{extra.price.toFixed(2)}</span>
+                    <button
+                      title={extra.isActive ? 'Çaktivizo' : 'Aktivizo'}
+                      onClick={async () => {
+                        const updated = { ...extra, isActive: !extra.isActive };
+                        setMenuExtras(prev => prev.map(e => e.id === extra.id ? updated : e));
+                        try { await upsertMenuExtra(updated); } catch { setMenuExtras(prev => prev.map(e => e.id === extra.id ? extra : e)); }
+                      }}
+                      className={`w-3.5 h-3.5 rounded-full border transition-colors shrink-0 ${extra.isActive ? 'bg-emerald-500 border-emerald-500' : 'bg-muted border-border'}`}
+                    />
+                    <button
+                      onClick={async () => {
+                        setMenuExtras(prev => prev.filter(e => e.id !== extra.id));
+                        try { await deleteMenuExtra(extra.id); } catch { const syncExtras = async () => { try { const liveExtras = await fetchMenuExtras(); setMenuExtras(liveExtras); } catch {} }; syncExtras(); }
+                      }}
+                      className="hover:text-destructive transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add new extra form */}
+              <div className="flex gap-2 items-center">
+                <input
+                  value={newCatalogExtraNameSq}
+                  onChange={(e) => setNewCatalogExtraNameSq(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.currentTarget.nextElementSibling?.querySelector('input') as HTMLInputElement)?.focus(); }}
+                  placeholder={language === 'sq' ? 'Emri (p.sh. Mish Extra)' : 'Name (e.g. Extra Meat)'}
+                  className="flex-1 px-3 py-2 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
+                />
+                <div className="relative shrink-0">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">€</span>
+                  <input
+                    type="number"
+                    step="0.10"
+                    min="0"
+                    value={newCatalogExtraPrice}
+                    onChange={(e) => setNewCatalogExtraPrice(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key !== 'Enter') return;
+                      const name = newCatalogExtraNameSq.trim();
+                      if (!name) return;
+                      const price = parseFloat(newCatalogExtraPrice) || 0;
+                      const newExtra: MenuExtra = { id: `extra-${Date.now()}`, name: { sq: name, en: name }, price, isActive: true, sortOrder: menuExtras.length };
+                      setMenuExtras(prev => [...prev, newExtra]);
+                      setNewCatalogExtraNameSq('');
+                      setNewCatalogExtraPrice('');
+                      try { await upsertMenuExtra(newExtra); toast.success(language === 'sq' ? 'Ekstra u shtua' : 'Extra added'); }
+                      catch { toast.error('Dështoi'); setMenuExtras(prev => prev.filter(ex => ex.id !== newExtra.id)); }
+                    }}
+                    placeholder="0.50"
+                    className="w-24 pl-7 pr-3 py-2 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <button
+                  disabled={!newCatalogExtraNameSq.trim()}
+                  onClick={async () => {
+                    const name = newCatalogExtraNameSq.trim();
+                    if (!name) return;
+                    const price = parseFloat(newCatalogExtraPrice) || 0;
+                    const newExtra: MenuExtra = { id: `extra-${Date.now()}`, name: { sq: name, en: name }, price, isActive: true, sortOrder: menuExtras.length };
+                    setMenuExtras(prev => [...prev, newExtra]);
+                    setNewCatalogExtraNameSq('');
+                    setNewCatalogExtraPrice('');
+                    try { await upsertMenuExtra(newExtra); toast.success(language === 'sq' ? 'Ekstra u shtua' : 'Extra added'); }
+                    catch { toast.error('Dështoi'); setMenuExtras(prev => prev.filter(ex => ex.id !== newExtra.id)); }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 flex items-center gap-1 shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
 
             {/* Add New Button */}
             <button
