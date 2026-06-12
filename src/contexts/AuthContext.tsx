@@ -6,8 +6,6 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  requestOtp: (email: string, lang?: string) => Promise<{ error: Error | null }>;
-  verifyOtp: (email: string, token: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -33,40 +31,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => { subscription.unsubscribe(); };
   }, []);
 
-  const requestOtp = async (email: string, lang = 'sq') => {
-    // Magic-link redirect: prefer the production callback when published,
-    // fall back to the current origin in previews/local dev so devs can test.
-    const isProd = typeof window !== 'undefined'
-      && /(^|\.)papirun\.(net|online)$/i.test(window.location.hostname);
-    const redirectBase = isProd
-      ? 'https://papirun.net'
-      : (typeof window !== 'undefined' ? window.location.origin : '');
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${redirectBase}/auth/callback`,
-        data: { lang },
-      },
-    });
-    return { error };
-  };
-
-  const verifyOtp = async (email: string, token: string) => {
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: 'email',
-    });
-    return { error };
-  };
-
+  // NOTE: there is intentionally NO email-sending auth method here. Codes are
+  // generated and delivered exclusively by /api/auth/send-tan (auth@papirun.net)
+  // and verified by /api/auth/verify-tan — GoTrue must never send an email.
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, requestOtp, verifyOtp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

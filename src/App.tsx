@@ -15,7 +15,6 @@ import Home from "./pages/Home";
 import ProductViewWrapper from "./pages/ProductViewWrapper";
 import AppProductPage from "./pages/AppProductPage";
 import OfferViewWrapper from "./pages/OfferViewWrapper";
-import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import DriverPanel from "./pages/DriverPanel";
 import InvoicePage from "./pages/InvoicePage";
@@ -47,7 +46,8 @@ const App = () => (
                   <Route path="/signup" element={<Navigate to="/" replace />} />
                   <Route path="/verify" element={<Navigate to="/" replace />} />
                   <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
-                  <Route path="/auth/callback" element={<AuthCallback />} />
+                  {/* Magic links are dead — TAN codes only. Old links land on the gate. */}
+                  <Route path="/auth/callback" element={<Navigate to="/" replace />} />
                   <Route path="/admin" element={<Admin />} />
                   {/* Web product page (desktop + mobile browser visiting papirun.net) */}
                   <Route path="/product/:id" element={<ProductViewWrapper />} />

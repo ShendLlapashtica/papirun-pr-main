@@ -117,6 +117,12 @@ interface Translations {
     welcome: string;
     haveAccount: string;
     noAccount: string;
+    codeExpires: string;
+    codeExpired: string;
+    emailNotConfigured: string;
+    sendFailed: string;
+    greeting: string;
+    logOut: string;
   };
 }
 
@@ -229,6 +235,12 @@ const translations: Record<Language, Translations> = {
       welcome: 'Mirë se erdhe!',
       haveAccount: 'Keni llogari?',
       noAccount: 'Nuk keni llogari?',
+      codeExpires: 'Kodi skadon për 5 minuta',
+      codeExpired: 'Kodi ka skaduar. Kërkoni një kod të ri.',
+      emailNotConfigured: 'Shërbimi i email-it nuk është konfiguruar ende. Provoni më vonë.',
+      sendFailed: 'Dërgimi i kodit dështoi. Provoni përsëri.',
+      greeting: 'Përshëndetje',
+      logOut: 'Dil',
     },
   },
   en: {
@@ -339,6 +351,12 @@ const translations: Record<Language, Translations> = {
       welcome: 'Welcome!',
       haveAccount: 'Have an account?',
       noAccount: "Don't have an account?",
+      codeExpires: 'Code expires in 5 minutes',
+      codeExpired: 'Code expired. Request a new one.',
+      emailNotConfigured: 'Email service is not configured yet. Try again later.',
+      sendFailed: 'Sending the code failed. Try again.',
+      greeting: 'Hi',
+      logOut: 'Log out',
     },
   },
 };

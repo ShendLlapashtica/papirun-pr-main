@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { MapPin, Phone, Clock, ShoppingBag, Menu, X, Globe, Search } from 'lucide-react';
+import { MapPin, Phone, Clock, ShoppingBag, Menu, X, Globe, Search, LogOut, User as UserIcon } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { fetchProfile } from '@/lib/profilesApi';
 import logo from '@/assets/logo.png';
 import { cn } from '@/lib/utils';
 
@@ -15,8 +17,30 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { language, setLanguage, t } = useLanguage();
+  const { user, signOut } = useAuth();
+  const [profileName, setProfileName] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Name shown after login: auth metadata first, profiles row as fallback
+  // (covers accounts created before metadata existed), email prefix last.
+  const metaName = (user?.user_metadata?.first_name as string | undefined)?.trim();
+  useEffect(() => {
+    if (!user || metaName) { setProfileName(null); return; }
+    let cancelled = false;
+    fetchProfile(user.id)
+      .then((p) => { if (!cancelled) setProfileName(p?.emri?.trim() || null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [user, metaName]);
+  const firstName = metaName || profileName || user?.email?.split('@')[0] || '';
+
+  const handleSignOut = async () => {
+    if (!window.confirm(language === 'sq' ? 'A doni të dilni nga llogaria?' : 'Sign out?')) return;
+    await signOut();
+    setMobileMenuOpen(false);
+    // AuthGate reacts to the cleared session and shows the login flow again.
+  };
 
   const navLinks = [
     { to: '/', label: t.header.menu },
@@ -87,6 +111,24 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
               <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>{language.toUpperCase()}</span>
             </button>
+
+            {/* Logged-in user: greeting + logout (desktop) */}
+            {user && firstName && (
+              <div className="hidden sm:flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/10">
+                <UserIcon className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs font-semibold text-primary max-w-[120px] truncate">
+                  {t.auth.greeting}, {firstName}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  aria-label={t.auth.logOut}
+                  title={t.auth.logOut}
+                  className="p-1.5 rounded-full hover:bg-primary/20 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-primary" />
+                </button>
+              </div>
+            )}
 
             {/* Info - Hidden on mobile */}
             <div className="hidden lg:flex items-center gap-3 text-xs text-muted-foreground">
@@ -168,6 +210,19 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
                 {link.label}
               </Link>
             ))}
+            {user && firstName && (
+              <div className="flex items-center justify-between pt-4 border-t border-border">
+                <span className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <UserIcon className="w-4 h-4" /> {t.auth.greeting}, {firstName}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" /> {t.auth.logOut}
+                </button>
+              </div>
+            )}
             <div className="pt-4 border-t border-border space-y-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-primary shrink-0" />

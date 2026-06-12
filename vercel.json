@@ -11,6 +11,12 @@
     },
     "api/place-order.ts": {
       "memory": 128
+    },
+    "api/auth/send-tan.ts": {
+      "memory": 128
+    },
+    "api/auth/verify-tan.ts": {
+      "memory": 128
     }
   }
 }

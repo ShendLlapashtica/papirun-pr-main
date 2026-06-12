@@ -4,10 +4,8 @@ import {
   AlertTriangle, ArrowLeft, ArrowRight, Loader2, Mail, MapPin, Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
-import { upsertProfile } from '@/lib/profilesApi';
 import AddressMapPicker from '@/components/checkout/AddressMapPicker';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import logo from '@/assets/logo.png';
@@ -45,7 +43,6 @@ const primaryBtnClass =
   'w-full flex items-center justify-center gap-2 text-sm font-semibold py-3.5 px-4 rounded-xl bg-primary text-primary-foreground transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50';
 
 const ConversationalAuth = () => {
-  const { requestOtp, verifyOtp } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
   const [mode, setMode] = useState<Mode>('signup');
@@ -136,59 +133,97 @@ const ConversationalAuth = () => {
       return;
     }
     setSending(true);
-    const { error } = await requestOtp(email, language);
-    setSending(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const res = await fetch('/api/auth/send-tan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, lang: language }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as { error?: string; wait?: number }));
+        if (body.error === 'cooldown') {
+          setResendIn(body.wait ?? COOLDOWN_SECS);
+          toast.error(language === 'sq'
+            ? `Prisni ${body.wait ?? 60}s para se të kërkoni kod të ri`
+            : `Wait ${body.wait ?? 60}s before requesting a new code`);
+        } else if (body.error === 'limit') {
+          setSendCount(MAX_SENDS);
+          toast.error(t.auth.maxSendsReached);
+        } else if (body.error === 'email_not_configured') {
+          toast.error(t.auth.emailNotConfigured);
+        } else {
+          toast.error(t.auth.sendFailed);
+        }
+        return;
+      }
+      setFormData((p) => ({ ...p, email }));
+      setSentEmail(email);
+      setCode('');
+      setSendCount((c) => c + 1);
+      setResendIn(COOLDOWN_SECS);
+      toast.success(t.auth.codeSent);
+      if (step === 'email') goNext();
+    } catch {
+      toast.error(t.auth.sendFailed);
+    } finally {
+      setSending(false);
     }
-    setFormData((p) => ({ ...p, email }));
-    setSentEmail(email);
-    setCode('');
-    setSendCount((c) => c + 1);
-    setResendIn(COOLDOWN_SECS);
-    toast.success(t.auth.codeSent);
-    if (step === 'email') goNext();
   };
 
   const handleVerify = async (value: string) => {
     if (verifying || value.length !== 6) return;
     setVerifying(true);
-    const { error } = await verifyOtp(sentEmail, value);
-    if (error) {
+    try {
+      // Our own TAN check — no Supabase auth email was ever involved.
+      const res = await fetch('/api/auth/verify-tan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: sentEmail,
+          code: value,
+          profile: mode === 'signup' ? {
+            emri: formData.emri.trim(),
+            mbiemri: formData.mbiemri.trim(),
+            numriTelefonit: formData.numriTelefonit.trim(),
+            vendbanimi: formData.vendbanimi.trim(),
+            latitude: formData.position?.[0] ?? null,
+            longitude: formData.position?.[1] ?? null,
+            lang: language,
+          } : null,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as { error?: string }));
+        setVerifying(false);
+        setCode('');
+        if (body.error === 'expired') toast.error(t.auth.codeExpired);
+        else if (body.error === 'too_many_attempts') toast.error(t.auth.maxSendsReached);
+        else toast.error(t.auth.invalidCode);
+        return;
+      }
+      const { token_hash } = await res.json();
+      // Exchange the server-minted token hash for a local session. Purely an
+      // internal API call — no email, no link, the user never leaves the page.
+      let { error } = await supabase.auth.verifyOtp({ token_hash, type: 'email' });
+      if (error) {
+        ({ error } = await supabase.auth.verifyOtp({
+          token_hash,
+          type: 'magiclink' as 'email',
+        }));
+      }
+      if (error) {
+        setVerifying(false);
+        setCode('');
+        toast.error(t.auth.invalidCode);
+        return;
+      }
+      // Session established: onAuthStateChange flips `user` and AuthGate
+      // unmounts this component — no setState past this point.
+      toast.success(t.auth.welcome);
+    } catch {
       setVerifying(false);
       setCode('');
-      toast.error(t.auth.invalidCode);
-      return;
-    }
-    // Success: onAuthStateChange flips `user` and AuthGate unmounts this
-    // component, so persist immediately and never setState past this point.
-    toast.success(t.auth.welcome);
-    if (mode === 'signup') {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await Promise.allSettled([
-            upsertProfile({
-              id: user.id,
-              emri: formData.emri.trim(),
-              mbiemri: formData.mbiemri.trim(),
-              numriTelefonit: formData.numriTelefonit.trim() || null,
-              vendbanimi: formData.vendbanimi.trim() || null,
-              latitude: formData.position?.[0] ?? null,
-              longitude: formData.position?.[1] ?? null,
-            }),
-            supabase.auth.updateUser({
-              data: {
-                first_name: formData.emri.trim(),
-                last_name: formData.mbiemri.trim(),
-                phone: formData.numriTelefonit.trim() || null,
-                lang: language,
-              },
-            }),
-          ]);
-        }
-      } catch { /* best-effort — never block the reveal */ }
+      toast.error(t.auth.sendFailed);
     }
   };
 
@@ -444,6 +479,7 @@ const ConversationalAuth = () => {
                     <p className="text-xs text-muted-foreground mt-1">
                       {t.auth.sentTo} <span className="font-medium text-foreground">{sentEmail}</span>
                     </p>
+                    <p className="text-[11px] text-muted-foreground/70 mt-0.5">{t.auth.codeExpires}</p>
                   </div>
 
                   <div className="flex justify-center">
