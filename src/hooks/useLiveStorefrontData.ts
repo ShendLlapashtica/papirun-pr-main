@@ -223,7 +223,6 @@ export const useLiveVisibleOffers = () => {
       }, 5000);
 
       try {
-        await ensureSeedStorefrontOffers(initialOffers);
         const liveOffers = await fetchStorefrontOffers();
         clearTimeout(timeout);
         

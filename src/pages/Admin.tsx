@@ -561,7 +561,6 @@ const Admin = () => {
 
     const syncOffers = async () => {
       try {
-        await ensureSeedStorefrontOffers(initialOffers);
         const nextOffers = await fetchStorefrontOffers();
         if (isMounted) setOffers(nextOffers);
       } catch (error) {
