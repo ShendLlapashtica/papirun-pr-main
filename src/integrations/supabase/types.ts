@@ -300,6 +300,42 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          created_at: string
+          emri: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          mbiemri: string | null
+          numri_telefonit: string | null
+          updated_at: string
+          vendbanimi: string | null
+        }
+        Insert: {
+          created_at?: string
+          emri?: string | null
+          id: string
+          latitude?: number | null
+          longitude?: number | null
+          mbiemri?: string | null
+          numri_telefonit?: string | null
+          updated_at?: string
+          vendbanimi?: string | null
+        }
+        Update: {
+          created_at?: string
+          emri?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          mbiemri?: string | null
+          numri_telefonit?: string | null
+          updated_at?: string
+          vendbanimi?: string | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: string

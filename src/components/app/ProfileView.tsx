@@ -81,7 +81,7 @@ const ProfileView = () => {
   const handleSignOut = async () => {
     if (!window.confirm(language === 'sq' ? 'A doni të dilni nga llogaria?' : 'Sign out?')) return;
     await signOut();
-    navigate('/login');
+    navigate('/');
   };
 
   const TabBtn = ({ id, icon: Icon, label }: { id: Tab; icon: any; label: string }) => {

@@ -32,7 +32,7 @@ export const clearActiveOrderId = () => {
 
 const TERMINAL: OrderStatus[] = ['rejected', 'completed'];
 
-const HIDDEN_ROUTES = ['/login', '/signup', '/verify', '/admin', '/driver'];
+const HIDDEN_ROUTES = ['/admin', '/driver'];
 
 const OrderTrackingPill = () => {
   const { language } = useLanguage();

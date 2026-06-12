@@ -8,9 +8,9 @@ import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import RequireAuth from "@/components/RequireAuth";
+import AuthGate from "@/components/AuthGate";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
-import Login from "./pages/Login";
 import Home from "./pages/Home";
 import ProductViewWrapper from "./pages/ProductViewWrapper";
 import AppProductPage from "./pages/AppProductPage";
@@ -40,11 +40,12 @@ const App = () => (
                 <Toaster />
                 <Sonner />
                 <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/login" element={<Login />} />
-                  {/* Legacy redirects — single passwordless flow now */}
-                  <Route path="/signup" element={<Navigate to="/login" replace />} />
-                  <Route path="/verify" element={<Navigate to="/login" replace />} />
+                  {/* Main page: conversational login/signup gate, storefront once authed */}
+                  <Route path="/" element={<AuthGate><Index /></AuthGate>} />
+                  {/* Legacy redirects — auth lives on the main page now */}
+                  <Route path="/login" element={<Navigate to="/" replace />} />
+                  <Route path="/signup" element={<Navigate to="/" replace />} />
+                  <Route path="/verify" element={<Navigate to="/" replace />} />
                   <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="/admin" element={<Admin />} />

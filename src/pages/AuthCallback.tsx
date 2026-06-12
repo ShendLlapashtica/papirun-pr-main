@@ -43,10 +43,10 @@ const AuthCallback = () => {
         <>
           <p className="text-sm text-destructive font-semibold">{error}</p>
           <button
-            onClick={() => navigate('/login', { replace: true })}
+            onClick={() => navigate('/', { replace: true })}
             className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
           >
-            Kthehu te login
+            Kthehu te faqja kryesore
           </button>
         </>
       ) : (

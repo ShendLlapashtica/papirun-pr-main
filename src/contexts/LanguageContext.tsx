@@ -83,6 +83,41 @@ interface Translations {
     orderViaSms: string;
     total: string;
   };
+  auth: {
+    signUp: string;
+    logIn: string;
+    stepNameTitle: string;
+    stepNameHint: string;
+    firstNamePlaceholder: string;
+    lastNamePlaceholder: string;
+    stepContactTitle: string;
+    stepContactHint: string;
+    phonePlaceholder: string;
+    addressPlaceholder: string;
+    stepEmailTitle: string;
+    stepEmailHint: string;
+    emailPlaceholder: string;
+    sendCode: string;
+    stepOtpTitle: string;
+    sentTo: string;
+    changeEmail: string;
+    resend: string;
+    verifying: string;
+    back: string;
+    next: string;
+    nameRequired: string;
+    phoneRequired: string;
+    locationRequired: string;
+    locationRequiredHint: string;
+    invalidEmail: string;
+    codeSent: string;
+    invalidCode: string;
+    maxSendsReached: string;
+    codesUsed: string;
+    welcome: string;
+    haveAccount: string;
+    noAccount: string;
+  };
 }
 
 const translations: Record<Language, Translations> = {
@@ -160,6 +195,41 @@ const translations: Record<Language, Translations> = {
       orderViaSms: 'SMS',
       total: 'Totali',
     },
+    auth: {
+      signUp: 'Regjistrohu',
+      logIn: 'Kyçu',
+      stepNameTitle: 'Cili është emri dhe mbiemri juaj?',
+      stepNameHint: 'Do të shfaqet te porositë tuaja',
+      firstNamePlaceholder: 'Emri',
+      lastNamePlaceholder: 'Mbiemri',
+      stepContactTitle: "Ku jetoni dhe si mund t'ju kontaktojmë?",
+      stepContactHint: 'Klikoni hartën ose tërhiqni shënuesin',
+      phonePlaceholder: '+383 4X XXX XXX',
+      addressPlaceholder: 'Zgjidhni vendndodhjen në hartë',
+      stepEmailTitle: 'Cila është adresa juaj e email-it?',
+      stepEmailHint: "Do t'ju dërgojmë një kod 6-shifror",
+      emailPlaceholder: 'emri@shembull.com',
+      sendCode: 'Dërgo Kodin',
+      stepOtpTitle: 'Shkruani kodin me 6 shifra që ju dërguam në Email:',
+      sentTo: 'Dërguar te',
+      changeEmail: 'Ndrysho emailin',
+      resend: 'Rikërko Kodin',
+      verifying: 'Po verifikohet…',
+      back: 'Kthehu',
+      next: 'Vazhdo',
+      nameRequired: 'Shkruani emrin dhe mbiemrin',
+      phoneRequired: 'Shkruani numrin e telefonit',
+      locationRequired: 'Lokacioni i kërkuar',
+      locationRequiredHint: 'Aktivizoni lokacionin GPS ose vendosni pinin në hartë.',
+      invalidEmail: 'Shkruani një email të vlefshëm',
+      codeSent: 'Kodi u dërgua në email',
+      invalidCode: 'Kod i pasaktë. Provo përsëri.',
+      maxSendsReached: 'Keni arritur limitin e kodeve. Provoni më vonë.',
+      codesUsed: 'kode të dërguara',
+      welcome: 'Mirë se erdhe!',
+      haveAccount: 'Keni llogari?',
+      noAccount: 'Nuk keni llogari?',
+    },
   },
   en: {
     header: {
@@ -234,6 +304,41 @@ const translations: Record<Language, Translations> = {
       orderViaViber: 'Viber',
       orderViaSms: 'SMS',
       total: 'Total',
+    },
+    auth: {
+      signUp: 'Sign Up',
+      logIn: 'Log In',
+      stepNameTitle: "What's your name and surname?",
+      stepNameHint: 'Shown on your orders',
+      firstNamePlaceholder: 'First name',
+      lastNamePlaceholder: 'Last name',
+      stepContactTitle: 'Where do you live & how can we reach you?',
+      stepContactHint: 'Tap the map or drag the pin',
+      phonePlaceholder: '+383 4X XXX XXX',
+      addressPlaceholder: 'Select location on map',
+      stepEmailTitle: "What's your email address?",
+      stepEmailHint: "We'll send you a 6-digit code",
+      emailPlaceholder: 'name@example.com',
+      sendCode: 'Send Code',
+      stepOtpTitle: 'Enter the 6-digit code we sent to your email:',
+      sentTo: 'Sent to',
+      changeEmail: 'Change email',
+      resend: 'Resend Code',
+      verifying: 'Verifying…',
+      back: 'Back',
+      next: 'Continue',
+      nameRequired: 'Enter your first and last name',
+      phoneRequired: 'Enter your phone number',
+      locationRequired: 'Location required',
+      locationRequiredHint: 'Enable GPS or place a pin on the map.',
+      invalidEmail: 'Enter a valid email',
+      codeSent: 'Code sent to your email',
+      invalidCode: 'Invalid code. Try again.',
+      maxSendsReached: 'You have reached the code limit. Try again later.',
+      codesUsed: 'codes sent',
+      welcome: 'Welcome!',
+      haveAccount: 'Have an account?',
+      noAccount: "Don't have an account?",
     },
   },
 };
