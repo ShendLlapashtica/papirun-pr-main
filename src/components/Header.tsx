@@ -113,7 +113,7 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
             </button>
 
             {/* Logged-in user: greeting + logout (desktop) */}
-            {user && firstName && (
+            {user && firstName ? (
               <div className="hidden sm:flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/10">
                 <UserIcon className="w-3.5 h-3.5 text-primary" />
                 <span className="text-xs font-semibold text-primary max-w-[120px] truncate">
@@ -128,7 +128,15 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
                   <LogOut className="w-3.5 h-3.5 text-primary" />
                 </button>
               </div>
-            )}
+            ) : !user ? (
+              <Link
+                to="/login"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-xs font-semibold text-primary transition-colors"
+              >
+                <UserIcon className="w-3.5 h-3.5" />
+                {language === 'sq' ? 'Hyr' : 'Log in'}
+              </Link>
+            ) : null}
 
             {/* Info - Hidden on mobile */}
             <div className="hidden lg:flex items-center gap-3 text-xs text-muted-foreground">
@@ -210,7 +218,7 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
                 {link.label}
               </Link>
             ))}
-            {user && firstName && (
+            {user && firstName ? (
               <div className="flex items-center justify-between pt-4 border-t border-border">
                 <span className="flex items-center gap-2 text-sm font-semibold text-primary">
                   <UserIcon className="w-4 h-4" /> {t.auth.greeting}, {firstName}
@@ -222,7 +230,18 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
                   <LogOut className="w-3.5 h-3.5" /> {t.auth.logOut}
                 </button>
               </div>
-            )}
+            ) : !user ? (
+              <div className="pt-4 border-t border-border">
+                <Link
+                  to="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 text-sm font-semibold text-primary"
+                >
+                  <UserIcon className="w-4 h-4" />
+                  {language === 'sq' ? 'Hyr / Regjistrohu' : 'Log in / Sign up'}
+                </Link>
+              </div>
+            ) : null}
             <div className="pt-4 border-t border-border space-y-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-primary shrink-0" />

@@ -8,8 +8,8 @@ import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import RequireAuth from "@/components/RequireAuth";
-import AuthGate from "@/components/AuthGate";
 import Index from "./pages/Index";
+import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import Home from "./pages/Home";
 import ProductViewWrapper from "./pages/ProductViewWrapper";
@@ -39,12 +39,12 @@ const App = () => (
                 <Toaster />
                 <Sonner />
                 <Routes>
-                  {/* Main page: conversational login/signup gate, storefront once authed */}
-                  <Route path="/" element={<AuthGate><Index /></AuthGate>} />
-                  {/* Legacy redirects — auth lives on the main page now */}
-                  <Route path="/login" element={<Navigate to="/" replace />} />
-                  <Route path="/signup" element={<Navigate to="/" replace />} />
-                  <Route path="/verify" element={<Navigate to="/" replace />} />
+                  {/* Public storefront — no auth required */}
+                  <Route path="/" element={<Index />} />
+                  {/* Dedicated login/signup page */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Navigate to="/login" replace />} />
+                  <Route path="/verify" element={<Navigate to="/login" replace />} />
                   <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
                   {/* Magic links are dead — TAN codes only. Old links land on the gate. */}
                   <Route path="/auth/callback" element={<Navigate to="/" replace />} />
