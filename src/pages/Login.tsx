@@ -10,7 +10,7 @@ const Login = () => {
   const { language } = useLanguage();
 
   useEffect(() => {
-    if (user) navigate('/', { replace: true });
+    if (user) navigate('/home', { replace: true });
   }, [user, navigate]);
 
   if (loading) {
@@ -21,7 +21,7 @@ const Login = () => {
     );
   }
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/home" replace />;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

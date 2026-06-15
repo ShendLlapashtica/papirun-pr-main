@@ -57,6 +57,7 @@ const ConversationalAuth = () => {
   const [verifying, setVerifying] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const [sendCount, setSendCount] = useState(0);
+  const [emailServiceDown, setEmailServiceDown] = useState(false);
 
   const steps = mode === 'signup' ? SIGNUP_STEPS : LOGIN_STEPS;
   const step = steps[stepIndex];
@@ -150,7 +151,7 @@ const ConversationalAuth = () => {
           setSendCount(MAX_SENDS);
           toast.error(t.auth.maxSendsReached);
         } else if (body.error === 'email_not_configured') {
-          toast.error(t.auth.emailNotConfigured);
+          setEmailServiceDown(true);
         } else {
           toast.error(t.auth.sendFailed);
         }
@@ -453,10 +454,21 @@ const ConversationalAuth = () => {
                     />
                   </div>
 
-                  <button type="submit" disabled={sending || sendCount >= MAX_SENDS} className={primaryBtnClass}>
+                  <button type="submit" disabled={sending || sendCount >= MAX_SENDS || emailServiceDown} className={primaryBtnClass}>
                     {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     {t.auth.sendCode}
                   </button>
+
+                  {emailServiceDown && (
+                    <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        {language === 'sq'
+                          ? 'Shërbimi i emailit po konfigurohet. Provo pak më vonë.'
+                          : 'Email delivery is being set up. Try again soon.'}
+                      </p>
+                    </div>
+                  )}
 
                   {sendCount >= MAX_SENDS && (
                     <p className="text-center text-xs text-destructive">{t.auth.maxSendsReached}</p>

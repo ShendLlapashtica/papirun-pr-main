@@ -115,10 +115,12 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
             {/* Logged-in user: greeting + logout (desktop) */}
             {user && firstName ? (
               <div className="hidden sm:flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/10">
-                <UserIcon className="w-3.5 h-3.5 text-primary" />
-                <span className="text-xs font-semibold text-primary max-w-[120px] truncate">
-                  {t.auth.greeting}, {firstName}
-                </span>
+                <Link to="/home" className="flex items-center gap-1 hover:opacity-80 transition-opacity">
+                  <UserIcon className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-primary max-w-[120px] truncate">
+                    {t.auth.greeting}, {firstName}
+                  </span>
+                </Link>
                 <button
                   onClick={handleSignOut}
                   aria-label={t.auth.logOut}
