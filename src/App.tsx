@@ -7,7 +7,6 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
-import RequireAuth from "@/components/RequireAuth";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
@@ -45,14 +44,15 @@ const App = () => (
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Navigate to="/login" replace />} />
                   <Route path="/verify" element={<Navigate to="/login" replace />} />
-                  <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
+                  {/* App shell — guests can browse; auth is only needed for profile/orders */}
+                  <Route path="/home" element={<Home />} />
                   {/* Magic links are dead — TAN codes only. Old links land on the gate. */}
                   <Route path="/auth/callback" element={<Navigate to="/" replace />} />
                   <Route path="/admin" element={<Admin />} />
                   {/* Web product page (desktop + mobile browser visiting papirun.net) */}
                   <Route path="/product/:id" element={<ProductViewWrapper />} />
-                  {/* App product page (PWA / logged-in /home users) */}
-                  <Route path="/app/product/:id" element={<RequireAuth><AppProductPage /></RequireAuth>} />
+                  {/* App product page */}
+                  <Route path="/app/product/:id" element={<AppProductPage />} />
                   <Route path="/offer/:id" element={<OfferViewWrapper />} />
                   <Route path="/driver" element={<DriverPanel />} />
                   <Route path="/driver-dashboard" element={<Navigate to="/driver" replace />} />

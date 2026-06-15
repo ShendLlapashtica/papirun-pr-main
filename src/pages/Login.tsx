@@ -31,10 +31,10 @@ const Login = () => {
       <div className="text-center pb-8">
         <button
           type="button"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/home')}
           className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
         >
-          {language === 'sq' ? 'Vazhdo si mysafir →' : 'Continue as guest →'}
+          {language === 'sq' ? 'Vazhdo pa llogari →' : 'Continue without account →'}
         </button>
       </div>
     </div>
