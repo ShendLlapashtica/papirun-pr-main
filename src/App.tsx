@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import Login2 from "./pages/Login2";
 import Admin from "./pages/Admin";
 import Home from "./pages/Home";
 import ProductViewWrapper from "./pages/ProductViewWrapper";
@@ -40,8 +41,9 @@ const App = () => (
                 <Routes>
                   {/* Public storefront — no auth required */}
                   <Route path="/" element={<Index />} />
-                  {/* Dedicated login/signup page */}
+                  {/* Dedicated login/signup pages — web vs app */}
                   <Route path="/login" element={<Login />} />
+                  <Route path="/login2" element={<Login2 />} />
                   <Route path="/signup" element={<Navigate to="/login" replace />} />
                   <Route path="/verify" element={<Navigate to="/login" replace />} />
                   {/* App shell — guests can browse; auth is only needed for profile/orders */}

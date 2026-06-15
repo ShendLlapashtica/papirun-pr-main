@@ -136,12 +136,6 @@ const AppHome = () => {
         </div>
       </div>
 
-      {isOfertaEnabled && (
-        <div className="px-4 mb-4">
-          <OfertaRamazani />
-        </div>
-      )}
-
       <div className="px-1">
         <FavoritesCarousel />
       </div>
@@ -232,6 +226,12 @@ const AppHome = () => {
           </>
         )}
       </div>
+
+      {isOfertaEnabled && (
+        <div className="px-4 pb-4">
+          <OfertaRamazani />
+        </div>
+      )}
     </div>
   );
 };
