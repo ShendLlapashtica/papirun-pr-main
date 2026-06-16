@@ -31,11 +31,11 @@ const Login2 = () => {
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         <ConversationalAuth />
       </div>
-      <div className="text-center pb-8">
+      <div className="pb-8 px-6 flex justify-center">
         <button
           type="button"
           onClick={() => navigate('/home')}
-          className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+          className="app-glass w-full max-w-sm px-6 py-3 rounded-full text-sm font-semibold text-[#1A1A1A] active:scale-95 transition-all"
         >
           {language === 'sq' ? 'Vazhdo pa llogari →' : 'Continue without account →'}
         </button>

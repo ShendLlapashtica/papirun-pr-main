@@ -36,6 +36,12 @@ const AppShell = ({ children }: { children: ReactNode }) => {
     return () => { delete document.documentElement.dataset.appShell; };
   }, []);
 
+  // Scroll the shell container (not window) to top on every route change.
+  // window.scrollTo has no effect here because overflow-y-auto is on shellRef.
+  useEffect(() => {
+    shellRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [location.pathname]);
+
   const handleRefresh = async () => {
     window.dispatchEvent(new Event('papirun:refresh'));
     await new Promise((r) => setTimeout(r, 600));
@@ -177,6 +183,25 @@ const AppShell = ({ children }: { children: ReactNode }) => {
                 </button>
               </div>
             </form>
+          )}
+
+          {/* Active search filter chip — visible when a search is applied */}
+          {params.get('search') && !searchOpen && (
+            <div className="px-1.5 pt-2 animate-slide-up">
+              <div className="inline-flex items-center gap-2 app-glass-chip px-3 py-1.5 rounded-full">
+                <Search className="w-3 h-3 text-[#1A1A1A]/60 shrink-0" />
+                <span className="text-xs font-semibold text-[#1A1A1A] max-w-[180px] truncate">
+                  {params.get('search')}
+                </span>
+                <button
+                  onClick={closeSearch}
+                  className="p-0.5 rounded-full hover:bg-black/10 active:scale-90 transition-all"
+                  aria-label="Pastro kërkimin"
+                >
+                  <X className="w-3 h-3 text-[#1A1A1A]/60" />
+                </button>
+              </div>
+            </div>
           )}
         </header>
 

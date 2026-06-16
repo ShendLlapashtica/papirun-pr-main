@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Plus, Heart, Check } from 'lucide-react';
+import { Plus, Heart } from 'lucide-react';
 import type { MenuItem } from '@/types/menu';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
-import { ingredientNames } from '@/data/ingredientTranslations';
 import { cn, getOptimizedImage } from '@/lib/utils';
 
 interface AppMenuCardProps {
@@ -34,27 +33,19 @@ const AppMenuCard = ({ item, index = 0, onAddToCart, onCardClick }: AppMenuCardP
     toggleFavorite(item.id);
   };
 
-  const visibleIngredients = item.ingredients.slice(0, 2);
-
-  const localizeIngredient = (raw: string) => {
-    const key = raw.toLowerCase().trim();
-    const entry = ingredientNames[key];
-    return entry ? entry[language] : raw;
-  };
-
   return (
     <div
       onClick={() => onCardClick?.()}
       className={cn(
         'group relative cursor-pointer flex h-full flex-col overflow-hidden rounded-[28px] transition-all duration-300 ease-out active:scale-[0.97]',
-        'app-glass',
+        'app-glass-strong',
         !item.isAvailable && 'opacity-60 grayscale',
       )}
     >
-      {/* Image frame — white panel matching product view */}
+      {/* Image frame — pure white panel matching product view */}
       <div className="relative px-3 pt-3">
-        <div className="relative aspect-square rounded-[22px] bg-white/60 overflow-hidden flex items-center justify-center">
-          {!imageLoaded && <div className="absolute inset-0 animate-pulse bg-white/40 rounded-[22px]" />}
+        <div className="relative aspect-square rounded-[22px] bg-white overflow-hidden flex items-center justify-center">
+          {!imageLoaded && <div className="absolute inset-0 animate-pulse bg-white/60 rounded-[22px]" />}
 
           {showFavorite && (
             <button
@@ -79,7 +70,7 @@ const AppMenuCard = ({ item, index = 0, onAddToCart, onCardClick }: AppMenuCardP
             fetchPriority={isEager ? 'high' : undefined}
             onLoad={() => setImageLoaded(true)}
             className={cn(
-              'w-[80%] h-[80%] object-contain transition-all duration-500',
+              'w-[75%] h-[75%] object-contain transition-all duration-500',
               imageLoaded
                 ? 'opacity-100 scale-100 group-hover:scale-108 group-hover:-rotate-2'
                 : 'opacity-0 scale-95 blur-sm'
@@ -113,18 +104,10 @@ const AppMenuCard = ({ item, index = 0, onAddToCart, onCardClick }: AppMenuCardP
           )}
         </div>
 
-        {visibleIngredients.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {visibleIngredients.map((ing) => (
-              <span
-                key={ing}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold text-[#1A1A1A]/70 app-glass-chip"
-              >
-                <Check className="w-2.5 h-2.5 text-[#1A1A1A]/60" strokeWidth={3} />
-                {localizeIngredient(ing)}
-              </span>
-            ))}
-          </div>
+        {item.description?.[language] && (
+          <p className="text-[11px] leading-[1.45] text-[#1A1A1A]/55 mt-1.5 line-clamp-2">
+            {item.description[language]}
+          </p>
         )}
 
         <button
