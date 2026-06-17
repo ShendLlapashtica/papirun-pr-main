@@ -29,6 +29,11 @@ const PRODUCTS_TABLE = 'products';
 const MENU_EXTRAS_TABLE = 'menu_extras';
 const PRODUCT_IMAGE_BUCKET = 'product-images';
 
+// Signals to other open tabs that products changed — they listen via the storage event.
+const notifyProductMutation = () => {
+  try { localStorage.setItem('papirun_products_mutated', Date.now().toString()); } catch { /* quota */ }
+};
+
 type ProductRow = {
   id: string;
   name_sq: string;
@@ -159,6 +164,7 @@ export const handleUpdateProduct = async (id: string, updates: Partial<MenuItem>
     .single();
 
   if (error) throw error;
+  notifyProductMutation();
   return mapRowToMenuItem(data as ProductRow);
 };
 
@@ -171,12 +177,14 @@ export const upsertProduct = async (item: MenuItem) => {
     .single();
 
   if (error) throw error;
+  notifyProductMutation();
   return mapRowToMenuItem(data as ProductRow);
 };
 
 export const deleteProduct = async (id: string) => {
   const { error } = await supabase.from(PRODUCTS_TABLE).delete().eq('id', id);
   if (error) throw error;
+  notifyProductMutation();
 };
 
 export const updateProductSortOrder = async (id: string, sortOrder: number) => {

@@ -119,17 +119,38 @@ export const useLiveMenuItems = () => {
       }
     };
 
+    // Cross-tab sync: admin writes set 'papirun_products_mutated' in localStorage.
+    // The storage event fires in OTHER tabs, triggering an immediate re-fetch.
+    const onStorageMutation = (e: StorageEvent) => {
+      if (e.key === 'papirun_products_mutated') syncFromDatabase();
+    };
+    window.addEventListener('storage', onStorageMutation);
+
+    // 30-second poll as fallback when Supabase realtime is silent.
+    const poll = setInterval(syncFromDatabase, 30_000);
+
     if (cached) {
       setIsLoading(false);
-      const timer = setTimeout(syncFromDatabase, 2000);
+      // Sync immediately in the background (was 2000ms delay — now 0).
+      syncFromDatabase();
       const unsubRealtime = subscribeProductsRealtime(() => syncFromDatabase());
-      return () => { isMounted = false; clearTimeout(timer); unsubRealtime(); };
+      return () => {
+        isMounted = false;
+        clearInterval(poll);
+        window.removeEventListener('storage', onStorageMutation);
+        unsubRealtime();
+      };
     }
 
     syncFromDatabase();
 
     const unsubRealtime = subscribeProductsRealtime(() => syncFromDatabase());
-    return () => { isMounted = false; unsubRealtime(); };
+    return () => {
+      isMounted = false;
+      clearInterval(poll);
+      window.removeEventListener('storage', onStorageMutation);
+      unsubRealtime();
+    };
   }, []);
 
   return { items, isLoading };
