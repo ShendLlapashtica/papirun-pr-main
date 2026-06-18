@@ -70,7 +70,7 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
 
   // Must be before early return for hooks rules
   const allOtherItems = useMemo(
-    () => menuItems.filter((m) => m.id !== id && m.category !== 'sides'),
+    () => menuItems.filter((m) => m.id !== id),
     [menuItems, id]
   );
 
@@ -96,6 +96,7 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
     { id: 'salad', label: t.categories.salads },
     { id: 'fajita', label: t.categories.fajitas },
     { id: 'sandwich', label: t.categories.sandwiches },
+    { id: 'sides', label: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras' },
   ];
 
   if (!item) {
