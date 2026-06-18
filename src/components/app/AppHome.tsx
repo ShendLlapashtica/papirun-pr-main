@@ -23,7 +23,7 @@ const AppHome = () => {
   const search = params.get('search') ?? '';
   // Category is driven entirely by the URL — no state variable, no stale default.
   // No `cat` param (or unknown value) → 'all' is always the default.
-  const VALID_CATS = new Set(['salad', 'fajita', 'sandwich']);
+  const VALID_CATS = new Set(['salad', 'fajita', 'sandwich', 'sides']);
   const catParam = params.get('cat') ?? '';
   const activeCategory = VALID_CATS.has(catParam) ? catParam : 'all';
 
@@ -47,7 +47,7 @@ const AppHome = () => {
     navigate(`/app/product/${id}`);
   };
 
-  const visibleItems = useMemo(() => menuItems.filter((i) => i.category !== 'sides'), [menuItems]);
+  const visibleItems = useMemo(() => menuItems, [menuItems]);
 
   const filtered = useMemo(() => {
     let items = visibleItems;
@@ -89,6 +89,7 @@ const AppHome = () => {
     { id: 'salad', label: t.categories.salads },
     { id: 'fajita', label: t.categories.fajitas },
     { id: 'sandwich', label: t.categories.sandwiches },
+    { id: 'sides', label: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras' },
   ];
 
   const greeting = (() => {
