@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { MenuItem } from '@/types/menu';
@@ -24,6 +24,11 @@ const MenuCard = ({ item, index = 0, onAddToCart, revealed = true, onImageReady 
   const [imageLoaded, setImageLoaded] = useState(false);
 
   const isEager = index < 2;
+  const hasImage = !!item.image;
+
+  useEffect(() => {
+    if (!hasImage) onImageReady?.();
+  }, [hasImage]);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -51,23 +56,26 @@ const MenuCard = ({ item, index = 0, onAddToCart, revealed = true, onImageReady 
     >
       {/* Image — fixed height, white bg */}
       <div className="relative h-40 sm:h-48 overflow-hidden bg-white pt-4">
-        {!imageLoaded && (
-          <div className="absolute inset-0 animate-pulse bg-muted" />
+        {hasImage && (
+          <>
+            {!imageLoaded && (
+              <div className="absolute inset-0 animate-pulse bg-muted" />
+            )}
+            <img
+              src={getOptimizedImage(item.image)}
+              alt={item.name[language]}
+              loading={isEager ? 'eager' : 'lazy'}
+              decoding="async"
+              fetchPriority={isEager ? 'high' : undefined}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+              className={cn(
+                'w-full h-full object-contain px-4 sm:px-5 transition-all duration-500 group-hover:scale-105',
+                imageLoaded ? 'opacity-100 blur-0' : 'opacity-40 blur-sm'
+              )}
+            />
+          </>
         )}
-
-        <img
-          src={getOptimizedImage(item.image)}
-          alt={item.name[language]}
-          loading={isEager ? 'eager' : 'lazy'}
-          decoding="async"
-          fetchPriority={isEager ? 'high' : undefined}
-          onLoad={handleImageLoad}
-          onError={handleImageError}
-          className={cn(
-            'w-full h-full object-contain px-4 sm:px-5 transition-all duration-500 group-hover:scale-105',
-            imageLoaded ? 'opacity-100 blur-0' : 'opacity-40 blur-sm'
-          )}
-        />
 
         {/* Unavailable Overlay */}
         {!item.isAvailable && (
