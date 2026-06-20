@@ -539,8 +539,14 @@ const Admin = () => {
   const { items: liveItems } = useLiveMenuItems();
 
   useEffect(() => {
-    setItems(liveItems);
-  }, [liveItems]);
+    setItems(prev =>
+      liveItems.map(live =>
+        live.id === editingItem
+          ? (prev.find(p => p.id === live.id) ?? live)
+          : live
+      )
+    );
+  }, [liveItems, editingItem]);
 
   // Sync menuExtras from DB
   useEffect(() => {
