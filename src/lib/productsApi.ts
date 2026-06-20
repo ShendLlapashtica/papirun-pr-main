@@ -97,9 +97,6 @@ const mapMenuItemToInsert = (item: MenuItem): TablesInsert<'products'> => ({
   ingredients: item.ingredients,
   extras: item.extras,
   crunch_level: item.crunchLevel,
-  likes: item.likes,
-  rating: item.rating,
-  review_count: item.reviewCount,
   is_available: item.isAvailable,
 });
 
@@ -122,9 +119,6 @@ const mapMenuItemPatchToUpdate = (updates: Partial<MenuItem>): TablesUpdate<'pro
   if (updates.ingredients) payload.ingredients = updates.ingredients;
   if (updates.extras) payload.extras = updates.extras;
   if (typeof updates.crunchLevel === 'number') payload.crunch_level = updates.crunchLevel;
-  if (typeof updates.likes === 'number') payload.likes = updates.likes;
-  if (typeof updates.rating === 'number') payload.rating = updates.rating;
-  if (typeof updates.reviewCount === 'number') payload.review_count = updates.reviewCount;
   if (typeof updates.isAvailable === 'boolean') payload.is_available = updates.isAvailable;
 
   return payload;
