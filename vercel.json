@@ -17,6 +17,15 @@
     },
     "api/auth/verify-tan.ts": {
       "memory": 128
+    },
+    "api/keep-alive.ts": {
+      "memory": 128
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/keep-alive",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }

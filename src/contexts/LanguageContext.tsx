@@ -194,7 +194,7 @@ const translations: Record<Language, Translations> = {
       phonePlaceholder: '+383 4X XXX XXX',
       address: 'Adresa e Dergeses',
       addressPlaceholder: 'Rruga, Numri, Qyteti',
-      notes: 'Shenime Shtese per Adresen',
+      notes: 'Shenime Shtese per Adrese ose Faturim',
       notesPlaceholder: 'p.sh. Kati 3, dera djathtas...',
       orderViaWhatsapp: 'WhatsApp',
       orderViaViber: 'Viber',
