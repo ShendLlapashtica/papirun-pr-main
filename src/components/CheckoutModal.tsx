@@ -29,7 +29,8 @@ const GUEST_INFO_KEY = 'papirun_guest_info';
 const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutModalProps) => {
   const { language, t } = useLanguage();
   const { user } = useAuth();
-  const deliveryFee = total < 10 ? 2 : 0;
+  const [isTakeaway, setIsTakeaway] = useState(false);
+  const deliveryFee = isTakeaway ? 0 : (total < 10 ? 2 : 0);
   const finalTotal = total + deliveryFee;
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', notes: '' });
   const [selectedPosition, setSelectedPosition] = useState<[number, number] | null>(null);
@@ -229,6 +230,18 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>{language === 'sq' ? 'Nëntotali' : 'Subtotal'}</span>
                       <span>€{total.toFixed(2)}</span>
+                    </div>
+                    <div
+                      className="flex items-center justify-between text-xs cursor-pointer select-none"
+                      onClick={() => setIsTakeaway(v => !v)}
+                    >
+                      <span>{language === 'sq' ? 'Merr vetë (Takeaway)' : 'Takeaway'}</span>
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={isTakeaway}
+                        className="accent-primary w-3.5 h-3.5 cursor-pointer"
+                      />
                     </div>
                     <div className={`flex justify-between text-xs font-medium ${deliveryFee === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
                       <span>{language === 'sq' ? 'Tarifa e transportit' : 'Delivery fee'}</span>
