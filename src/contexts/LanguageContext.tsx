@@ -33,6 +33,7 @@ interface Translations {
     fajitas: string;
     sandwiches: string;
     sides: string;
+    drinks: string;
   };
   menu: {
     likes: string;
@@ -151,6 +152,7 @@ const translations: Record<Language, Translations> = {
       fajitas: 'Fajita',
       sandwiches: 'Sanduiçe',
       sides: 'Supë & Ekstra',
+      drinks: 'Pijet',
     },
     menu: {
       likes: 'pelqime',
@@ -267,6 +269,7 @@ const translations: Record<Language, Translations> = {
       fajitas: 'Fajitas',
       sandwiches: 'Sandwiches',
       sides: 'Soup & Extras',
+      drinks: 'Drinks',
     },
     menu: {
       likes: 'likes',

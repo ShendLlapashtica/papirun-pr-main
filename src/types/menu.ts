@@ -11,7 +11,7 @@ export interface MenuItem {
   description: LocalizedString;
   price: number;
   image: string;
-  category: 'salad' | 'fajita' | 'sandwich' | 'sides';
+  category: 'salad' | 'fajita' | 'sandwich' | 'sides' | 'drink';
   ingredients: string[];
   extras: string[];
   crunchLevel: number; // 1-5

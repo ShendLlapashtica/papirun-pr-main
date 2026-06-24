@@ -1352,6 +1352,7 @@ const Admin = () => {
                           { value: 'fajita',   emoji: '🌯', label: 'Fajita' },
                           { value: 'salad',    emoji: '🥗', label: language === 'sq' ? 'Sallatë' : 'Salad' },
                           { value: 'sides',    emoji: '🍲', label: language === 'sq' ? 'Supë / Ekstra' : 'Soup / Extra' },
+                          { value: 'drink',    emoji: '🥤', label: language === 'sq' ? 'Pije' : 'Drink' },
                         ] as const).map(({ value, emoji, label }) => (
                           <button
                             key={value}
@@ -1373,7 +1374,7 @@ const Admin = () => {
                           ← {language === 'sq' ? 'Ndrysho kategorinë' : 'Change category'}
                         </button>
                         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                          {wizardCategory === 'sandwich' ? '🥪 Sanduiç' : wizardCategory === 'fajita' ? '🌯 Fajita' : wizardCategory === 'salad' ? '🥗 Sallatë' : '🍲 Supë/Ekstra'}
+                          {wizardCategory === 'sandwich' ? '🥪 Sanduiç' : wizardCategory === 'fajita' ? '🌯 Fajita' : wizardCategory === 'salad' ? '🥗 Sallatë' : wizardCategory === 'drink' ? '🥤 Pije' : '🍲 Supë/Ekstra'}
                         </span>
                       </div>
                       <div className="space-y-3">
@@ -1533,12 +1534,13 @@ const Admin = () => {
               {language === 'sq' ? 'Shto Produkt te Ri' : 'Add New Product'}
             </button>
 
-            {(['sandwich', 'salad', 'fajita', 'sides'] as const).map((cat) => {
+            {(['sandwich', 'salad', 'fajita', 'sides', 'drink'] as const).map((cat) => {
               const catItems = items.filter((i) => i.category === cat);
               if (catItems.length === 0) return null;
               const catLabel = cat === 'sandwich' ? (language === 'sq' ? 'Sanduiçe' : 'Sandwiches')
                 : cat === 'salad' ? (language === 'sq' ? 'Sallata' : 'Salads')
                 : cat === 'fajita' ? (language === 'sq' ? 'Fajita' : 'Fajitas')
+                : cat === 'drink' ? (language === 'sq' ? 'Pijet' : 'Drinks')
                 : (language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras');
 
               const moveItem = async (itemId: string, direction: 'up' | 'down') => {
@@ -1723,6 +1725,7 @@ const Admin = () => {
                               <option value="fajita">Fajita</option>
                               <option value="sandwich">Sandwich</option>
                               <option value="sides">Sides</option>
+                              <option value="drink">Drink (Pije)</option>
                             </select>
                           </div>
                         </div>

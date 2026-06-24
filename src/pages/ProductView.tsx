@@ -97,6 +97,7 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
     { id: 'fajita', label: t.categories.fajitas },
     { id: 'sandwich', label: t.categories.sandwiches },
     { id: 'sides', label: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras' },
+    { id: 'drink', label: language === 'sq' ? 'Pijet' : 'Drinks' },
   ];
 
   if (!item) {

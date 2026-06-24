@@ -23,7 +23,7 @@ const AppHome = () => {
   const search = params.get('search') ?? '';
   // Category is driven entirely by the URL — no state variable, no stale default.
   // No `cat` param (or unknown value) → 'all' is always the default.
-  const VALID_CATS = new Set(['salad', 'fajita', 'sandwich', 'sides']);
+  const VALID_CATS = new Set(['salad', 'fajita', 'sandwich', 'sides', 'drink']);
   const catParam = params.get('cat') ?? '';
   const activeCategory = VALID_CATS.has(catParam) ? catParam : 'all';
 
@@ -90,6 +90,7 @@ const AppHome = () => {
     { id: 'fajita', label: t.categories.fajitas },
     { id: 'sandwich', label: t.categories.sandwiches },
     { id: 'sides', label: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras' },
+    { id: 'drink', label: t.categories.drinks },
   ];
 
   const greeting = (() => {
