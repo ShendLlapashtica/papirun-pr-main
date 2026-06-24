@@ -3,7 +3,7 @@ import { reviews } from '@/data/menuData';
 import type { MenuItem } from '@/types/menu';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
-import { useLiveMenuItems, useOfertaEnabled, useLiveVisibleOffers } from '@/hooks/useLiveStorefrontData';
+import { useLiveMenuItems, useOfertaEnabled, useLiveVisibleOffers, useLiveCategoryOrder } from '@/hooks/useLiveStorefrontData';
 import SEO from '@/components/SEO';
 import Header from '@/components/Header';
 import HeroSection from '@/components/HeroSection';
@@ -25,6 +25,7 @@ const Index = () => {
   const { t, language } = useLanguage();
   const { items: menuItems, isLoading: isMenuLoading } = useLiveMenuItems();
   const isOfertaEnabled = useOfertaEnabled();
+  const categoryOrder = useLiveCategoryOrder();
   const menuRef = useRef<HTMLElement>(null);
   const { cart, cartCount, isTrayOpen, isCheckoutOpen, setIsTrayOpen, setIsCheckoutOpen, addToCart, updateQuantity, updateNote, removeFromCart, clearCart } = useCart();
 
@@ -48,13 +49,16 @@ const Index = () => {
 
   const scrollToMenu = () => menuRef.current?.scrollIntoView({ behavior: 'smooth' });
 
+  const CATEGORY_LABELS: Record<string, string> = {
+    salad: t.categories.salads,
+    fajita: t.categories.fajitas,
+    sandwich: t.categories.sandwiches,
+    sides: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras',
+    drink: language === 'sq' ? 'Pijet' : 'Drinks',
+  };
   const categories = [
     { id: 'all', label: t.categories.all },
-    { id: 'salad', label: t.categories.salads },
-    { id: 'fajita', label: t.categories.fajitas },
-    { id: 'sandwich', label: t.categories.sandwiches },
-    { id: 'sides', label: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras' },
-    { id: 'drink', label: language === 'sq' ? 'Pijet' : 'Drinks' },
+    ...categoryOrder.map((id) => ({ id, label: CATEGORY_LABELS[id] ?? id })),
   ];
 
   return (

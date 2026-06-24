@@ -15,6 +15,8 @@ import {
   DEFAULT_OFFER_BADGE_TEXT,
   SITE_TEXTS_SETTING_KEY,
   WHATSAPP_FALLBACK_KEY,
+  CATEGORY_ORDER_KEY,
+  DEFAULT_CATEGORY_ORDER,
   type StorefrontOffer,
   deleteStorefrontOffer,
   deleteMenuExtra,
@@ -476,6 +478,20 @@ const Admin = () => {
   const [editingExtraId, setEditingExtraId] = useState<string | null>(null);
   const [newCatalogExtraNameSq, setNewCatalogExtraNameSq] = useState('');
   const [newCatalogExtraPrice, setNewCatalogExtraPrice] = useState('');
+  // Category order
+  const [catOrder, setCatOrder] = useState<string[]>(DEFAULT_CATEGORY_ORDER);
+  useEffect(() => {
+    fetchStorefrontSetting<string[]>(CATEGORY_ORDER_KEY, DEFAULT_CATEGORY_ORDER).then(setCatOrder).catch(() => {});
+  }, []);
+  const moveCat = async (idx: number, dir: 'up' | 'down') => {
+    const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= catOrder.length) return;
+    const next = [...catOrder];
+    [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+    setCatOrder(next);
+    await upsertStorefrontSetting(CATEGORY_ORDER_KEY, next);
+  };
+
   // Wizard state for adding new products
   const [showAddWizard, setShowAddWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
@@ -1522,6 +1538,49 @@ const Admin = () => {
                 >
                   <Plus className="w-4 h-4" />
                 </button>
+              </div>
+            </div>
+
+            {/* Category Order Panel */}
+            <div className="rounded-2xl border border-border bg-card p-4 mb-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                {language === 'sq' ? 'Renditja e Kategorive' : 'Category Order'}
+              </p>
+              <div className="space-y-1.5">
+                {(() => {
+                  const CAT_META: Record<string, { emoji: string; sq: string; en: string }> = {
+                    salad:    { emoji: '🥗', sq: 'Sallata',       en: 'Salads' },
+                    fajita:   { emoji: '🌯', sq: 'Fajita',        en: 'Fajitas' },
+                    sandwich: { emoji: '🥪', sq: 'Sanduiçe',      en: 'Sandwiches' },
+                    sides:    { emoji: '🍲', sq: 'Supë & Ekstra', en: 'Soup & Extras' },
+                    drink:    { emoji: '🥤', sq: 'Pijet',         en: 'Drinks' },
+                  };
+                  return catOrder.map((cat, idx) => {
+                    const meta = CAT_META[cat];
+                    return (
+                      <div key={cat} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50">
+                        <span className="text-base">{meta?.emoji ?? '•'}</span>
+                        <span className="flex-1 text-sm font-medium">{meta?.[language] ?? cat}</span>
+                        <button
+                          onClick={() => moveCat(idx, 'up')}
+                          disabled={idx === 0}
+                          className="p-1 rounded-lg hover:bg-background disabled:opacity-20 transition-colors"
+                          aria-label="Move up"
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => moveCat(idx, 'down')}
+                          disabled={idx === catOrder.length - 1}
+                          className="p-1 rounded-lg hover:bg-background disabled:opacity-20 transition-colors"
+                          aria-label="Move down"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 

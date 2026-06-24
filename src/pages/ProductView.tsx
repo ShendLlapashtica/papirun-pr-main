@@ -5,7 +5,7 @@ import { getIngredientName } from '@/data/ingredientTranslations';
 import type { MenuItem } from '@/types/menu';
 import type { SelectedExtra } from '@/types/menuExtra';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useLiveMenuExtras, useLiveMenuItems } from '@/hooks/useLiveStorefrontData';
+import { useLiveMenuExtras, useLiveMenuItems, useLiveCategoryOrder } from '@/hooks/useLiveStorefrontData';
 import MenuCard from '@/components/MenuCard';
 import SearchBar from '@/components/SearchBar';
 import Header from '@/components/Header';
@@ -31,6 +31,7 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const { items: menuItems } = useLiveMenuItems();
   const menuExtras = useLiveMenuExtras();
+  const categoryOrder = useLiveCategoryOrder();
 
   const item = menuItems.find((m) => m.id === id);
 
@@ -91,13 +92,16 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
   const visibleDiscoverItems = filteredDiscoverItems.slice(0, visibleCount);
   const hasMore = visibleCount < filteredDiscoverItems.length;
 
+  const CATEGORY_LABELS: Record<string, string> = {
+    salad: t.categories.salads,
+    fajita: t.categories.fajitas,
+    sandwich: t.categories.sandwiches,
+    sides: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras',
+    drink: language === 'sq' ? 'Pijet' : 'Drinks',
+  };
   const categories = [
     { id: 'all', label: t.categories.all },
-    { id: 'salad', label: t.categories.salads },
-    { id: 'fajita', label: t.categories.fajitas },
-    { id: 'sandwich', label: t.categories.sandwiches },
-    { id: 'sides', label: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras' },
-    { id: 'drink', label: language === 'sq' ? 'Pijet' : 'Drinks' },
+    ...categoryOrder.map((id) => ({ id, label: CATEGORY_LABELS[id] ?? id })),
   ];
 
   if (!item) {

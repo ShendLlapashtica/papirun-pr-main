@@ -16,6 +16,8 @@ export const SITE_TEXTS_SETTING_KEY = 'site_texts';
 export const OFFER_BADGE_TEXT_KEY = 'offer_badge_text';
 export const WHATSAPP_FALLBACK_KEY = 'whatsapp_fallback_enabled';
 export const DEFAULT_OFFER_BADGE_TEXT = 'Vetëm në pikën Papirun Çagllavicë';
+export const CATEGORY_ORDER_KEY = 'category_order';
+export const DEFAULT_CATEGORY_ORDER: string[] = ['salad', 'fajita', 'sandwich', 'sides', 'drink'];
 
 export interface StorefrontOffer extends OfferItem {
   isActive: boolean;

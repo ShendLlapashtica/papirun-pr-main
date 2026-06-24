@@ -18,7 +18,7 @@ import {
   subscribeStorefrontOffersRealtime,
   subscribeStorefrontSettingsRealtime,
 } from '@/lib/productsApi';
-import { OFFERS_SECTION_ENABLED_KEY, OFFER_BADGE_TEXT_KEY, DEFAULT_OFFER_BADGE_TEXT } from '@/lib/storefrontApi';
+import { OFFERS_SECTION_ENABLED_KEY, OFFER_BADGE_TEXT_KEY, DEFAULT_OFFER_BADGE_TEXT, CATEGORY_ORDER_KEY, DEFAULT_CATEGORY_ORDER } from '@/lib/storefrontApi';
 
 // Build a lookup of local bundled images by product id
 const localImageMap = new Map<string, string>();
@@ -272,6 +272,29 @@ export const useLiveVisibleOffers = () => {
   }, []);
 
   return { offers, isLoading };
+};
+
+const CAT_ORDER_CACHE_KEY = 'papirun_category_order_cache';
+
+export const useLiveCategoryOrder = (): string[] => {
+  const cached = readCache<string[]>(CAT_ORDER_CACHE_KEY);
+  const [order, setOrder] = useState<string[]>(cached ?? DEFAULT_CATEGORY_ORDER);
+
+  useEffect(() => {
+    let isMounted = true;
+    const sync = async () => {
+      try {
+        await ensureStorefrontSetting(CATEGORY_ORDER_KEY, DEFAULT_CATEGORY_ORDER);
+        const next = await fetchStorefrontSetting<string[]>(CATEGORY_ORDER_KEY, DEFAULT_CATEGORY_ORDER);
+        if (isMounted) { setOrder(next); writeCache(CAT_ORDER_CACHE_KEY, next); }
+      } catch { /* keep cached/default */ }
+    };
+    sync();
+    const unsubscribe = subscribeStorefrontSettingsRealtime(sync);
+    return () => { isMounted = false; unsubscribe(); };
+  }, []);
+
+  return order;
 };
 
 export const useOfferBadgeText = () => {

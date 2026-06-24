@@ -9,6 +9,8 @@ export {
   DEFAULT_OFFER_BADGE_TEXT,
   SITE_TEXTS_SETTING_KEY,
   WHATSAPP_FALLBACK_KEY,
+  CATEGORY_ORDER_KEY,
+  DEFAULT_CATEGORY_ORDER,
   type StorefrontOffer,
   deleteStorefrontOffer,
   ensureSeedStorefrontOffers,

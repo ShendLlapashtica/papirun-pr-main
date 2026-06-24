@@ -3,7 +3,7 @@ import { Sparkles, UtensilsCrossed } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
-import { useLiveMenuItems, useOfertaEnabled } from '@/hooks/useLiveStorefrontData';
+import { useLiveMenuItems, useOfertaEnabled, useLiveCategoryOrder } from '@/hooks/useLiveStorefrontData';
 import { useAuth } from '@/contexts/AuthContext';
 import AppMenuCard from './AppMenuCard';
 import OpenClosedBar from '@/components/OpenClosedBar';
@@ -18,6 +18,7 @@ const AppHome = () => {
   const navigate = useNavigate();
   const { items: menuItems, isLoading } = useLiveMenuItems();
   const isOfertaEnabled = useOfertaEnabled();
+  const categoryOrder = useLiveCategoryOrder();
   const { addToCart } = useCart();
 
   const search = params.get('search') ?? '';
@@ -84,13 +85,16 @@ const AppHome = () => {
 
   const visibleProducts = filtered.slice(0, visibleCount);
 
+  const CATEGORY_LABELS: Record<string, string> = {
+    salad: t.categories.salads,
+    fajita: t.categories.fajitas,
+    sandwich: t.categories.sandwiches,
+    sides: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras',
+    drink: t.categories.drinks,
+  };
   const categories = [
     { id: 'all', label: t.categories.all },
-    { id: 'salad', label: t.categories.salads },
-    { id: 'fajita', label: t.categories.fajitas },
-    { id: 'sandwich', label: t.categories.sandwiches },
-    { id: 'sides', label: language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras' },
-    { id: 'drink', label: t.categories.drinks },
+    ...categoryOrder.map((id) => ({ id, label: CATEGORY_LABELS[id] ?? id })),
   ];
 
   const greeting = (() => {
