@@ -47,7 +47,10 @@ const Index = () => {
     return items;
   }, [searchQuery, activeCategory, language, visibleItems]);
 
-  const scrollToMenu = () => menuRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToMenu = () => {
+    setActiveCategory('all');
+    menuRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const CATEGORY_LABELS: Record<string, string> = {
     salad: t.categories.salads,
