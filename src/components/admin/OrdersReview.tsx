@@ -239,6 +239,27 @@ const playDing = () => {
   } catch {}
 };
 
+const playTickTick = () => {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const ctx = _audioCtx;
+    const tick = (t: number) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(1100, ctx.currentTime + t);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.07);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime + t);
+      o.stop(ctx.currentTime + t + 0.09);
+    };
+    tick(0);
+    tick(0.18);
+  } catch {}
+};
+
 const ARCHIVE_KEY = 'papirun_admin_archived_order_ids';
 const loadArchive = (): Set<string> => {
   try { return new Set(JSON.parse(localStorage.getItem(ARCHIVE_KEY) || '[]')); }
@@ -425,6 +446,8 @@ const OrdersReview = ({
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [typingMap, setTypingMap] = useState<Record<string, { client?: number; staff?: number }>>({});
   const [newMsgMap, setNewMsgMap] = useState<Record<string, { count: number; firstMsgTs: number; sender: 'user' | 'driver' }>>({});
+  const [newPendingIds, setNewPendingIds] = useState<Set<string>>(new Set());
+  const alarmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Confirm-delete dialog state
   const [confirmDeleteTarget, setConfirmDeleteTarget] = useState<{ id: string } | { all: true } | null>(null);
@@ -579,6 +602,15 @@ const OrdersReview = ({
           if (newOnes.length) {
             playDing();
             const newIds = newOnes.map((o) => o.id);
+            // Track new pending orders for alarm banner
+            const pendingNewIds = newOnes.filter((o) => o.status === 'pending').map((o) => o.id);
+            if (pendingNewIds.length > 0) {
+              setNewPendingIds((prev) => {
+                const next = new Set(prev);
+                pendingNewIds.forEach((id) => next.add(id));
+                return next;
+              });
+            }
             setGlowingIds((prev) => {
               const next = new Set(prev);
               newIds.forEach((id) => next.add(id));
@@ -778,6 +810,29 @@ const OrdersReview = ({
     onUnreadChange?.(list);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newMsgMap, orders]);
+
+  // Remove orders from newPendingIds when they transition away from pending
+  useEffect(() => {
+    setNewPendingIds((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set<string>();
+      for (const id of prev) {
+        const order = orders.find((o) => o.id === id);
+        if (order && order.status === 'pending') next.add(id);
+      }
+      if (next.size === prev.size) return prev;
+      return next;
+    });
+  }, [orders]);
+
+  // Loop tick-tick alarm while there are unaccepted new pending orders
+  const hasNewPending = newPendingIds.size > 0;
+  useEffect(() => {
+    if (!hasNewPending) return;
+    playTickTick();
+    const id = setInterval(playTickTick, 2500);
+    return () => clearInterval(id);
+  }, [hasNewPending]);
 
   // Jump to order when highlightId changes (triggered from bell dropdown)
   useEffect(() => {
@@ -1207,6 +1262,32 @@ const OrdersReview = ({
                 Pastro intervalin
               </button>
             )}
+          </div>
+        )}
+
+        {/* New order pulse alarm banner — stays until order is accepted/rejected */}
+        {newPendingIds.size > 0 && (
+          <div className="rounded-2xl p-3.5 space-y-2.5 animate-pulse" style={{ background: 'rgba(249,115,22,0.12)', border: '2px solid rgba(249,115,22,0.65)' }}>
+            <div className="flex items-center gap-2 font-bold text-sm" style={{ color: '#ea580c' }}>
+              <AlertCircle className="w-5 h-5 shrink-0" style={{ animation: 'bounce 1s infinite' }} />
+              🔔 {newPendingIds.size === 1 ? '1 POROSI E RE!' : `${newPendingIds.size} POROSI TË REJA!`} — Prano ose Refuzo
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {Array.from(newPendingIds).map((id) => {
+                const order = orders.find((o) => o.id === id);
+                if (!order) return null;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => { setSelectedId(id); setStatusFilter('active'); }}
+                    className="text-xs px-3 py-1.5 rounded-full text-white font-bold transition-colors hover:opacity-90"
+                    style={{ background: '#ea580c' }}
+                  >
+                    {order.customerName || 'Anonim'} · €{order.total.toFixed(2)}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 

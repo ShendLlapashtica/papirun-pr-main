@@ -483,6 +483,33 @@ const Admin = () => {
   useEffect(() => {
     fetchStorefrontSetting<string[]>(CATEGORY_ORDER_KEY, DEFAULT_CATEGORY_ORDER).then(setCatOrder).catch(() => {});
   }, []);
+
+  // Product order counts — computed from order history, used to sort menu products by popularity
+  const [productOrderCounts, setProductOrderCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (activeTab !== 'menu') return;
+    let cancelled = false;
+    const snapshot = [...items];
+    if (snapshot.length === 0) return;
+    import('@/lib/ordersApi').then(({ fetchAllOrders }) => {
+      fetchAllOrders().then((allOrders) => {
+        if (cancelled) return;
+        const counts: Record<string, number> = {};
+        for (const order of allOrders) {
+          for (const it of (order.items as any[])) {
+            if (it.id) counts[it.id] = (counts[it.id] || 0) + (it.quantity ?? 1);
+          }
+        }
+        setProductOrderCounts(counts);
+        // Sync sort_order to DB: most-ordered product gets the lowest sort_order index
+        const sorted = [...snapshot].sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
+        sorted.forEach((item, sortIdx) => updateProductSortOrder(item.id, sortIdx).catch(() => {}));
+      }).catch(() => {});
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const moveCat = async (idx: number, dir: 'up' | 'down') => {
     const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
     if (swapIdx < 0 || swapIdx >= catOrder.length) return;
@@ -1594,8 +1621,11 @@ const Admin = () => {
             </button>
 
             {(['sandwich', 'salad', 'fajita', 'sides', 'drink'] as const).map((cat) => {
-              const catItems = items.filter((i) => i.category === cat);
-              if (catItems.length === 0) return null;
+              const catItemsRaw = items.filter((i) => i.category === cat);
+              if (catItemsRaw.length === 0) return null;
+              const catItems = [...catItemsRaw].sort(
+                (a, b) => (productOrderCounts[b.id] || 0) - (productOrderCounts[a.id] || 0)
+              );
               const catLabel = cat === 'sandwich' ? (language === 'sq' ? 'Sanduiçe' : 'Sandwiches')
                 : cat === 'salad' ? (language === 'sq' ? 'Sallata' : 'Salads')
                 : cat === 'fajita' ? (language === 'sq' ? 'Fajita' : 'Fajitas')
@@ -1947,9 +1977,16 @@ const Admin = () => {
                           <h3 className="font-semibold text-sm sm:text-base truncate">
                             {item.name[language]}
                           </h3>
-                          <span className="text-primary font-bold text-sm shrink-0">
-                            €{item.price.toFixed(2)}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {(productOrderCounts[item.id] ?? 0) > 0 && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                📦 {(productOrderCounts[item.id] || 0).toLocaleString()}
+                              </span>
+                            )}
+                            <span className="text-primary font-bold text-sm">
+                              €{item.price.toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                         <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                           {item.description[language]}
