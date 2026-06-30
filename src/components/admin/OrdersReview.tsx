@@ -58,7 +58,16 @@ const STATUS_LABEL: Record<string, string> = {
 type FilterKey = 'hour' | 'today' | 'week' | 'month' | 'custom' | 'all';
 type StatusFilter = 'active' | 'pending' | 'approved' | 'rejected' | 'history';
 
-const isCagllavice = (o: OrderRecord): boolean => o.suggestedLocation === 'cagllavice';
+// Çagllavicë detection — uses suggestedLocation when set, falls back to address/coord for old orders
+const isCagllavice = (o: OrderRecord): boolean => {
+  if (o.suggestedLocation) return o.suggestedLocation === 'cagllavice';
+  const addr = (o.deliveryAddress || '').toLowerCase();
+  if (addr.includes('çagllavic') || addr.includes('cagllavic')) return true;
+  if (o.deliveryLat !== null && o.deliveryLng !== null) {
+    return o.deliveryLat >= 42.585 && o.deliveryLat <= 42.650 && o.deliveryLng >= 21.040 && o.deliveryLng <= 21.115;
+  }
+  return false;
+};
 
 const CATEGORY_LABEL: Record<string, string> = {
   salad: 'Salad',
@@ -1200,28 +1209,30 @@ const OrdersReview = ({
           <FilterTab k="all" label="Të gjitha" />
         </div>
 
-        {/* Location filter — hidden in caglOnly mode (AdminCg always shows cagllavice) */}
-        {!caglOnly && (
-          <div className="flex items-center gap-1.5">
-            {([
-              { key: 'all',        label: 'Të gjitha',   style: 'bg-secondary text-muted-foreground' },
-              { key: 'qender',     label: 'Q Qendër',     style: 'bg-primary/10 text-primary' },
-              { key: 'cagllavice', label: 'C Çagllavicë', style: 'bg-blue-500/10 text-blue-600' },
-            ] as const).map(({ key, label, style }) => (
+        {/* Location filter — in caglOnly mode Çagllavicë is always active, others disabled */}
+        <div className="flex items-center gap-1.5">
+          {([
+            { key: 'all',        label: 'Të gjitha',   style: 'bg-secondary text-muted-foreground' },
+            { key: 'qender',     label: 'Q Qendër',     style: 'bg-primary/10 text-primary' },
+            { key: 'cagllavice', label: 'C Çagllavicë', style: 'bg-blue-500/10 text-blue-600' },
+          ] as const).map(({ key, label, style }) => {
+            const isActive = caglOnly ? key === 'cagllavice' : locationFilter === key;
+            return (
               <button
                 key={key}
-                onClick={() => setLocationFilter(key)}
+                onClick={() => { if (!caglOnly) setLocationFilter(key); }}
+                disabled={caglOnly && key !== 'cagllavice'}
                 className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
-                  locationFilter === key
+                  isActive
                     ? `${style} ring-2 ring-offset-1 ring-current/30 shadow-sm`
                     : 'bg-secondary/60 text-muted-foreground hover:bg-secondary'
-                }`}
+                } ${caglOnly && key !== 'cagllavice' ? 'opacity-30 cursor-not-allowed' : ''}`}
               >
                 {label}
               </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
 
         {(filter === 'custom' || statusFilter === 'history') && (
           <div className="flex flex-wrap items-center gap-2 bg-secondary/40 rounded-xl p-2.5 text-xs">

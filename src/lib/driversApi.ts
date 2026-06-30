@@ -61,7 +61,7 @@ export const DRIVER_COLORS = [
 export const RESTAURANT_COORDS = { lat: 42.6629, lng: 21.1655 };
 
 /** Çagllavicë branch location */
-export const CAGLLAVICE_COORDS = { lat: 42.6280, lng: 21.1730 };
+export const CAGLLAVICE_COORDS = { lat: 42.618, lng: 21.077 };
 
 /** Haversine great-circle distance in kilometres */
 export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
