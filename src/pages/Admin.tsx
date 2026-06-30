@@ -1303,7 +1303,7 @@ const Admin = () => {
           </div>
         )}
 
-        {activeTab === 'orders' && <TabErrorBoundary><OrdersReview onTypingCount={setTypingCount} onUnreadChange={setUnreadOrders} highlightId={highlightId} /></TabErrorBoundary>}
+        {activeTab === 'orders' && <TabErrorBoundary><OrdersReview onTypingCount={setTypingCount} onUnreadChange={setUnreadOrders} highlightId={highlightId} caglOnly={profile === 'cagllavice'} /></TabErrorBoundary>}
         {activeTab === 'users' && <SubscribersList />}
         {activeTab === 'drivers' && (
           <div className="space-y-8">
