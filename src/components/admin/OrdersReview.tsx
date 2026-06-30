@@ -58,16 +58,7 @@ const STATUS_LABEL: Record<string, string> = {
 type FilterKey = 'hour' | 'today' | 'week' | 'month' | 'custom' | 'all';
 type StatusFilter = 'active' | 'pending' | 'approved' | 'rejected' | 'history';
 
-// Çagllavicë detection — uses suggestedLocation when set, falls back to address/coord for old orders
-const isCagllavice = (o: OrderRecord): boolean => {
-  if (o.suggestedLocation) return o.suggestedLocation === 'cagllavice';
-  const addr = (o.deliveryAddress || '').toLowerCase();
-  if (addr.includes('çagllavic') || addr.includes('cagllavic')) return true;
-  if (o.deliveryLat !== null && o.deliveryLng !== null) {
-    return o.deliveryLat >= 42.585 && o.deliveryLat <= 42.650 && o.deliveryLng >= 21.040 && o.deliveryLng <= 21.115;
-  }
-  return false;
-};
+const isCagllavice = (o: OrderRecord): boolean => o.suggestedLocation === 'cagllavice';
 
 const CATEGORY_LABEL: Record<string, string> = {
   salad: 'Salad',
