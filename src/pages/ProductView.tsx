@@ -49,8 +49,10 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
     () =>
       item?.category === 'sides'
         ? []
-        : menuExtras.filter((extra) => extra.isActive).sort((a, b) => a.sortOrder - b.sortOrder),
-    [item?.category, menuExtras]
+        : menuExtras
+            .filter((extra) => extra.isActive && (item?.extras ?? []).includes(extra.id))
+            .sort((a, b) => a.sortOrder - b.sortOrder),
+    [item?.category, item?.extras, menuExtras]
   );
 
   useEffect(() => {

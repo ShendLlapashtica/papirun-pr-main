@@ -40,8 +40,11 @@ const AppProductView = () => {
   const [checkedExtras, setCheckedExtras] = useState<Record<string, boolean>>({});
 
   const availableExtras = useMemo(
-    () => (item?.category === 'sides' ? [] : menuExtras.filter((e) => e.isActive).sort((a, b) => a.sortOrder - b.sortOrder)),
-    [item?.category, menuExtras],
+    () =>
+      item?.category === 'sides'
+        ? []
+        : menuExtras.filter((e) => e.isActive && (item?.extras ?? []).includes(e.id)).sort((a, b) => a.sortOrder - b.sortOrder),
+    [item?.category, item?.extras, menuExtras],
   );
 
   useEffect(() => {
