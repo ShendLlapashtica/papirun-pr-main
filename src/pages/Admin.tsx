@@ -488,9 +488,8 @@ const Admin = () => {
   const [productOrderCounts, setProductOrderCounts] = useState<Record<string, number>>({});
   useEffect(() => {
     if (activeTab !== 'menu') return;
+    if (items.length === 0) return;
     let cancelled = false;
-    const snapshot = [...items];
-    if (snapshot.length === 0) return;
     import('@/lib/ordersApi').then(({ fetchAllOrders }) => {
       fetchAllOrders().then((allOrders) => {
         if (cancelled) return;
@@ -501,9 +500,6 @@ const Admin = () => {
           }
         }
         setProductOrderCounts(counts);
-        // Sync sort_order to DB: most-ordered product gets the lowest sort_order index
-        const sorted = [...snapshot].sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
-        sorted.forEach((item, sortIdx) => updateProductSortOrder(item.id, sortIdx).catch(() => {}));
       }).catch(() => {});
     });
     return () => { cancelled = true; };
@@ -711,10 +707,14 @@ const Admin = () => {
   };
 
   const handleUpdate = async (id: string, updates: Partial<MenuItem>) => {
+    const previous = items.find((item) => item.id === id);
+    updateItem(id, updates);
     try {
       await handleUpdateProduct(id, updates);
     } catch (updateError) {
       console.error('Failed to update product:', updateError);
+      if (previous) updateItem(id, previous);
+      throw updateError;
     }
   };
 
@@ -722,17 +722,21 @@ const Admin = () => {
     try {
       await upsertProduct(item);
       setEditingItem(null);
+      toast.success(language === 'sq' ? 'U ruajt' : 'Saved');
     } catch (saveError) {
       console.error('Failed to save product:', saveError);
+      toast.error(language === 'sq' ? 'Ruajtja dështoi — provo përsëri' : 'Save failed — try again');
     }
   };
 
-  const toggleAvailability = (id: string) => {
+  const toggleAvailability = async (id: string) => {
     const target = items.find((item) => item.id === id);
     if (!target) return;
-    const nextAvailability = !target.isAvailable;
-    updateItem(id, { isAvailable: nextAvailability });
-    handleUpdate(id, { isAvailable: nextAvailability });
+    try {
+      await handleUpdate(id, { isAvailable: !target.isAvailable });
+    } catch {
+      toast.error(language === 'sq' ? 'Ruajtja dështoi' : 'Save failed');
+    }
   };
 
   const addNewItem = async (overrides?: Partial<MenuItem>) => {
@@ -758,6 +762,9 @@ const Admin = () => {
       await upsertProduct(newItem);
     } catch (err) {
       console.error('Failed to create new product in DB:', err);
+      setItems((prev) => prev.filter((item) => item.id !== newItem.id));
+      setEditingItem(null);
+      toast.error(language === 'sq' ? 'Krijimi dështoi' : 'Create failed');
     }
   };
 
@@ -779,11 +786,15 @@ const Admin = () => {
   };
 
   const deleteItem = async (id: string) => {
+    const removed = items.find((item) => item.id === id);
     setItems((prev) => prev.filter((item) => item.id !== id));
     try {
       await deleteProduct(id);
+      toast.success(language === 'sq' ? 'U fshi' : 'Deleted');
     } catch (deleteError) {
       console.error('Failed to delete product:', deleteError);
+      if (removed) setItems((prev) => [...prev, removed]);
+      toast.error(language === 'sq' ? 'Fshirja dështoi' : 'Delete failed');
     }
   };
 
@@ -803,7 +814,6 @@ const Admin = () => {
           try {
             const oldUrl = items.find((i) => i.id === itemId)?.image || '';
             const publicUrl = await uploadProductImage(file, itemId, oldUrl);
-            updateItem(itemId, { image: publicUrl });
             await handleUpdate(itemId, { image: publicUrl });
             toast.success(language === 'sq' ? 'Foto u ngarkua' : 'Image uploaded');
           } catch (uploadError) {
@@ -823,7 +833,6 @@ const Admin = () => {
       try {
         const oldUrl = items.find((i) => i.id === targetId)?.image || '';
         const publicUrl = await uploadProductImage(file, targetId, oldUrl);
-        updateItem(targetId, { image: publicUrl });
         await handleUpdate(targetId, { image: publicUrl });
         toast.success(language === 'sq' ? 'Foto u ngarkua' : 'Image uploaded');
       } catch (uploadError) {
