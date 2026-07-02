@@ -6,7 +6,6 @@ import type { MenuExtra } from '@/types/menuExtra';
 import type { OfferItem } from '@/data/menuData';
 import {
   ensureSeedMenuExtras,
-  ensureSeedProducts,
   ensureSeedStorefrontOffers,
   ensureStorefrontSetting,
   fetchMenuExtras,
@@ -97,7 +96,6 @@ export const useLiveMenuItems = () => {
 
       try {
         if (!hasSeedRun()) {
-          await ensureSeedProducts(initialMenuItems);
           markSeedDone();
         }
         const liveItems = await fetchProducts();

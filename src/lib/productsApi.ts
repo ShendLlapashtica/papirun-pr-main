@@ -137,19 +137,6 @@ export const fetchProducts = async (): Promise<MenuItem[]> => {
   return (data as ProductRow[]).map(mapRowToMenuItem);
 };
 
-export const ensureSeedProducts = async (fallbackItems: MenuItem[]) => {
-  const { count, error: countError } = await supabase
-    .from(PRODUCTS_TABLE)
-    .select('*', { count: 'exact', head: true });
-
-  if (countError) throw countError;
-  if ((count ?? 0) > 0) return;
-
-  const payload = fallbackItems.map(mapMenuItemToInsert);
-  const { error } = await supabase.from(PRODUCTS_TABLE).upsert(payload, { onConflict: 'id' });
-  if (error) throw error;
-};
-
 export const handleUpdateProduct = async (id: string, updates: Partial<MenuItem>) => {
   const payload = mapMenuItemPatchToUpdate(updates);
   const { data, error } = await supabase
