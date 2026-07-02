@@ -21,8 +21,6 @@ import {
   deleteStorefrontOffer,
   deleteMenuExtra,
   deleteProduct,
-  ensureSeedMenuExtras,
-  ensureSeedStorefrontOffers,
   ensureStorefrontSetting,
   fetchMenuExtras,
   fetchStorefrontOffers,
@@ -874,8 +872,10 @@ const Admin = () => {
       };
       await upsertStorefrontOffer(cleaned, cleaned.sortOrder);
       setEditingOffer(null);
+      toast.success(language === 'sq' ? 'U ruajt' : 'Saved');
     } catch (error) {
       console.error('Failed to save offer:', error);
+      toast.error(language === 'sq' ? 'Ruajtja dështoi — provo përsëri' : 'Save failed — try again');
     }
   };
 
@@ -965,9 +965,11 @@ const Admin = () => {
 
     try {
       await deleteStorefrontOffer(offerId);
+      toast.success(language === 'sq' ? 'U fshi' : 'Deleted');
     } catch (error) {
       console.error('Failed to delete offer:', error);
       setOffers(previousOffers);
+      toast.error(language === 'sq' ? 'Fshirja dështoi' : 'Delete failed');
     }
   };
 
@@ -1507,14 +1509,14 @@ const Admin = () => {
                       onClick={async () => {
                         const updated = { ...extra, isActive: !extra.isActive };
                         setMenuExtras(prev => prev.map(e => e.id === extra.id ? updated : e));
-                        try { await upsertMenuExtra(updated); } catch { setMenuExtras(prev => prev.map(e => e.id === extra.id ? extra : e)); }
+                        try { await upsertMenuExtra(updated); } catch { setMenuExtras(prev => prev.map(e => e.id === extra.id ? extra : e)); toast.error(language === 'sq' ? 'Ruajtja dështoi' : 'Save failed'); }
                       }}
                       className={`w-3.5 h-3.5 rounded-full border transition-colors shrink-0 ${extra.isActive ? 'bg-emerald-500 border-emerald-500' : 'bg-muted border-border'}`}
                     />
                     <button
                       onClick={async () => {
                         setMenuExtras(prev => prev.filter(e => e.id !== extra.id));
-                        try { await deleteMenuExtra(extra.id); } catch { const syncExtras = async () => { try { const liveExtras = await fetchMenuExtras(); setMenuExtras(liveExtras); } catch {} }; syncExtras(); }
+                        try { await deleteMenuExtra(extra.id); } catch { const syncExtras = async () => { try { const liveExtras = await fetchMenuExtras(); setMenuExtras(liveExtras); } catch {} }; syncExtras(); toast.error(language === 'sq' ? 'Fshirja dështoi' : 'Delete failed'); }
                       }}
                       className="hover:text-destructive transition-colors"
                     >

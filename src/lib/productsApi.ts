@@ -13,7 +13,6 @@ export {
   DEFAULT_CATEGORY_ORDER,
   type StorefrontOffer,
   deleteStorefrontOffer,
-  ensureSeedStorefrontOffers,
   ensureStorefrontSetting,
   fetchStorefrontOffers,
   fetchStorefrontSetting,
@@ -202,28 +201,6 @@ export const fetchMenuExtras = async (): Promise<MenuExtra[]> => {
 
   if (error) throw error;
   return (data as MenuExtraRow[]).map(mapMenuExtraRow);
-};
-
-export const ensureSeedMenuExtras = async (fallbackExtras: MenuExtra[]) => {
-  const client = supabase as any;
-  const { count, error: countError } = await client
-    .from(MENU_EXTRAS_TABLE)
-    .select('*', { count: 'exact', head: true });
-
-  if (countError) throw countError;
-  if ((count ?? 0) > 0) return;
-
-  const payload = fallbackExtras.map((extra) => ({
-    id: extra.id,
-    name_sq: extra.name.sq,
-    name_en: extra.name.en,
-    price: extra.price,
-    is_active: extra.isActive,
-    sort_order: extra.sortOrder,
-  }));
-
-  const { error } = await client.from(MENU_EXTRAS_TABLE).upsert(payload, { onConflict: 'id' });
-  if (error) throw error;
 };
 
 export const upsertMenuExtra = async (extra: MenuExtra) => {

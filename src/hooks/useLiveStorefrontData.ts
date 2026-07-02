@@ -5,8 +5,6 @@ import type { MenuItem } from '@/types/menu';
 import type { MenuExtra } from '@/types/menuExtra';
 import type { OfferItem } from '@/data/menuData';
 import {
-  ensureSeedMenuExtras,
-  ensureSeedStorefrontOffers,
   ensureStorefrontSetting,
   fetchMenuExtras,
   fetchProducts,
@@ -56,15 +54,6 @@ const PRODUCTS_CACHE_KEY = 'papirun_products_cache';
 const EXTRAS_CACHE_KEY = 'papirun_extras_cache';
 const OFFERS_CACHE_KEY = 'papirun_storefront_offers_cache';
 const OFERTA_ENABLED_CACHE_KEY = 'papirun_storefront_offers_enabled_cache';
-const SEED_DONE_KEY = 'papirun_seed_done';
-
-// Only seed once per browser ever (not on every visit)
-function hasSeedRun(): boolean {
-  return localStorage.getItem(SEED_DONE_KEY) === '1';
-}
-function markSeedDone() {
-  localStorage.setItem(SEED_DONE_KEY, '1');
-}
 
 const applyLocalImages = (items: MenuItem[]): MenuItem[] =>
   items.map((item) => {
@@ -95,9 +84,6 @@ export const useLiveMenuItems = () => {
       }, 5000);
 
       try {
-        if (!hasSeedRun()) {
-          markSeedDone();
-        }
         const liveItems = await fetchProducts();
         clearTimeout(timeout);
 
@@ -163,9 +149,6 @@ export const useLiveMenuExtras = () => {
 
     const syncFromDatabase = async () => {
       try {
-        if (!hasSeedRun()) {
-          await ensureSeedMenuExtras(defaultMenuExtras);
-        }
         const liveExtras = await fetchMenuExtras();
         if (isMounted) {
           setExtras(liveExtras);

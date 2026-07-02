@@ -7,7 +7,6 @@ const STOREFRONT_OFFERS_TABLE = 'storefront_offers';
 const STOREFRONT_SETTINGS_TABLE = 'storefront_settings';
 const PRODUCT_IMAGE_BUCKET = 'product-images';
 
-const LEGACY_OFFERS_KEY = 'papirun_offers_data';
 const LEGACY_OFFERS_SECTION_KEY = 'papirun_oferta_ramazani';
 const LEGACY_SITE_TEXTS_KEY = 'papirun_site_texts';
 
@@ -54,8 +53,6 @@ const readLegacyJson = <T>(key: string): T | null => {
   }
 };
 
-const readLegacyOffers = (): OfferItem[] | null => readLegacyJson<OfferItem[]>(LEGACY_OFFERS_KEY);
-
 const readLegacyOffersSectionEnabled = (): boolean | null => {
   if (!isBrowser()) return null;
 
@@ -66,12 +63,6 @@ const readLegacyOffersSectionEnabled = (): boolean | null => {
 
 const readLegacySiteTexts = (): SiteTextOverrides | null =>
   readLegacyJson<SiteTextOverrides>(LEGACY_SITE_TEXTS_KEY);
-
-const normalizeOffer = (offer: OfferItem, index = 0): StorefrontOffer => ({
-  ...offer,
-  isActive: true,
-  sortOrder: index,
-});
 
 const mapRowToOffer = (row: StorefrontOfferRow): StorefrontOffer => {
   const images = row.image_urls?.length ? row.image_urls : (row.image_url ? [row.image_url] : []);
@@ -113,27 +104,6 @@ export const fetchStorefrontOffers = async (): Promise<StorefrontOffer[]> => {
 
   if (error) throw error;
   return (data as StorefrontOfferRow[]).map(mapRowToOffer);
-};
-
-export const ensureSeedStorefrontOffers = async (fallbackOffers: OfferItem[]) => {
-  const client = supabase as any;
-  const { count, error: countError } = await client
-    .from(STOREFRONT_OFFERS_TABLE)
-    .select('*', { count: 'exact', head: true });
-
-  if (countError) throw countError;
-  if ((count ?? 0) > 0) return;
-
-  const sourceOffers = readLegacyOffers() ?? fallbackOffers;
-  const payload = sourceOffers.map((offer, index) =>
-    mapOfferToRow(normalizeOffer(offer, index), index)
-  );
-
-  const { error } = await client
-    .from(STOREFRONT_OFFERS_TABLE)
-    .upsert(payload, { onConflict: 'id' });
-
-  if (error) throw error;
 };
 
 export const upsertStorefrontOffer = async (
