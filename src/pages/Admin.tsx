@@ -21,8 +21,10 @@ import {
   deleteStorefrontOffer,
   deleteMenuExtra,
   deleteProduct,
+  diffMenuItem,
   ensureStorefrontSetting,
   fetchMenuExtras,
+  fetchProductById,
   fetchStorefrontOffers,
   fetchStorefrontSetting,
   handleUpdateProduct,
@@ -453,6 +455,8 @@ const Admin = () => {
   const [items, setItems] = useState<MenuItem[]>(initialMenuItems);
   const [menuExtras, setMenuExtras] = useState<MenuExtra[]>(defaultMenuExtras);
   const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editSnapshot, setEditSnapshot] = useState<MenuItem | null>(null);
+  const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'harta' | 'databaze'>('orders');
   const [typingCount, setTypingCount] = useState(0);
   const [unreadOrders, setUnreadOrders] = useState<Array<{ id: string; name: string; count: number; urgent: boolean }>>([]);
@@ -716,10 +720,46 @@ const Admin = () => {
     }
   };
 
-  const handleSaveItem = async (item: MenuItem) => {
+  // Always fetches the real DB row before opening the edit form, so a slow/uncompleted
+  // background sync can never leave stale fallback data (e.g. a hardcoded "all extras"
+  // list) frozen for the duration of the edit session.
+  const beginEditItem = async (id: string) => {
+    setEditLoadingId(id);
     try {
-      await upsertProduct(item);
+      const fresh = await fetchProductById(id);
+      if (!fresh) {
+        toast.error(language === 'sq' ? 'Produkti nuk u gjet' : 'Product not found');
+        return;
+      }
+      setItems((prev) => prev.map((p) => (p.id === id ? fresh : p)));
+      setEditSnapshot(fresh);
+      setEditingItem(id);
+    } catch (err) {
+      console.error('Failed to load fresh product data before editing:', err);
+      toast.error(language === 'sq' ? 'Nuk u ngarkuan të dhënat — provo përsëri' : 'Could not load latest data — try again');
+    } finally {
+      setEditLoadingId(null);
+    }
+  };
+
+  const handleSaveItem = async (item: MenuItem) => {
+    // Only write back fields that actually changed since the edit form opened — a field
+    // the admin never touched can never be pushed to the DB, even if local state were
+    // ever stale for some other reason.
+    const patch = editSnapshot ? diffMenuItem(editSnapshot, item) : item;
+    if (editSnapshot && Object.keys(patch).length === 0) {
       setEditingItem(null);
+      setEditSnapshot(null);
+      return;
+    }
+    try {
+      if (editSnapshot) {
+        await handleUpdateProduct(item.id, patch);
+      } else {
+        await upsertProduct(item);
+      }
+      setEditingItem(null);
+      setEditSnapshot(null);
       toast.success(language === 'sq' ? 'U ruajt' : 'Saved');
     } catch (saveError) {
       console.error('Failed to save product:', saveError);
@@ -755,14 +795,19 @@ const Admin = () => {
       ...overrides,
     };
     setItems((prev) => [newItem, ...prev]);
+    setEditSnapshot(newItem);
     setEditingItem(newItem.id);
+    setEditLoadingId(newItem.id);
     try {
       await upsertProduct(newItem);
     } catch (err) {
       console.error('Failed to create new product in DB:', err);
       setItems((prev) => prev.filter((item) => item.id !== newItem.id));
       setEditingItem(null);
+      setEditSnapshot(null);
       toast.error(language === 'sq' ? 'Krijimi dështoi' : 'Create failed');
+    } finally {
+      setEditLoadingId(null);
     }
   };
 
@@ -1950,7 +1995,8 @@ const Admin = () => {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleSaveItem(item)}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium"
+                            disabled={editLoadingId === item.id}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
                           >
                             <Save className="w-4 h-4" />
                             {language === 'sq' ? 'Ruaj' : 'Save'}
@@ -2004,9 +2050,13 @@ const Admin = () => {
                         </p>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <button
-                            onClick={() => setEditingItem(item.id)}
-                            className="px-3 py-1.5 rounded-full bg-secondary text-xs font-medium hover:bg-secondary/80 transition-colors"
+                            onClick={() => beginEditItem(item.id)}
+                            disabled={editLoadingId === item.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium hover:bg-secondary/80 transition-colors disabled:opacity-60"
                           >
+                            {editLoadingId === item.id && (
+                              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            )}
                             {language === 'sq' ? 'Ndrysho' : 'Edit'}
                           </button>
                           <button

@@ -136,6 +136,33 @@ export const fetchProducts = async (): Promise<MenuItem[]> => {
   return (data as ProductRow[]).map(mapRowToMenuItem);
 };
 
+export const fetchProductById = async (id: string): Promise<MenuItem | null> => {
+  const { data, error } = await supabase
+    .from(PRODUCTS_TABLE)
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? mapRowToMenuItem(data as ProductRow) : null;
+};
+
+// Only the fields that actually differ between two snapshots of the same product —
+// used so Admin saves can never write back a field the user never touched.
+export const diffMenuItem = (before: MenuItem, after: MenuItem): Partial<MenuItem> => {
+  const patch: Partial<MenuItem> = {};
+  if (after.name.sq !== before.name.sq || after.name.en !== before.name.en) patch.name = after.name;
+  if (after.description.sq !== before.description.sq || after.description.en !== before.description.en) patch.description = after.description;
+  if (after.price !== before.price) patch.price = after.price;
+  if (after.image !== before.image) patch.image = after.image;
+  if (after.category !== before.category) patch.category = after.category;
+  if (JSON.stringify(after.ingredients) !== JSON.stringify(before.ingredients)) patch.ingredients = after.ingredients;
+  if (JSON.stringify(after.extras) !== JSON.stringify(before.extras)) patch.extras = after.extras;
+  if (after.crunchLevel !== before.crunchLevel) patch.crunchLevel = after.crunchLevel;
+  if (after.isAvailable !== before.isAvailable) patch.isAvailable = after.isAvailable;
+  return patch;
+};
+
 export const handleUpdateProduct = async (id: string, updates: Partial<MenuItem>) => {
   const payload = mapMenuItemPatchToUpdate(updates);
   const { data, error } = await supabase
