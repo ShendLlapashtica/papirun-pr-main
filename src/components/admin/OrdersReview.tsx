@@ -21,7 +21,7 @@ import ClientsOverviewMap from '@/components/admin/ClientsOverviewMap';
 import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
 import { generateInvoice } from '@/lib/invoiceGenerator';
-import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllDriverLocations, driverShortCode, haversineKm, type DeliveryDriver } from '@/lib/driversApi';
+import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllDriverLocations, driverShortCode, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import CustomerDriverMap from '@/components/CustomerDriverMap';
@@ -56,7 +56,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 type FilterKey = 'hour' | 'today' | 'week' | 'month' | 'custom' | 'all';
-type StatusFilter = 'active' | 'pending' | 'approved' | 'rejected' | 'history';
+type StatusFilter = 'active' | 'pending' | 'approved' | 'history';
 
 // Çagllavicë detection — uses suggestedLocation when set, falls back to address/coord for old orders
 const isCagllavice = (o: OrderRecord): boolean => {
@@ -408,6 +408,9 @@ const OrdersReview = ({
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [filter, setFilter] = useState<FilterKey>('month');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+  const [historyOutcomeFilter, setHistoryOutcomeFilter] = useState<'completed' | 'rejected' | 'all'>('all');
+  const [showRruges, setShowRruges] = useState(false);
+  const [rrugesFilter, setRrugesFilter] = useState<'delivering' | 'returning'>('delivering');
   const [locationFilter, setLocationFilter] = useState<'all' | 'qender' | 'cagllavice'>('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -673,10 +676,15 @@ const OrdersReview = ({
     return () => { unsub(); clearInterval(poll); };
   }, []);
 
+  // Within History, once sliced to a specific outcome (Konfirmuar/Anuluar), the date tabs mean
+  // "when was this resolved" rather than "when was this placed" — so they key off updatedAt
+  // instead of createdAt (an order placed last week but rejected today should count as "Sot").
+  const useResolvedDate = statusFilter === 'history' && historyOutcomeFilter !== 'all';
+
   const timeFiltered = useMemo(() => {
     const now = new Date();
     return orders.filter((o) => {
-      const created = new Date(o.createdAt);
+      const created = new Date(useResolvedDate ? o.updatedAt : o.createdAt);
       switch (filter) {
         case 'hour': return created >= new Date(now.getTime() - 60 * 60 * 1000);
         case 'today': return created >= startOfDay(now);
@@ -693,7 +701,7 @@ const OrdersReview = ({
         default: return true;
       }
     });
-  }, [orders, filter, customFrom, customTo]);
+  }, [orders, filter, customFrom, customTo, useResolvedDate]);
 
   const isInHistory = (o: OrderRecord) =>
     o.isVisible === false || archivedIds.has(o.id) || o.status === 'completed' || o.status === 'rejected';
@@ -703,11 +711,35 @@ const OrdersReview = ({
     return {
       pending: visible.filter((o) => o.status === 'pending').length,
       approved: visible.filter((o) => ['approved', 'preparing', 'out_for_delivery', 'completed'].includes(o.status)).length,
-      rejected: visible.filter((o) => o.status === 'rejected').length,
       history: timeFiltered.filter(isInHistory).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeFiltered, archivedIds]);
+
+  const historyCounts = useMemo(() => {
+    const hist = timeFiltered.filter(isInHistory);
+    return {
+      completed: hist.filter((o) => o.status === 'completed').length,
+      rejected: hist.filter((o) => o.status === 'rejected').length,
+      all: hist.length,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeFiltered, archivedIds]);
+
+  const rrugesDelivering = useMemo(() => {
+    const byDriver = new Map<string, OrderRecord[]>();
+    for (const o of orders) {
+      if (o.status !== 'out_for_delivery' || !o.assignedDriverId) continue;
+      const list = byDriver.get(o.assignedDriverId) ?? [];
+      list.push(o);
+      byDriver.set(o.assignedDriverId, list);
+    }
+    return drivers
+      .filter((d) => byDriver.has(d.id))
+      .map((driver) => ({ driver, orders: byDriver.get(driver.id)! }));
+  }, [drivers, orders]);
+
+  const rrugesReturning = useMemo(() => drivers.filter((d) => d.isReturning), [drivers]);
 
   const overduePending = useMemo(
     () => timeFiltered.some((o) => o.status === 'pending' && !isInHistory(o) && now - new Date(o.createdAt).getTime() > 60_000),
@@ -721,10 +753,12 @@ const OrdersReview = ({
       const inHistory = isInHistory(o);
       const matchesStatus = (() => {
         switch (statusFilter) {
-          case 'history': return inHistory;
+          case 'history':
+            if (!inHistory) return false;
+            if (historyOutcomeFilter === 'all') return true;
+            return o.status === historyOutcomeFilter;
           case 'pending': return !inHistory && o.status === 'pending';
           case 'approved': return !inHistory && ['approved', 'preparing', 'out_for_delivery', 'completed'].includes(o.status);
-          case 'rejected': return !inHistory && o.status === 'rejected';
           case 'active':
           default: return !inHistory;
         }
@@ -750,7 +784,7 @@ const OrdersReview = ({
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFiltered, statusFilter, archivedIds, priorityIds, searchQuery, caglOnly, locationFilter]);
+  }, [timeFiltered, statusFilter, historyOutcomeFilter, archivedIds, priorityIds, searchQuery, caglOnly, locationFilter]);
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
 
@@ -1412,18 +1446,18 @@ const OrdersReview = ({
           </button>
 
           <button
-            onClick={() => setStatusFilter(statusFilter === 'rejected' ? 'active' : 'rejected')}
+            onClick={() => setShowRruges((v) => !v)}
             className={`rounded-2xl p-3 text-left border transition-all active:scale-[0.98] ${
-              statusFilter === 'rejected'
-                ? 'bg-red-500/20 border-red-500/50 ring-2 ring-red-500/40'
-                : 'bg-red-500/10 border-red-500/20 hover:bg-red-500/15'
+              showRruges
+                ? 'bg-blue-500/20 border-blue-500/50 ring-2 ring-blue-500/40'
+                : 'bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/15'
             }`}
           >
             <div className="flex items-center gap-1.5">
-              <X className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-              <p className="text-[10px] uppercase tracking-wider font-semibold text-red-700 dark:text-rose-400">Anuluar</p>
+              <Navigation className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-blue-700 dark:text-blue-400">RRUGES&gt;</p>
             </div>
-            <p className="text-2xl font-bold text-red-700 dark:text-white mt-0.5">{counts.rejected}</p>
+            <p className="text-2xl font-bold text-blue-700 dark:text-white mt-0.5">{rrugesDelivering.length + rrugesReturning.length}</p>
           </button>
 
           <button
@@ -1441,6 +1475,134 @@ const OrdersReview = ({
             <p className="text-2xl font-bold text-foreground dark:text-white mt-0.5">{counts.history}</p>
           </button>
         </div>
+
+        {/* RRUGES panel — live driver routing status, independent of statusFilter/order list */}
+        {showRruges && (
+          <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-3 space-y-3">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setRrugesFilter('delivering')}
+                className={`flex-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  rrugesFilter === 'delivering' ? 'bg-blue-500 text-white' : 'bg-background text-muted-foreground hover:bg-secondary'
+                }`}
+              >
+                Duke shkuar · {rrugesDelivering.length}
+              </button>
+              <button
+                onClick={() => setRrugesFilter('returning')}
+                className={`flex-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  rrugesFilter === 'returning' ? 'bg-purple-500 text-white' : 'bg-background text-muted-foreground hover:bg-secondary'
+                }`}
+              >
+                Duke u kthyer · {rrugesReturning.length}
+              </button>
+            </div>
+
+            {rrugesFilter === 'delivering' && (
+              rrugesDelivering.length === 0 ? (
+                <p className="text-center text-xs text-muted-foreground py-4">Asnjë shofer nuk është duke dërguar aktualisht.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {rrugesDelivering.map(({ driver, orders: driverOrders }) => (
+                    <div key={driver.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-background">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0" style={{ background: driver.color || '#6b7280' }}>
+                        {driverShortCode(driver)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-sm truncate">🚴 {driver.name}</div>
+                        <div className="text-[11px] text-blue-600 font-semibold truncate">
+                          {driverOrders.map((o) => o.customerName).join(', ')}
+                        </div>
+                      </div>
+                      {driver.phone && (
+                        <a
+                          href={`tel:${driver.phone}`}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold active:scale-95 transition-all shrink-0"
+                        >
+                          <Phone className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+
+            {rrugesFilter === 'returning' && (
+              rrugesReturning.length === 0 ? (
+                <p className="text-center text-xs text-muted-foreground py-4">Asnjë shofer nuk është duke u kthyer aktualisht.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {rrugesReturning.map((driver) => {
+                    const distKm = driver.lat != null && driver.lng != null
+                      ? haversineKm(driver.lat, driver.lng, RESTAURANT_COORDS.lat, RESTAURANT_COORDS.lng)
+                      : null;
+                    return (
+                      <div key={driver.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-background">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shrink-0" style={{ background: driver.color || '#6b7280' }}>
+                          {driverShortCode(driver)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-sm truncate">🏁 {driver.name}</div>
+                          <div className="text-[11px] text-purple-600 font-semibold truncate">
+                            Duke u kthyer në bazë{distKm != null ? <> · {distKm.toFixed(1)}km larg</> : ''}
+                          </div>
+                        </div>
+                        {driver.phone && (
+                          <a
+                            href={`tel:${driver.phone}`}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold active:scale-95 transition-all shrink-0"
+                          >
+                            <Phone className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+          </div>
+        )}
+
+        {/* History outcome sub-filter: Konfirmuar / Anuluar / Të Gjitha */}
+        {statusFilter === 'history' && (
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setHistoryOutcomeFilter('completed')}
+              className={`rounded-xl p-2.5 text-center border transition-all active:scale-[0.98] ${
+                historyOutcomeFilter === 'completed'
+                  ? 'bg-emerald-500/20 border-emerald-500/50 ring-2 ring-emerald-500/40'
+                  : 'bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/15'
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-400">Konfirmuar</p>
+              <p className="text-lg font-bold text-emerald-700 dark:text-white">{historyCounts.completed}</p>
+            </button>
+            <button
+              onClick={() => setHistoryOutcomeFilter('rejected')}
+              className={`rounded-xl p-2.5 text-center border transition-all active:scale-[0.98] ${
+                historyOutcomeFilter === 'rejected'
+                  ? 'bg-red-500/20 border-red-500/50 ring-2 ring-red-500/40'
+                  : 'bg-red-500/10 border-red-500/20 hover:bg-red-500/15'
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-red-700 dark:text-rose-400">Anuluar</p>
+              <p className="text-lg font-bold text-red-700 dark:text-white">{historyCounts.rejected}</p>
+            </button>
+            <button
+              onClick={() => setHistoryOutcomeFilter('all')}
+              className={`rounded-xl p-2.5 text-center border transition-all active:scale-[0.98] ${
+                historyOutcomeFilter === 'all'
+                  ? 'bg-foreground/10 border-foreground/30 ring-2 ring-foreground/20'
+                  : 'bg-secondary/60 border-border hover:bg-secondary'
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Të Gjitha</p>
+              <p className="text-lg font-bold text-foreground dark:text-white">{historyCounts.all}</p>
+            </button>
+          </div>
+        )}
 
         {/* History export + delete-all toolbar */}
         {statusFilter === 'history' && historyOrders.length > 0 && (
@@ -1473,10 +1635,10 @@ const OrdersReview = ({
         <div className="flex items-center justify-between px-1">
           <p className="text-xs text-muted-foreground">
             {filtered.length} porosi · {
-              statusFilter === 'history' ? 'Histori' :
+              statusFilter === 'history'
+                ? (historyOutcomeFilter === 'completed' ? 'Histori · Konfirmuar' : historyOutcomeFilter === 'rejected' ? 'Histori · Anuluar' : 'Histori') :
               statusFilter === 'pending' ? 'Duke pritur' :
               statusFilter === 'approved' ? 'Konfirmuar' :
-              statusFilter === 'rejected' ? 'Anuluar' :
               'Aktive'
             }
           </p>
