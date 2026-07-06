@@ -676,55 +676,65 @@ const OrdersReview = ({
     return () => { unsub(); clearInterval(poll); };
   }, []);
 
-  // Within History, once sliced to a specific outcome (Konfirmuar/Anuluar), the date tabs mean
-  // "when was this resolved" rather than "when was this placed" — so they key off updatedAt
-  // instead of createdAt (an order placed last week but rejected today should count as "Sot").
-  const useResolvedDate = statusFilter === 'history' && historyOutcomeFilter !== 'all';
-
-  const timeFiltered = useMemo(() => {
-    const now = new Date();
-    return orders.filter((o) => {
-      const created = new Date(useResolvedDate ? o.updatedAt : o.createdAt);
-      switch (filter) {
-        case 'hour': return created >= new Date(now.getTime() - 60 * 60 * 1000);
-        case 'today': return created >= startOfDay(now);
-        case 'week': return created >= startOfWeek(now);
-        case 'month': return created >= startOfMonth(now);
-        case 'custom': {
-          if (!customFrom && !customTo) return true;
-          const from = customFrom ? new Date(customFrom) : null;
-          const to = customTo ? new Date(customTo + 'T23:59:59') : null;
-          if (from && created < from) return false;
-          if (to && created > to) return false;
-          return true;
-        }
-        default: return true;
+  // Two independent date-windowed views, always both kept up to date (not swapped based on
+  // whatever's currently selected) so every badge/count reflects what its own tab would show:
+  // - byCreated: "when was this placed" — used everywhere except resolved-outcome history views.
+  // - byResolved: "when was this resolved" — used only for Konfirmuar/Anuluar inside History,
+  //   so an order placed last week but rejected today correctly counts as "Sot".
+  const dateWindow = (dateStr: string, now: Date): boolean => {
+    const d = new Date(dateStr);
+    switch (filter) {
+      case 'hour': return d >= new Date(now.getTime() - 60 * 60 * 1000);
+      case 'today': return d >= startOfDay(now);
+      case 'week': return d >= startOfWeek(now);
+      case 'month': return d >= startOfMonth(now);
+      case 'custom': {
+        if (!customFrom && !customTo) return true;
+        const from = customFrom ? new Date(customFrom) : null;
+        const to = customTo ? new Date(customTo + 'T23:59:59') : null;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
       }
-    });
-  }, [orders, filter, customFrom, customTo, useResolvedDate]);
+      default: return true;
+    }
+  };
+
+  const timeFilteredByCreated = useMemo(() => {
+    const now = new Date();
+    return orders.filter((o) => dateWindow(o.createdAt, now));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, filter, customFrom, customTo]);
+
+  const timeFilteredByResolved = useMemo(() => {
+    const now = new Date();
+    return orders.filter((o) => dateWindow(o.updatedAt, now));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, filter, customFrom, customTo]);
 
   const isInHistory = (o: OrderRecord) =>
     o.isVisible === false || archivedIds.has(o.id) || o.status === 'completed' || o.status === 'rejected';
 
   const counts = useMemo(() => {
-    const visible = timeFiltered.filter((o) => !isInHistory(o));
+    const visible = timeFilteredByCreated.filter((o) => !isInHistory(o));
     return {
       pending: visible.filter((o) => o.status === 'pending').length,
       approved: visible.filter((o) => ['approved', 'preparing', 'out_for_delivery', 'completed'].includes(o.status)).length,
-      history: timeFiltered.filter(isInHistory).length,
+      history: timeFilteredByCreated.filter(isInHistory).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFiltered, archivedIds]);
+  }, [timeFilteredByCreated, archivedIds]);
 
   const historyCounts = useMemo(() => {
-    const hist = timeFiltered.filter(isInHistory);
+    const histByCreated = timeFilteredByCreated.filter(isInHistory);
+    const histByResolved = timeFilteredByResolved.filter(isInHistory);
     return {
-      completed: hist.filter((o) => o.status === 'completed').length,
-      rejected: hist.filter((o) => o.status === 'rejected').length,
-      all: hist.length,
+      completed: histByResolved.filter((o) => o.status === 'completed').length,
+      rejected: histByResolved.filter((o) => o.status === 'rejected').length,
+      all: histByCreated.length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFiltered, archivedIds]);
+  }, [timeFilteredByCreated, timeFilteredByResolved, archivedIds]);
 
   const rrugesDelivering = useMemo(() => {
     const byDriver = new Map<string, OrderRecord[]>();
@@ -742,14 +752,16 @@ const OrdersReview = ({
   const rrugesReturning = useMemo(() => drivers.filter((d) => d.isReturning), [drivers]);
 
   const overduePending = useMemo(
-    () => timeFiltered.some((o) => o.status === 'pending' && !isInHistory(o) && now - new Date(o.createdAt).getTime() > 60_000),
+    () => timeFilteredByCreated.some((o) => o.status === 'pending' && !isInHistory(o) && now - new Date(o.createdAt).getTime() > 60_000),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [timeFiltered, now, archivedIds]
+    [timeFilteredByCreated, now, archivedIds]
   );
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const arr = timeFiltered.filter((o) => {
+    const usingResolvedDate = statusFilter === 'history' && historyOutcomeFilter !== 'all';
+    const base = usingResolvedDate ? timeFilteredByResolved : timeFilteredByCreated;
+    const arr = base.filter((o) => {
       const inHistory = isInHistory(o);
       const matchesStatus = (() => {
         switch (statusFilter) {
@@ -784,7 +796,7 @@ const OrdersReview = ({
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFiltered, statusFilter, historyOutcomeFilter, archivedIds, priorityIds, searchQuery, caglOnly, locationFilter]);
+  }, [timeFilteredByCreated, timeFilteredByResolved, statusFilter, historyOutcomeFilter, archivedIds, priorityIds, searchQuery, caglOnly, locationFilter]);
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
 
@@ -1069,9 +1081,9 @@ const OrdersReview = ({
   };
 
   const historyOrders = useMemo(
-    () => timeFiltered.filter(isInHistory),
+    () => timeFilteredByCreated.filter(isInHistory),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [timeFiltered, archivedIds]
+    [timeFilteredByCreated, archivedIds]
   );
 
   const FilterTab = ({ k, label }: { k: FilterKey; label: string }) => (
