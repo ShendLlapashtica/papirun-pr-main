@@ -517,6 +517,53 @@ const Admin = () => {
     await upsertStorefrontSetting(CATEGORY_ORDER_KEY, next);
   };
 
+  // Exports the menu exactly as currently loaded in this admin session (live products,
+  // extras, category order) to a CSV the user can download and keep as a manual backup.
+  const csvCell = (value: unknown): string => {
+    const s = Array.isArray(value) ? value.join(';') : String(value ?? '');
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const handleExportMenuCsv = () => {
+    const productColumns = ['id', 'name_sq', 'name_en', 'description_sq', 'description_en', 'price', 'image', 'category', 'ingredients', 'extras', 'crunchLevel', 'likes', 'rating', 'reviewCount', 'isAvailable'];
+    const productRows = items.map((it) => [
+      it.id, it.name.sq, it.name.en, it.description.sq, it.description.en, it.price,
+      it.image, it.category, it.ingredients, it.extras, it.crunchLevel, it.likes,
+      it.rating, it.reviewCount, it.isAvailable,
+    ]);
+    const productsCsv = [productColumns.join(','), ...productRows.map((row) => row.map(csvCell).join(','))].join('\n');
+
+    const extraColumns = ['id', 'name_sq', 'name_en', 'price', 'isActive', 'sortOrder'];
+    const extraRows = menuExtras.map((ex) => [ex.id, ex.name.sq, ex.name.en, ex.price, ex.isActive, ex.sortOrder]);
+    const extrasCsv = [extraColumns.join(','), ...extraRows.map((row) => row.map(csvCell).join(','))].join('\n');
+
+    const categoryOrderCsv = ['position,category', ...catOrder.map((cat, idx) => `${idx},${csvCell(cat)}`)].join('\n');
+
+    const csv = [
+      `# Menu export — ${new Date().toISOString()}`,
+      '',
+      '## products',
+      productsCsv,
+      '',
+      '## menu_extras',
+      extrasCsv,
+      '',
+      '## category_order',
+      categoryOrderCsv,
+      '',
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `menu-backup-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   // Wizard state for adding new products
   const [showAddWizard, setShowAddWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
@@ -1674,6 +1721,15 @@ const Admin = () => {
             >
               <Plus className="w-5 h-5" />
               {language === 'sq' ? 'Shto Produkt te Ri' : 'Add New Product'}
+            </button>
+
+            {/* Export CSV Button — manual local backup of the menu exactly as currently loaded */}
+            <button
+              onClick={handleExportMenuCsv}
+              className="w-full py-3 rounded-2xl border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+            >
+              <HardDrive className="w-4 h-4" />
+              {language === 'sq' ? 'Eksporto CSV (Backup)' : 'Export CSV (Backup)'}
             </button>
 
             {(['sandwich', 'salad', 'fajita', 'sides', 'drink'] as const).map((cat) => {
