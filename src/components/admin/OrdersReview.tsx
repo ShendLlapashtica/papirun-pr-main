@@ -37,6 +37,18 @@ const statusColor = (s: string) => {
   return 'bg-secondary text-muted-foreground';
 };
 
+const dayKey = (dateStr: string): string => {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+};
+
+const formatOrderDate = (dateStr: string): string => {
+  const d = new Date(dateStr);
+  const today = new Date();
+  if (dayKey(dateStr) === dayKey(today.toISOString())) return 'Sot';
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
 const useNow = (intervalMs = 5000) => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -1788,7 +1800,9 @@ const OrdersReview = ({
 
         <div className="flex flex-col gap-3 xl:grid xl:grid-cols-2">
         <AnimatePresence initial={false}>
-          {filtered.map((o) => {
+          {filtered.map((o, idx) => {
+            const prevOrder = idx > 0 ? filtered[idx - 1] : null;
+            const showDayDivider = !prevOrder || dayKey(o.createdAt) !== dayKey(prevOrder.createdAt);
             const isSelected = o.id === selectedId;
             const isMassSelected = selectedOrderIds.has(o.id);
             const isGlowing = glowingIds.has(o.id);
@@ -1815,6 +1829,14 @@ const OrdersReview = ({
             const msgSenderLabel = msgEntry?.sender === 'driver' ? 'Shoferi' : 'Klienti';
             return (
               <React.Fragment key={o.id}>
+              {showDayDivider && (
+                <div className="xl:col-span-2 flex items-center gap-2 px-1 pt-1 first:pt-0">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">
+                    {formatOrderDate(o.createdAt)}
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+              )}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: isDeleting ? 0.45 : 1 }}
@@ -1999,7 +2021,7 @@ const OrdersReview = ({
                       <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground dark:text-slate-300">
                         <span className="flex items-center gap-1"><Phone className="w-3 h-3 opacity-50 shrink-0" />{o.customerPhone}</span>
                         <span className="opacity-30">·</span>
-                        <span>{new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>{formatOrderDate(o.createdAt)} · {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0 mt-0.5 ${statusColor(o.status)}`}>
