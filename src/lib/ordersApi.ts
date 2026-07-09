@@ -179,20 +179,6 @@ export const fetchAllOrders = async (): Promise<OrderRecord[]> => {
   return (data as Row[]).map(mapRow);
 };
 
-// Real, unbounded per-product order counts (quantity summed across ALL orders),
-// via a read-only RPC — never writes anything, and works for anonymous
-// storefront users since it bypasses the authenticated-only RLS on `orders`.
-export const fetchProductOrderCounts = async (): Promise<Record<string, number>> => {
-  const client = supabase as any;
-  const { data, error } = await client.rpc('get_product_order_counts');
-  if (error) throw error;
-  const counts: Record<string, number> = {};
-  for (const row of (data as { product_id: string; total_qty: number }[]) ?? []) {
-    counts[row.product_id] = Number(row.total_qty);
-  }
-  return counts;
-};
-
 export const updateOrderStatus = async (id: string, status: OrderStatus, adminNote = '') => {
   const client = supabase as any;
   const { error } = await client.from(TABLE).update({ status, admin_note: adminNote }).eq('id', id);

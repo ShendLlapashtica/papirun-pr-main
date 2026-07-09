@@ -15,7 +15,6 @@ import {
   subscribeStorefrontOffersRealtime,
   subscribeStorefrontSettingsRealtime,
 } from '@/lib/productsApi';
-import { fetchProductOrderCounts } from '@/lib/ordersApi';
 import { OFFERS_SECTION_ENABLED_KEY, OFFER_BADGE_TEXT_KEY, DEFAULT_OFFER_BADGE_TEXT, CATEGORY_ORDER_KEY, DEFAULT_CATEGORY_ORDER } from '@/lib/storefrontApi';
 
 // Build a lookup of local bundled images by product id
@@ -55,7 +54,6 @@ const PRODUCTS_CACHE_KEY = 'papirun_products_cache';
 const EXTRAS_CACHE_KEY = 'papirun_extras_cache';
 const OFFERS_CACHE_KEY = 'papirun_storefront_offers_cache';
 const OFERTA_ENABLED_CACHE_KEY = 'papirun_storefront_offers_enabled_cache';
-const ORDER_COUNTS_CACHE_KEY = 'papirun_product_order_counts_cache';
 
 const applyLocalImages = (items: MenuItem[]): MenuItem[] =>
   items.map((item) => {
@@ -140,35 +138,6 @@ export const useLiveMenuItems = () => {
   }, []);
 
   return { items, isLoading };
-};
-
-// Read-only, real per-product popularity (total quantity ever ordered).
-// Used only to decide DISPLAY ORDER for the "Te Gjitha" tab — never written
-// back anywhere, so it can never corrupt product data or fight with the
-// admin's manual sort_order reordering.
-export const useProductOrderCounts = () => {
-  const cached = readCache<Record<string, number>>(ORDER_COUNTS_CACHE_KEY);
-  const [counts, setCounts] = useState<Record<string, number>>(cached ?? {});
-
-  useEffect(() => {
-    let isMounted = true;
-
-    fetchProductOrderCounts()
-      .then((liveCounts) => {
-        if (!isMounted) return;
-        setCounts(liveCounts);
-        writeCache(ORDER_COUNTS_CACHE_KEY, liveCounts);
-      })
-      .catch((error) => {
-        console.error('Failed to fetch product order counts:', error);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  return counts;
 };
 
 export const useLiveMenuExtras = () => {
