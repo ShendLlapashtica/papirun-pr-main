@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star, Download } from 'lucide-react';
 import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import { rateDriver, fetchDriverLocation, subscribeDriverLocation, fetchDriverById, driverShortCode } from '@/lib/driversApi';
@@ -14,6 +15,12 @@ import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
 const GOOGLE_REVIEW_URL = 'https://search.google.com/local/writereview?placeid=ChIJIcfXheaeVBMRHkjfl6e6kf8';
 
 const STORAGE_KEY = 'papirun_active_order_id';
+
+// An "optimistic-<timestamp>" id must be replaced by the real server order id almost
+// instantly. If it never is (create request hung, failed silently, tab closed
+// mid-request and reopened later), don't leave the customer staring at a fake
+// "#OPTIMIST..." pending order forever — time it out and clear it.
+const OPTIMISTIC_TIMEOUT_MS = 20_000;
 
 const getActiveId = (): string | null => {
   try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
@@ -126,6 +133,22 @@ const OrderTrackingPill = () => {
     });
     return () => { active = false; unsub(); };
   }, [orderId]);
+
+  // Time out a stuck optimistic placeholder — the create request should resolve in
+  // well under this; if it hasn't, it hung/failed silently/tab closed mid-request.
+  useEffect(() => {
+    if (!orderId || !orderId.startsWith('optimistic-')) return;
+    const placedAt = Number(orderId.slice('optimistic-'.length)) || Date.now();
+    const remaining = Math.max(0, OPTIMISTIC_TIMEOUT_MS - (Date.now() - placedAt));
+    const timer = setTimeout(() => {
+      clearActiveId();
+      setOrderId(null);
+      toast.error(language === 'sq'
+        ? 'Porosia dështoi të dërgohet — provo përsëri'
+        : 'Order failed to send — please try again');
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [orderId, language]);
 
   // Poll every 2s while pending — guarantees transition even if realtime lags or misses
   useEffect(() => {
