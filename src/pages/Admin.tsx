@@ -564,6 +564,189 @@ const Admin = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Imports a CSV in exactly the format handleExportMenuCsv produces and restores
+  // products, menu extras, and category order via the same live Supabase writes every
+  // individual admin edit already uses (upsertProduct / upsertMenuExtra /
+  // upsertStorefrontSetting) — never a standalone script, never local fallback data.
+  const [importingCsv, setImportingCsv] = useState(false);
+  const csvImportInputRef = useRef<HTMLInputElement>(null);
+
+  const parseCsvBlock = (text: string): string[][] => {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let field = '';
+    let inQuotes = false;
+    let i = 0;
+    const pushField = () => { row.push(field); field = ''; };
+    const pushRow = () => { pushField(); rows.push(row); row = []; };
+    while (i < text.length) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i += 1; continue;
+        }
+        field += c; i += 1; continue;
+      }
+      if (c === '"') { inQuotes = true; i += 1; continue; }
+      if (c === ',') { pushField(); i += 1; continue; }
+      if (c === '\r') { i += 1; continue; }
+      if (c === '\n') { pushRow(); i += 1; continue; }
+      field += c; i += 1;
+    }
+    if (field.length > 0 || row.length > 0) pushRow();
+    return rows.filter((r) => r.length > 1 || r[0] !== '');
+  };
+
+  const extractCsvSection = (fullText: string, marker: string, nextMarkers: string[]): string => {
+    const lines = fullText.split('\n');
+    const startIdx = lines.findIndex((l) => l.trim() === marker);
+    if (startIdx === -1) return '';
+    let endIdx = lines.length;
+    for (let j = startIdx + 1; j < lines.length; j++) {
+      if (nextMarkers.some((m) => lines[j].trim() === m)) { endIdx = j; break; }
+    }
+    return lines.slice(startIdx + 1, endIdx).join('\n');
+  };
+
+  const csvRowsToObjects = (rows: string[][]): Record<string, string>[] => {
+    if (rows.length === 0) return [];
+    const header = rows[0];
+    return rows.slice(1).map((row) => {
+      const obj: Record<string, string> = {};
+      header.forEach((key, idx) => { obj[key] = row[idx] ?? ''; });
+      return obj;
+    });
+  };
+
+  const csvParseBool = (s: string | undefined) => (s ?? '').trim().toLowerCase() === 'true';
+  const csvParseList = (s: string | undefined) => {
+    const trimmed = (s ?? '').trim();
+    return trimmed === '' ? [] : trimmed.split(';').map((x) => x.trim()).filter(Boolean);
+  };
+
+  const handleImportMenuCsvFile = async (file: File) => {
+    if (!window.confirm(
+      language === 'sq'
+        ? 'Kjo do të mbishkruajë produktet, ekstrat dhe renditjen e kategorive live me të dhënat e këtij CSV. Vazhdo?'
+        : "This will overwrite live products, extras, and category order with this CSV's data. Continue?"
+    )) return;
+
+    setImportingCsv(true);
+    try {
+      const text = await file.text();
+
+      const productObjs = csvRowsToObjects(parseCsvBlock(extractCsvSection(text, '## products', ['## menu_extras', '## category_order'])));
+      const extraObjs = csvRowsToObjects(parseCsvBlock(extractCsvSection(text, '## menu_extras', ['## category_order'])));
+      const catObjs = csvRowsToObjects(parseCsvBlock(extractCsvSection(text, '## category_order', [])));
+
+      if (productObjs.length === 0) {
+        throw new Error('No products found under "## products" — is this a menu export CSV?');
+      }
+
+      const importedProducts: MenuItem[] = productObjs.map((r) => ({
+        id: r.id,
+        name: { sq: r.name_sq, en: r.name_en },
+        description: { sq: r.description_sq, en: r.description_en },
+        price: Number(r.price) || 0,
+        image: r.image,
+        category: r.category as MenuItem['category'],
+        ingredients: csvParseList(r.ingredients),
+        extras: csvParseList(r.extras),
+        crunchLevel: Number(r.crunchLevel) || 0,
+        likes: Number(r.likes) || 0,
+        rating: Number(r.rating) || 0,
+        reviewCount: Number(r.reviewCount) || 0,
+        isAvailable: csvParseBool(r.isAvailable),
+      }));
+
+      const importedExtras: MenuExtra[] = extraObjs.map((r) => ({
+        id: r.id,
+        name: { sq: r.name_sq, en: r.name_en },
+        price: Number(r.price) || 0,
+        isActive: csvParseBool(r.isActive),
+        sortOrder: Number(r.sortOrder) || 0,
+      }));
+
+      const importedCatOrder = catObjs
+        .slice()
+        .sort((a, b) => Number(a.position) - Number(b.position))
+        .map((r) => r.category)
+        .filter(Boolean);
+
+      // Snapshot current live product ids BEFORE writing, so we can report (never
+      // silently delete) any live product this file doesn't mention.
+      const { data: existingRows } = await supabase.from('products').select('id');
+      const existingIds = new Set(((existingRows ?? []) as { id: string }[]).map((r) => r.id));
+      const importedIds = new Set(importedProducts.map((p) => p.id));
+      const untouchedIds = [...existingIds].filter((id) => !importedIds.has(id));
+
+      const savedProducts: MenuItem[] = [];
+      const productErrors: string[] = [];
+      for (const product of importedProducts) {
+        try {
+          savedProducts.push(await upsertProduct(product));
+        } catch (err) {
+          console.error(`Failed to import product ${product.id}:`, err);
+          productErrors.push(product.id);
+        }
+      }
+
+      const savedExtras: MenuExtra[] = [];
+      const extraErrors: string[] = [];
+      for (const extra of importedExtras) {
+        try {
+          savedExtras.push(await upsertMenuExtra(extra));
+        } catch (err) {
+          console.error(`Failed to import extra ${extra.id}:`, err);
+          extraErrors.push(extra.id);
+        }
+      }
+
+      if (importedCatOrder.length > 0) {
+        await upsertStorefrontSetting(CATEGORY_ORDER_KEY, importedCatOrder);
+        setCatOrder(importedCatOrder);
+      }
+
+      setItems((prev) => {
+        const byId = new Map(prev.map((p) => [p.id, p]));
+        savedProducts.forEach((p) => byId.set(p.id, p));
+        return Array.from(byId.values());
+      });
+      setMenuExtras((prev) => {
+        const byId = new Map(prev.map((e) => [e.id, e]));
+        savedExtras.forEach((e) => byId.set(e.id, e));
+        return Array.from(byId.values());
+      });
+
+      toast.success(
+        (language === 'sq' ? 'U importua: ' : 'Imported: ') +
+        `${savedProducts.length}/${importedProducts.length} products, ${savedExtras.length}/${importedExtras.length} extras, ${importedCatOrder.length} categories`
+      );
+      if (untouchedIds.length > 0) {
+        toast.info(
+          (language === 'sq'
+            ? `${untouchedIds.length} produkt(e) live nuk ishin ne kete skedar, nuk u prekën: `
+            : `${untouchedIds.length} live product(s) not in this file, left untouched: `) +
+          untouchedIds.join(', '),
+          { duration: 15000 }
+        );
+      }
+      if (productErrors.length > 0 || extraErrors.length > 0) {
+        toast.error(
+          (language === 'sq' ? 'Deshtuan: ' : 'Failed: ') +
+          [...productErrors, ...extraErrors].join(', '),
+          { duration: 15000 }
+        );
+      }
+    } catch (error) {
+      console.error('Menu CSV import failed:', error);
+      toast.error(language === 'sq' ? 'Importimi dështoi — provo përsëri' : 'Import failed — try again');
+    } finally {
+      setImportingCsv(false);
+    }
+  };
+
   // Wizard state for adding new products
   const [showAddWizard, setShowAddWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
@@ -1730,6 +1913,29 @@ const Admin = () => {
             >
               <HardDrive className="w-4 h-4" />
               {language === 'sq' ? 'Eksporto CSV (Backup)' : 'Export CSV (Backup)'}
+            </button>
+
+            {/* Import CSV Button — restores products/extras/category order from a backup produced by Export CSV above */}
+            <input
+              ref={csvImportInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImportMenuCsvFile(file);
+                e.target.value = '';
+              }}
+            />
+            <button
+              onClick={() => csvImportInputRef.current?.click()}
+              disabled={importingCsv}
+              className="w-full py-3 rounded-2xl border border-border text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"
+            >
+              <Upload className="w-4 h-4" />
+              {importingCsv
+                ? (language === 'sq' ? 'Duke importuar...' : 'Importing...')
+                : (language === 'sq' ? 'Importo CSV (Restore)' : 'Import CSV (Restore)')}
             </button>
 
             {(['sandwich', 'salad', 'fajita', 'sides', 'drink'] as const).map((cat) => {
