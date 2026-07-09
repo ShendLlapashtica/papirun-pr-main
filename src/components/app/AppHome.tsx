@@ -3,7 +3,7 @@ import { Sparkles, UtensilsCrossed } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
-import { useLiveMenuItems, useOfertaEnabled, useLiveCategoryOrder } from '@/hooks/useLiveStorefrontData';
+import { useLiveMenuItems, useOfertaEnabled, useLiveCategoryOrder, useProductOrderCounts } from '@/hooks/useLiveStorefrontData';
 import { useAuth } from '@/contexts/AuthContext';
 import AppMenuCard from './AppMenuCard';
 import OpenClosedBar from '@/components/OpenClosedBar';
@@ -19,6 +19,7 @@ const AppHome = () => {
   const { items: menuItems, isLoading } = useLiveMenuItems();
   const isOfertaEnabled = useOfertaEnabled();
   const categoryOrder = useLiveCategoryOrder();
+  const orderCounts = useProductOrderCounts();
   const { addToCart } = useCart();
 
   const search = params.get('search') ?? '';
@@ -61,8 +62,14 @@ const AppHome = () => {
           i.ingredients.some((ing) => ing.toLowerCase().includes(q))
       );
     }
+    // "Te Gjitha" only: rank by real order popularity. Array.sort is stable,
+    // so items with equal (including zero) order counts keep the relative
+    // order they already had (admin's manual sort_order) instead of shuffling.
+    if (activeCategory === 'all') {
+      items = [...items].sort((a, b) => (orderCounts[b.id] ?? 0) - (orderCounts[a.id] ?? 0));
+    }
     return items;
-  }, [visibleItems, activeCategory, search, language]);
+  }, [visibleItems, activeCategory, search, language, orderCounts]);
 
   useEffect(() => {
     setVisibleCount(8);

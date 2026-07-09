@@ -486,21 +486,18 @@ const Admin = () => {
     fetchStorefrontSetting<string[]>(CATEGORY_ORDER_KEY, DEFAULT_CATEGORY_ORDER).then(setCatOrder).catch(() => {});
   }, []);
 
-  // Product order counts — computed from order history, used to sort menu products by popularity
+  // Product order counts — real, unbounded totals from the read-only
+  // get_product_order_counts RPC (not capped at the last 500 orders like a
+  // client-side fetchAllOrders loop would be). Used only to sort/display menu
+  // products by popularity — never written back anywhere.
   const [productOrderCounts, setProductOrderCounts] = useState<Record<string, number>>({});
   useEffect(() => {
     if (activeTab !== 'menu') return;
     if (items.length === 0) return;
     let cancelled = false;
-    import('@/lib/ordersApi').then(({ fetchAllOrders }) => {
-      fetchAllOrders().then((allOrders) => {
+    import('@/lib/ordersApi').then(({ fetchProductOrderCounts }) => {
+      fetchProductOrderCounts().then((counts) => {
         if (cancelled) return;
-        const counts: Record<string, number> = {};
-        for (const order of allOrders) {
-          for (const it of (order.items as any[])) {
-            if (it.id) counts[it.id] = (counts[it.id] || 0) + (it.quantity ?? 1);
-          }
-        }
         setProductOrderCounts(counts);
       }).catch(() => {});
     });
