@@ -5,11 +5,24 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useLiveMenuItems, useOfertaEnabled, useLiveCategoryOrder } from '@/hooks/useLiveStorefrontData';
 import { useAuth } from '@/contexts/AuthContext';
+import type { MenuItem } from '@/types/menu';
 import AppMenuCard from './AppMenuCard';
 import OpenClosedBar from '@/components/OpenClosedBar';
 import FavoritesCarousel from './FavoritesCarousel';
 import LastOrderCard from './LastOrderCard';
 import OfertaRamazani from '@/components/OfertaRamazani';
+
+// "Te Gjitha" (all) tab only: crunch-branded items first, then fajita, then
+// everything else, soups/drinks last. Category tabs and admin's own manual
+// per-category ordering are untouched — this only reorders the "all" view.
+const isCrunchItem = (item: MenuItem) => /crunch/i.test(item.name.sq) || /crunch/i.test(item.name.en);
+
+const teGjithaGroup = (item: MenuItem): number => {
+  if (isCrunchItem(item)) return 0;
+  if (item.category === 'fajita') return 1;
+  if (item.category === 'sides' || item.category === 'drink') return 3;
+  return 2;
+};
 
 const AppHome = () => {
   const { language, t } = useLanguage();
@@ -52,7 +65,11 @@ const AppHome = () => {
 
   const filtered = useMemo(() => {
     let items = visibleItems;
-    if (activeCategory !== 'all') items = items.filter((i) => i.category === activeCategory);
+    if (activeCategory !== 'all') {
+      items = items.filter((i) => i.category === activeCategory);
+    } else {
+      items = [...items].sort((a, b) => teGjithaGroup(a) - teGjithaGroup(b));
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       items = items.filter(
