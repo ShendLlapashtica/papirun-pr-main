@@ -8,11 +8,12 @@ import { getIngredientName } from '@/data/ingredientTranslations';
 import AddressMapPicker from '@/components/checkout/AddressMapPicker';
 // OrderStatusModal handled globally via OrderTrackingPill
 import { getCartLineTotal } from '@/lib/cartPricing';
-import { createOrder, detectOrderSource } from '@/lib/ordersApi';
+import { createOrder, detectOrderSource, suggestOrderLocation } from '@/lib/ordersApi';
 import { setActiveOrderId, clearActiveOrderId } from '@/components/OrderTrackingPill';
 import { fetchAddresses, deleteAddress, type SavedAddress } from '@/lib/addressesApi';
 import { fetchStorefrontSetting } from '@/lib/storefrontApi';
 import { WHATSAPP_FALLBACK_KEY } from '@/lib/storefrontApi';
+import { fetchLocations, isLocationOpenNow, formatNextOpenStatus, type StorefrontLocation } from '@/lib/locationsApi';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -38,12 +39,24 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   const [trackingOrderId] = useState<string | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [whatsappFallbackEnabled, setWhatsappFallbackEnabled] = useState(true);
+  const [locations, setLocations] = useState<StorefrontLocation[]>([]);
 
   useEffect(() => {
     fetchStorefrontSetting<boolean>(WHATSAPP_FALLBACK_KEY, true)
       .then(setWhatsappFallbackEnabled)
       .catch(() => {});
   }, []);
+
+  // Fetch business hours while checkout is open, so we can show "Mbyllur Tani" instead
+  // of letting the customer submit an order that the backend will just auto-reject.
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const sync = () => fetchLocations().then((data) => { if (active) setLocations(data); }).catch(() => {});
+    sync();
+    const interval = setInterval(sync, 60_000);
+    return () => { active = false; clearInterval(interval); };
+  }, [isOpen]);
 
   // Autofill name+phone from last order (guests and logged-in users)
   useEffect(() => {
@@ -108,6 +121,11 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   const hasLocation = selectedPosition !== null && formData.address.trim().length > 0;
   const isFormValid = formData.name.trim() && formData.phone.trim() && hasLocation;
 
+  const currentLocation = locations.length > 0
+    ? locations.find((l) => l.id === suggestOrderLocation(selectedPosition?.[0] ?? null, selectedPosition?.[1] ?? null, formData.address))
+    : undefined;
+  const isClosedNow = !!currentLocation && !isLocationOpenNow(currentLocation);
+
   const resetForm = () => {
     setFormData({ name: '', phone: '', address: '', notes: '' });
     setSelectedPosition(null);
@@ -118,6 +136,10 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
       toast.error(language === 'sq'
         ? '📍 Aktivizo lokacionin ose vendos pinin në hartë para se të porosisësh'
         : '📍 Enable location or set pin on map before ordering', { duration: 4000 });
+      return;
+    }
+    if (isClosedNow) {
+      toast.error(language === 'sq' ? '🔴 Mbyllur Tani' : '🔴 Closed Now', { duration: 4000 });
       return;
     }
     if (!isFormValid) return;
@@ -349,6 +371,21 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
                 </div>
               </div>
 
+              {/* Closed-now warning — mirrors backend auto-reject in api/place-order.ts */}
+              {hasLocation && isClosedNow && currentLocation && (
+                <div className="flex items-start gap-2 bg-destructive/10 border border-destructive/30 rounded-xl p-3">
+                  <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-destructive">
+                      {language === 'sq' ? 'Mbyllur Tani' : 'Closed Now'}
+                    </p>
+                    <p className="text-[11px] text-destructive/80 mt-0.5">
+                      {formatNextOpenStatus(currentLocation, language)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Force-location warning when missing */}
               {!hasLocation && (
                 <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
@@ -370,11 +407,17 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={!isFormValid || submitting}
+                  disabled={!isFormValid || submitting || isClosedNow}
                   className="w-full flex items-center justify-center gap-2 text-sm font-semibold py-3.5 px-4 rounded-xl bg-primary text-primary-foreground transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
                 >
                   {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : !hasLocation ? <MapPin className="w-5 h-5" /> : <Send className="w-5 h-5" />}
-                  {submitting ? 'Duke dërguar...' : !hasLocation ? (language === 'sq' ? 'AKTIVIZO LOKACIONIN' : 'ENABLE LOCATION') : 'POROSIT'}
+                  {submitting
+                    ? 'Duke dërguar...'
+                    : !hasLocation
+                      ? (language === 'sq' ? 'AKTIVIZO LOKACIONIN' : 'ENABLE LOCATION')
+                      : isClosedNow
+                        ? (language === 'sq' ? 'MBYLLUR TANI' : 'CLOSED NOW')
+                        : 'POROSIT'}
                 </button>
                 {whatsappFallbackEnabled && (
                   <button
