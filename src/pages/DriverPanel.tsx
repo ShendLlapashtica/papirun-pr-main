@@ -155,6 +155,7 @@ const DriverPanel = () => {
   const driverAlarmFiredRef = useRef<Set<string>>(new Set());
   const [showManual, setShowManual] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [syncError, setSyncError] = useState('');
   const [showPinChange, setShowPinChange] = useState(false);
   const [curPin, setCurPin] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -247,6 +248,7 @@ const DriverPanel = () => {
       const raw = await fetchDriverOrders(driverId);
       const mapped = (raw as any[]).map(mapOrderRow);
       setOrders(mapped);
+      setSyncError('');
       const active = mapped.filter((o) => !['completed', 'rejected', 'histori'].includes(o.status));
       const activeCount = active.length;
       if (activeCount > prevOrderCountRef.current && prevOrderCountRef.current >= 0) {
@@ -258,7 +260,10 @@ const DriverPanel = () => {
           assignTimesRef.current = { ...assignTimesRef.current, ...times };
         }).catch(() => {});
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      setSyncError(e instanceof Error ? e.message : String(e));
+    }
   }, []);
 
   useEffect(() => {
@@ -776,6 +781,12 @@ const DriverPanel = () => {
               </div>
             );
           })()}
+
+          {syncError && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-3 text-xs text-destructive font-mono break-words">
+              Gabim gjatë marrjes së porosive: {syncError}
+            </div>
+          )}
 
           {/* Active orders list */}
           <div className="space-y-3">
