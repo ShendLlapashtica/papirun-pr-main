@@ -441,25 +441,38 @@ export const ensureRealDrivers = async (): Promise<void> => {
   if (!all) return;
 
   for (const d of REAL_DRIVERS) {
-    // Match by phone OR by name (case-insensitive) to avoid creating dupes
-    const matches = (all as { id: string; name: string; phone: string; created_at: string }[])
-      .filter(r => r.phone === d.phone || r.name?.toLowerCase() === d.name.toLowerCase());
+    try {
+      // Match by phone OR by name (case-insensitive) to avoid creating dupes
+      const matches = (all as { id: string; name: string; phone: string; created_at: string }[])
+        .filter(r => r.phone === d.phone || r.name?.toLowerCase() === d.name.toLowerCase());
 
-    if (matches.length === 0) {
-      await client.from(TABLE).insert({
-        name: d.name, username: d.name.toLowerCase(), display_name: d.name,
-        phone: d.phone, pin: d.pin, role: 'driver', is_active: true, password_hash: d.pin,
-      });
-    } else {
-      // Delete extras, update the survivor
-      const [keep, ...dupes] = matches;
-      for (const dupe of dupes) {
-        await client.from(TABLE).delete().eq('id', dupe.id);
+      if (matches.length === 0) {
+        await client.from(TABLE).insert({
+          name: d.name, username: d.name.toLowerCase(), display_name: d.name,
+          phone: d.phone, pin: d.pin, role: 'driver', is_active: true, password_hash: d.pin,
+        });
+      } else {
+        // Delete extras, update the survivor
+        const [keep, ...dupes] = matches;
+        for (const dupe of dupes) {
+          // orders.assigned_driver_id has a FK to delivery_drivers.id — if an order was ever
+          // assigned to this duplicate row, deleting it outright throws a FK violation that
+          // was silently swallowed by the caller's .catch(). That left the duplicate behind
+          // forever, and any driver whose device happened to be logged into that duplicate
+          // (instead of the "keep" survivor) would never see orders assigned to it. Repoint
+          // first so the delete always succeeds and every order ends up visible to whichever
+          // row survives.
+          await client.from('orders').update({ assigned_driver_id: keep.id }).eq('assigned_driver_id', dupe.id);
+          await client.from(TABLE).delete().eq('id', dupe.id);
+        }
+        await client.from(TABLE).update({
+          name: d.name, username: d.name.toLowerCase(),
+          phone: d.phone, pin: d.pin, password_hash: d.pin, is_active: true,
+        }).eq('id', keep.id);
       }
-      await client.from(TABLE).update({
-        name: d.name, username: d.name.toLowerCase(),
-        phone: d.phone, pin: d.pin, password_hash: d.pin, is_active: true,
-      }).eq('id', keep.id);
+    } catch (e) {
+      // Don't let one driver's cleanup failure stop the rest of the list from being processed.
+      console.error(`ensureRealDrivers: failed to reconcile ${d.name}`, e);
     }
   }
 };
