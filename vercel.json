@@ -12,6 +12,9 @@
     "api/place-order.ts": {
       "memory": 128
     },
+    "api/driver-orders.ts": {
+      "memory": 128
+    },
     "api/auth/send-tan.ts": {
       "memory": 128
     },

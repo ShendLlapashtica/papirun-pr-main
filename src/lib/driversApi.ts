@@ -413,12 +413,27 @@ export const rateDriver = async (orderId: string, rating: number, note?: string)
   if (error) throw error;
 };
 
-/** Fetch orders assigned to a specific driver — uses RPC to bypass RLS for anon drivers */
+/**
+ * Fetch orders assigned to a specific driver.
+ * Goes through /api/driver-orders (a Vercel serverless function using the
+ * service role key) instead of the driver_fetch_orders() RPC — RPCs defined
+ * in migrations have previously gone missing from the live database without
+ * anyone noticing (see get_order_by_id incident), and a server-side route
+ * sidesteps that risk entirely. Falls back to the RPC if the route itself
+ * is ever unreachable.
+ */
 export const fetchDriverOrders = async (driverId: string) => {
-  const client = supabase as any;
-  const { data, error } = await client.rpc('driver_fetch_orders', { p_driver_id: driverId });
-  if (error) throw error;
-  return data;
+  try {
+    const res = await fetch(`/api/driver-orders?driverId=${encodeURIComponent(driverId)}`);
+    if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || `HTTP ${res.status}`);
+    const { data } = await res.json();
+    return data;
+  } catch (apiErr) {
+    const client = supabase as any;
+    const { data, error } = await client.rpc('driver_fetch_orders', { p_driver_id: driverId });
+    if (error) throw apiErr;
+    return data;
+  }
 };
 
 const REAL_DRIVERS = [
