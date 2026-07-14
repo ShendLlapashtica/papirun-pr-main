@@ -667,6 +667,7 @@ const DriverPanel = () => {
                 {driver.name}
               </h1>
               <p className="text-[10px] text-muted-foreground">{driver.lat != null ? '📍 GPS aktiv' : 'GPS joaktiv'}</p>
+              <p className="text-[9px] text-muted-foreground/60 font-mono select-all">ID: {driver.id}</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap justify-end">

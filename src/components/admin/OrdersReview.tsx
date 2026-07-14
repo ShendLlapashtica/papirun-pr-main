@@ -2087,8 +2087,17 @@ const OrdersReview = ({
 
                   {/* ── Driver row ── */}
                   {(() => {
-                    const drv = o.assignedDriverId ? drivers.find((d) => d.id === o.assignedDriverId) : null;
-                    if (!drv) return null;
+                    if (!o.assignedDriverId) return null;
+                    const drv = drivers.find((d) => d.id === o.assignedDriverId);
+                    if (!drv) {
+                      // Assigned id doesn't match any driver currently loaded here — surface it
+                      // instead of hiding the row, since a silent mismatch is exactly the bug we're chasing.
+                      return (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono text-red-600 select-all">? {o.assignedDriverId}</span>
+                        </div>
+                      );
+                    }
                     const assignedMs = assignTimes[o.id];
                     const isLate = o.status === 'approved' && assignedMs && (now - assignedMs) > 60_000;
                     return (
@@ -2096,6 +2105,7 @@ const OrdersReview = ({
                         <div className="w-3 h-3 rounded-full shrink-0" style={{ background: drv.color || '#6b7280' }} />
                         <span className="text-[10px] font-bold" style={{ color: drv.color || undefined }}>{driverShortCode(drv)}</span>
                         <span className="text-[10px] text-muted-foreground truncate flex-1">{drv.name}</span>
+                        <span className="text-[8px] font-mono text-muted-foreground/50 select-all">{drv.id}</span>
                         {isLate && drv.phone && (
                           <a
                             href={`tel:${drv.phone}`}
