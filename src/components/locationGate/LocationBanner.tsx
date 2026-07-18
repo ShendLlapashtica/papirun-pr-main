@@ -16,14 +16,14 @@ const LocationBanner = ({ branch, onChange }: LocationBannerProps) => {
   const { language } = useLanguage();
 
   return (
-    <div className="fixed top-0 inset-x-0 z-[90] flex justify-center pt-[env(safe-area-inset-top,0px)]">
+    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] right-3 sm:right-4 z-[90]">
       <button
         type="button"
         onClick={onChange}
         title={language === 'sq' ? 'Ndrysho pikën' : 'Change location'}
-        className="mt-1.5 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-foreground/90 text-background text-xs font-medium shadow-md backdrop-blur-sm active:scale-95 transition-transform"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 rounded-full bg-foreground/90 text-background text-[11px] sm:text-xs font-medium shadow-md backdrop-blur-sm active:scale-95 transition-transform"
       >
-        <MapPin className="w-3 h-3" />
+        <MapPin className="w-3 h-3 shrink-0" />
         {BRANCH_LABEL[branch]}
       </button>
     </div>
