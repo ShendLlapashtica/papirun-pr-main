@@ -489,6 +489,7 @@ const Admin = () => {
   const [contentSubTab, setContentSubTab] = useState<'texts' | 'locations' | 'replies'>('texts');
   const [ofertaEnabled, setOfertaEnabled] = useState(true);
   const [whatsappFallbackEnabled, setWhatsappFallbackEnabled] = useState(true);
+  const [forceOpenEnabled, setForceOpenEnabled] = useState(DEFAULT_ORDERS_FORCE_OPEN);
   const [offerBadgeText, setOfferBadgeText] = useState(DEFAULT_OFFER_BADGE_TEXT);
   const [offerBadgeSaving, setOfferBadgeSaving] = useState(false);
   const [offers, setOffers] = useState<StorefrontOffer[]>(() =>
@@ -714,10 +715,18 @@ const Admin = () => {
       } catch {}
     };
 
+    const syncForceOpen = async () => {
+      try {
+        const val = await fetchStorefrontSetting<boolean>(ORDERS_FORCE_OPEN_KEY, DEFAULT_ORDERS_FORCE_OPEN);
+        if (isMounted) setForceOpenEnabled(val);
+      } catch {}
+    };
+
     syncOffers();
     syncOfertaEnabled();
     syncOfferBadgeText();
     syncWhatsappFallback();
+    syncForceOpen();
     ensureRealDrivers().catch(() => {});
 
     const unsubscribeOffers = subscribeStorefrontOffersRealtime(syncOffers);
@@ -994,6 +1003,17 @@ const Admin = () => {
       await upsertStorefrontSetting(WHATSAPP_FALLBACK_KEY, nextValue);
     } catch {
       setWhatsappFallbackEnabled(!nextValue);
+    }
+  };
+
+  const toggleForceOpen = async () => {
+    const nextValue = !forceOpenEnabled;
+    setForceOpenEnabled(nextValue);
+    try {
+      await upsertStorefrontSetting(ORDERS_FORCE_OPEN_KEY, nextValue);
+    } catch {
+      setForceOpenEnabled(!nextValue);
+      toast.error('Ruajtja dështoi');
     }
   };
 
@@ -2291,6 +2311,28 @@ const Admin = () => {
                   }`}
                 >
                   {whatsappFallbackEnabled ? <><ToggleRight className="w-5 h-5" /> ON</> : <><ToggleLeft className="w-5 h-5" /> OFF</>}
+                </button>
+              </div>
+            </div>
+
+            {/* Force-open override — temporarily ignore business hours so a test order can go through */}
+            <div className="bg-card rounded-2xl p-5 shadow-card border border-amber-500/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-semibold text-lg dark:text-white">
+                    🔓 Anashkalo Orarin
+                  </h3>
+                  <p className="text-xs text-muted-foreground dark:text-slate-400 mt-1">
+                    Lejon porosi edhe jashtë orarit — përdore vetëm për testim, pastaj fike
+                  </p>
+                </div>
+                <button
+                  onClick={toggleForceOpen}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    forceOpenEnabled ? 'bg-amber-500 text-white' : 'bg-secondary text-muted-foreground'
+                  }`}
+                >
+                  {forceOpenEnabled ? <><ToggleRight className="w-5 h-5" /> ON</> : <><ToggleLeft className="w-5 h-5" /> OFF</>}
                 </button>
               </div>
             </div>

@@ -13,6 +13,8 @@ export {
   DEFAULT_CATEGORY_ORDER,
   CAGLLAVICE_UNAVAILABLE_KEY,
   DEFAULT_CAGLLAVICE_UNAVAILABLE,
+  ORDERS_FORCE_OPEN_KEY,
+  DEFAULT_ORDERS_FORCE_OPEN,
   type StorefrontOffer,
   deleteStorefrontOffer,
   ensureStorefrontSetting,

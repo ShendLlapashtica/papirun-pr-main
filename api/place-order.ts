@@ -27,7 +27,18 @@ function suggestLocationId(lat: number | null, lng: number | null, address = '')
   return dC < dQ ? 'cagllavice' : 'qender';
 }
 
+async function isForceOpen(): Promise<boolean> {
+  const { data } = await supabase
+    .from('storefront_settings')
+    .select('value_json')
+    .eq('key', 'orders_force_open')
+    .maybeSingle();
+  return data?.value_json === true;
+}
+
 async function isOpenNow(locationId: string): Promise<boolean> {
+  if (await isForceOpen()) return true;
+
   const { data } = await supabase
     .from('storefront_locations')
     .select('open_days, open_minute, close_minute')
