@@ -81,6 +81,12 @@ const isCagllavice = (o: OrderRecord): boolean => {
   return false;
 };
 
+const matchesLocationFilter = (o: OrderRecord, loc: 'all' | 'qender' | 'cagllavice'): boolean => {
+  if (loc === 'cagllavice') return isCagllavice(o);
+  if (loc === 'qender') return !isCagllavice(o);
+  return true;
+};
+
 const CATEGORY_LABEL: Record<string, string> = {
   salad: 'Salad',
   fajita: 'Fajita',
@@ -727,26 +733,28 @@ const OrdersReview = ({
   const isInHistory = (o: OrderRecord) =>
     o.isVisible === false || archivedIds.has(o.id) || o.status === 'completed' || o.status === 'rejected';
 
+  const effectiveLocFilter = caglOnly ? 'cagllavice' : locationFilter;
+
   const counts = useMemo(() => {
-    const visible = timeFilteredByCreated.filter((o) => !isInHistory(o));
+    const visible = timeFilteredByCreated.filter((o) => !isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter));
     return {
       pending: visible.filter((o) => o.status === 'pending').length,
       approved: visible.filter((o) => ['approved', 'preparing', 'out_for_delivery', 'completed'].includes(o.status)).length,
-      history: timeFilteredByCreated.filter(isInHistory).length,
+      history: timeFilteredByCreated.filter((o) => isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter)).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFilteredByCreated, archivedIds]);
+  }, [timeFilteredByCreated, archivedIds, effectiveLocFilter]);
 
   const historyCounts = useMemo(() => {
-    const histByCreated = timeFilteredByCreated.filter(isInHistory);
-    const histByResolved = timeFilteredByResolved.filter(isInHistory);
+    const histByCreated = timeFilteredByCreated.filter((o) => isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter));
+    const histByResolved = timeFilteredByResolved.filter((o) => isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter));
     return {
       completed: histByResolved.filter((o) => o.status === 'completed').length,
       rejected: histByResolved.filter((o) => o.status === 'rejected').length,
       all: histByCreated.length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFilteredByCreated, timeFilteredByResolved, archivedIds]);
+  }, [timeFilteredByCreated, timeFilteredByResolved, archivedIds, effectiveLocFilter]);
 
   const rrugesDelivering = useMemo(() => {
     const byDriver = new Map<string, OrderRecord[]>();
@@ -788,9 +796,7 @@ const OrdersReview = ({
         }
       })();
       if (!matchesStatus) return false;
-      const effectiveLocFilter = caglOnly ? 'cagllavice' : locationFilter;
-      if (effectiveLocFilter === 'cagllavice' && !isCagllavice(o)) return false;
-      if (effectiveLocFilter === 'qender' && isCagllavice(o)) return false;
+      if (!matchesLocationFilter(o, effectiveLocFilter)) return false;
       if (!q) return true;
       const itemsStr = o.items.map((i: any) => `${i.name?.sq || ''} ${i.name?.en || ''}`).join(' ').toLowerCase();
       return (
@@ -808,7 +814,7 @@ const OrdersReview = ({
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFilteredByCreated, timeFilteredByResolved, statusFilter, historyOutcomeFilter, archivedIds, priorityIds, searchQuery, caglOnly, locationFilter]);
+  }, [timeFilteredByCreated, timeFilteredByResolved, statusFilter, historyOutcomeFilter, archivedIds, priorityIds, searchQuery, effectiveLocFilter]);
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) ?? null, [orders, selectedId]);
 
