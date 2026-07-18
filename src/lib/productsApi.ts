@@ -11,6 +11,8 @@ export {
   WHATSAPP_FALLBACK_KEY,
   CATEGORY_ORDER_KEY,
   DEFAULT_CATEGORY_ORDER,
+  CAGLLAVICE_UNAVAILABLE_KEY,
+  DEFAULT_CAGLLAVICE_UNAVAILABLE,
   type StorefrontOffer,
   deleteStorefrontOffer,
   ensureStorefrontSetting,
@@ -51,7 +53,6 @@ type ProductRow = {
   rating: number;
   review_count: number;
   is_available: boolean;
-  is_available_cagllavice: boolean;
 };
 
 type MenuExtraRow = {
@@ -77,7 +78,11 @@ const mapRowToMenuItem = (row: ProductRow): MenuItem => ({
   rating: Number(row.rating),
   reviewCount: row.review_count,
   isAvailable: row.is_available,
-  isAvailableOnCagllavice: row.is_available_cagllavice,
+  // Real value is merged in from the cagllavice_unavailable_ids storefront
+  // setting by useLiveMenuItems — there is no DB column for this (see
+  // CAGLLAVICE_UNAVAILABLE_KEY). Default true so any direct caller of this
+  // mapper still gets a valid MenuItem.
+  isAvailableOnCagllavice: true,
 });
 
 const mapMenuExtraRow = (row: MenuExtraRow): MenuExtra => ({
@@ -101,7 +106,6 @@ const mapMenuItemToInsert = (item: MenuItem): TablesInsert<'products'> => ({
   extras: item.extras,
   crunch_level: item.crunchLevel,
   is_available: item.isAvailable,
-  is_available_cagllavice: item.isAvailableOnCagllavice,
 });
 
 const mapMenuItemPatchToUpdate = (updates: Partial<MenuItem>): TablesUpdate<'products'> => {
@@ -124,7 +128,8 @@ const mapMenuItemPatchToUpdate = (updates: Partial<MenuItem>): TablesUpdate<'pro
   if (updates.extras) payload.extras = updates.extras;
   if (typeof updates.crunchLevel === 'number') payload.crunch_level = updates.crunchLevel;
   if (typeof updates.isAvailable === 'boolean') payload.is_available = updates.isAvailable;
-  if (typeof updates.isAvailableOnCagllavice === 'boolean') payload.is_available_cagllavice = updates.isAvailableOnCagllavice;
+  // isAvailableOnCagllavice is intentionally not persisted here — it lives in
+  // the cagllavice_unavailable_ids storefront setting, not a products column.
 
   return payload;
 };
@@ -164,7 +169,6 @@ export const diffMenuItem = (before: MenuItem, after: MenuItem): Partial<MenuIte
   if (JSON.stringify(after.extras) !== JSON.stringify(before.extras)) patch.extras = after.extras;
   if (after.crunchLevel !== before.crunchLevel) patch.crunchLevel = after.crunchLevel;
   if (after.isAvailable !== before.isAvailable) patch.isAvailable = after.isAvailable;
-  if (after.isAvailableOnCagllavice !== before.isAvailableOnCagllavice) patch.isAvailableOnCagllavice = after.isAvailableOnCagllavice;
   return patch;
 };
 

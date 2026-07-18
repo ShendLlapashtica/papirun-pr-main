@@ -17,6 +17,8 @@ import {
   WHATSAPP_FALLBACK_KEY,
   CATEGORY_ORDER_KEY,
   DEFAULT_CATEGORY_ORDER,
+  CAGLLAVICE_UNAVAILABLE_KEY,
+  DEFAULT_CAGLLAVICE_UNAVAILABLE,
   type StorefrontOffer,
   deleteStorefrontOffer,
   deleteMenuExtra,
@@ -827,9 +829,14 @@ const Admin = () => {
   const toggleCagllaviceAvailability = async (id: string) => {
     const target = items.find((item) => item.id === id);
     if (!target) return;
+    const nextAvailable = !target.isAvailableOnCagllavice;
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, isAvailableOnCagllavice: nextAvailable } : it)));
     try {
-      await handleUpdate(id, { isAvailableOnCagllavice: !target.isAvailableOnCagllavice });
+      const current = await fetchStorefrontSetting<string[]>(CAGLLAVICE_UNAVAILABLE_KEY, DEFAULT_CAGLLAVICE_UNAVAILABLE);
+      const next = nextAvailable ? current.filter((x) => x !== id) : [...current, id];
+      await upsertStorefrontSetting(CAGLLAVICE_UNAVAILABLE_KEY, next);
     } catch {
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, isAvailableOnCagllavice: !nextAvailable } : it)));
       toast.error(language === 'sq' ? 'Ruajtja dështoi' : 'Save failed');
     }
   };

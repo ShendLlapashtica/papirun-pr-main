@@ -74,7 +74,6 @@ describe('diffMenuItem', () => {
       extras: after.extras,
       crunchLevel: after.crunchLevel,
       isAvailable: after.isAvailable,
-      isAvailableOnCagllavice: after.isAvailableOnCagllavice,
     });
   });
 });

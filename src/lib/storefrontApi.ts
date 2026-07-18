@@ -18,6 +18,11 @@ export const DEFAULT_OFFER_BADGE_TEXT = 'Vetëm në pikën Papirun Çagllavicë'
 export const CATEGORY_ORDER_KEY = 'category_order';
 export const DEFAULT_CATEGORY_ORDER: string[] = ['salad', 'fajita', 'sandwich', 'sides', 'drink'];
 
+// Product ids not stocked at the Çagllavicë branch. Stored as a settings row
+// instead of a products.* column so it works without a DB migration.
+export const CAGLLAVICE_UNAVAILABLE_KEY = 'cagllavice_unavailable_ids';
+export const DEFAULT_CAGLLAVICE_UNAVAILABLE: string[] = [];
+
 export interface StorefrontOffer extends OfferItem {
   isActive: boolean;
   sortOrder: number;

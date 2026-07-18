@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { menuItems as initialMenuItems, ofertaRamazani as initialOffers } from '@/data/menuData';
 import { defaultMenuExtras } from '@/data/menuExtras';
 import type { MenuItem } from '@/types/menu';
@@ -15,7 +15,7 @@ import {
   subscribeStorefrontOffersRealtime,
   subscribeStorefrontSettingsRealtime,
 } from '@/lib/productsApi';
-import { OFFERS_SECTION_ENABLED_KEY, OFFER_BADGE_TEXT_KEY, DEFAULT_OFFER_BADGE_TEXT, CATEGORY_ORDER_KEY, DEFAULT_CATEGORY_ORDER } from '@/lib/storefrontApi';
+import { OFFERS_SECTION_ENABLED_KEY, OFFER_BADGE_TEXT_KEY, DEFAULT_OFFER_BADGE_TEXT, CATEGORY_ORDER_KEY, DEFAULT_CATEGORY_ORDER, CAGLLAVICE_UNAVAILABLE_KEY, DEFAULT_CAGLLAVICE_UNAVAILABLE } from '@/lib/storefrontApi';
 
 // Build a lookup of local bundled images by product id
 const localImageMap = new Map<string, string>();
@@ -54,6 +54,7 @@ const PRODUCTS_CACHE_KEY = 'papirun_products_cache';
 const EXTRAS_CACHE_KEY = 'papirun_extras_cache';
 const OFFERS_CACHE_KEY = 'papirun_storefront_offers_cache';
 const OFERTA_ENABLED_CACHE_KEY = 'papirun_storefront_offers_enabled_cache';
+const CAGLLAVICE_UNAVAILABLE_CACHE_KEY = 'papirun_cagllavice_unavailable_cache';
 
 const applyLocalImages = (items: MenuItem[]): MenuItem[] =>
   items.map((item) => {
@@ -65,11 +66,22 @@ const applyLocalImages = (items: MenuItem[]): MenuItem[] =>
     return item;
   });
 
+// Cagllavicë per-product availability lives in a storefront setting
+// (CAGLLAVICE_UNAVAILABLE_KEY), not a products.* column — always recompute
+// from the latest ids list so a product flips back to available the moment
+// it's removed from the list.
+const applyCagllaviceFlags = (items: MenuItem[], unavailableIds: string[]): MenuItem[] => {
+  const unavailableSet = new Set(unavailableIds);
+  return items.map((item) => ({ ...item, isAvailableOnCagllavice: !unavailableSet.has(item.id) }));
+};
+
 export const useLiveMenuItems = () => {
   const cached = readCache<MenuItem[]>(PRODUCTS_CACHE_KEY);
+  const cachedUnavailable = readCache<string[]>(CAGLLAVICE_UNAVAILABLE_CACHE_KEY) ?? DEFAULT_CAGLLAVICE_UNAVAILABLE;
   // Apply localImageMap immediately to fix stale hash paths from previous builds
   const initialItems = cached ? applyLocalImages(cached) : initialMenuItems;
-  const [items, setItems] = useState<MenuItem[]>(initialItems);
+  const [rawItems, setRawItems] = useState<MenuItem[]>(initialItems);
+  const [unavailableIds, setUnavailableIds] = useState<string[]>(cachedUnavailable);
   const [isLoading, setIsLoading] = useState(!cached);
 
   useEffect(() => {
@@ -78,7 +90,7 @@ export const useLiveMenuItems = () => {
     const syncFromDatabase = async () => {
       const timeout = setTimeout(() => {
         if (isMounted && isLoading) {
-          setItems(applyLocalImages(initialMenuItems));
+          setRawItems(applyLocalImages(initialMenuItems));
           setIsLoading(false);
         }
       }, 5000);
@@ -89,7 +101,7 @@ export const useLiveMenuItems = () => {
 
         const merged = applyLocalImages(liveItems);
         if (isMounted) {
-          setItems(merged);
+          setRawItems(merged);
           setIsLoading(false);
           writeCache(PRODUCTS_CACHE_KEY, merged);
         }
@@ -97,10 +109,20 @@ export const useLiveMenuItems = () => {
         clearTimeout(timeout);
         console.error('Failed to sync products from database:', error);
         if (isMounted) {
-          setItems(applyLocalImages(initialMenuItems));
+          setRawItems(applyLocalImages(initialMenuItems));
           setIsLoading(false);
         }
       }
+    };
+
+    const syncCagllaviceUnavailable = async () => {
+      try {
+        const ids = await fetchStorefrontSetting<string[]>(CAGLLAVICE_UNAVAILABLE_KEY, DEFAULT_CAGLLAVICE_UNAVAILABLE);
+        if (isMounted) {
+          setUnavailableIds(ids);
+          writeCache(CAGLLAVICE_UNAVAILABLE_CACHE_KEY, ids);
+        }
+      } catch { /* keep cached/default */ }
     };
 
     // Cross-tab sync: admin writes set 'papirun_products_mutated' in localStorage.
@@ -113,29 +135,21 @@ export const useLiveMenuItems = () => {
     // 30-second poll as fallback when Supabase realtime is silent.
     const poll = setInterval(syncFromDatabase, 30_000);
 
-    if (cached) {
-      setIsLoading(false);
-      // Sync immediately in the background (was 2000ms delay — now 0).
-      syncFromDatabase();
-      const unsubRealtime = subscribeProductsRealtime(() => syncFromDatabase());
-      return () => {
-        isMounted = false;
-        clearInterval(poll);
-        window.removeEventListener('storage', onStorageMutation);
-        unsubRealtime();
-      };
-    }
-
     syncFromDatabase();
+    syncCagllaviceUnavailable();
 
     const unsubRealtime = subscribeProductsRealtime(() => syncFromDatabase());
+    const unsubSettings = subscribeStorefrontSettingsRealtime(() => syncCagllaviceUnavailable());
     return () => {
       isMounted = false;
       clearInterval(poll);
       window.removeEventListener('storage', onStorageMutation);
       unsubRealtime();
+      unsubSettings();
     };
   }, []);
+
+  const items = useMemo(() => applyCagllaviceFlags(rawItems, unavailableIds), [rawItems, unavailableIds]);
 
   return { items, isLoading };
 };

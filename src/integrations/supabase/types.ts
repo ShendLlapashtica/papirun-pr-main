@@ -378,7 +378,6 @@ export type Database = {
           image_url: string
           ingredients: string[]
           is_available: boolean
-          is_available_cagllavice: boolean
           likes: number
           name_en: string
           name_sq: string
@@ -399,7 +398,6 @@ export type Database = {
           image_url?: string
           ingredients?: string[]
           is_available?: boolean
-          is_available_cagllavice?: boolean
           likes?: number
           name_en: string
           name_sq: string
@@ -420,7 +418,6 @@ export type Database = {
           image_url?: string
           ingredients?: string[]
           is_available?: boolean
-          is_available_cagllavice?: boolean
           likes?: number
           name_en?: string
           name_sq?: string
