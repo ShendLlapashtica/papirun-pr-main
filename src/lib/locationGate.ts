@@ -34,3 +34,25 @@ export const saveLocationChoice = (choice: LocationChoice): void => {
 export const clearLocationChoice = (): void => {
   try { localStorage.removeItem(GATE_CACHE_KEY); } catch { /* ignore */ }
 };
+
+// Routes where the branch gate/banner must NOT appear: the app-shell (still a
+// separate, deferred pass) and staff/utility routes that aren't a customer
+// ordering surface. Everything else — homepage, product pages, offer pages —
+// is a place a customer could reach checkout from, so the gate applies there.
+const EXEMPT_ROUTE_PREFIXES = [
+  '/home',
+  '/app/product',
+  '/admin',
+  '/driver',
+  '/login',
+  '/invoice',
+  '/privacy',
+  '/auth/callback',
+  '/signup',
+  '/verify',
+];
+
+export const isGateExemptRoute = (pathname: string): boolean => {
+  const p = pathname.toLowerCase();
+  return EXEMPT_ROUTE_PREFIXES.some((prefix) => p.startsWith(prefix));
+};
