@@ -11,7 +11,9 @@ const LocationGateStep1 = ({ onPick }: LocationGateStep1Props) => {
 
   return (
     <div className="fixed inset-0 z-[200] bg-background flex flex-col items-center justify-center px-6 transition-opacity duration-300">
-      <img src={logo} alt="Papirun" className="w-20 h-20 rounded-2xl shadow-card mb-6" />
+      <div className="w-20 h-20 rounded-2xl overflow-hidden bg-primary shadow-card flex items-center justify-center mb-6">
+        <img src={logo} alt="Papirun" className="w-full h-full object-cover" />
+      </div>
       <h1 className="font-display font-bold text-xl sm:text-2xl text-foreground mb-1 text-center">
         {language === 'sq' ? 'Zgjedhni Pikën' : 'Choose Your Location'}
       </h1>
