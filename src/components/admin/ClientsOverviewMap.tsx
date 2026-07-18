@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { toast } from 'sonner';
-import { assignDriverToOrder, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
+import { assignDriverToOrder, RESTAURANT_COORDS, driversForBranch, type DeliveryDriver } from '@/lib/driversApi';
 import { type OrderRecord } from '@/lib/ordersApi';
 import { X } from 'lucide-react';
 
@@ -127,11 +127,26 @@ export default function ClientsOverviewMap({ orders, drivers, onClose }: Props) 
 
       <div ref={mapRef} className="flex-1 min-h-0" style={{ minHeight: 320 }} />
 
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && (() => {
+        const selectedBranches = new Set(
+          Array.from(selectedIds)
+            .map((id) => orders.find((o) => o.id === id)?.suggestedLocation)
+            .filter((b): b is NonNullable<typeof b> => !!b)
+        );
+        const isMixedBranch = selectedBranches.size > 1;
+        const eligibleDrivers = isMixedBranch
+          ? []
+          : driversForBranch(drivers.filter((d) => d.isActive), [...selectedBranches][0] ?? 'qender');
+        return (
         <div className="px-3 py-2.5 bg-card border-t border-border/40 shrink-0">
           <p className="text-[11px] text-muted-foreground mb-1.5">Cakto {selectedIds.size} porosi tek shoferi:</p>
           <div className="flex flex-wrap gap-1.5">
-            {drivers.filter((d) => d.isActive).map((d) => {
+            {isMixedBranch && (
+              <span className="text-xs text-destructive font-medium py-1.5">
+                Zgjedhja përfshin porosi nga të dy degët — zgjidh porosi vetëm nga një degë
+              </span>
+            )}
+            {eligibleDrivers.map((d) => {
               const emoji = d.isReturning ? '🏁' : d.isPaused ? '☕' : '✅';
               return (
                 <button
@@ -152,7 +167,8 @@ export default function ClientsOverviewMap({ orders, drivers, onClose }: Props) 
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {selectedIds.size === 0 && (
         <div className="px-4 py-2 bg-card border-t border-border/40 shrink-0">

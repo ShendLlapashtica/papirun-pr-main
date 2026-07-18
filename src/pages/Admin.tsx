@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback, Component, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, Component, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, Check, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map, KeyRound, Bell, Moon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchDrivers, createDriver, updateDriver, deleteDriver, ensureRealDrivers, subscribeAllDriverLocations, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, createDriver, updateDriver, deleteDriver, ensureRealDrivers, subscribeAllDriverLocations, haversineKm, RESTAURANT_COORDS, setDriverBranch, driversForBranch, type DeliveryDriver } from '@/lib/driversApi';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import { menuItems as initialMenuItems, ofertaRamazani as initialOffers } from '@/data/menuData';
 import { defaultMenuExtras } from '@/data/menuExtras';
@@ -188,7 +188,7 @@ const SiteTextsEditor = ({ language }: { language: Language }) => {
   );
 };
 
-type AdminProfile = 'qendra' | 'cagllavice';
+export type AdminProfile = 'qendra' | 'cagllavice';
 
 const profileFromEmail = (email: string): AdminProfile => {
   const username = email.split('@')[0].toLowerCase();
@@ -196,7 +196,7 @@ const profileFromEmail = (email: string): AdminProfile => {
 };
 
 // ---- Drivers Manager ----
-const DriversManager = () => {
+const DriversManager = ({ profile }: { profile: AdminProfile }) => {
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -241,6 +241,17 @@ const DriversManager = () => {
 
   const toggleActive = async (d: DeliveryDriver) => {
     try { await updateDriver(d.id, { isActive: !d.isActive }); reload(); } catch {}
+  };
+
+  const handleToggleBranch = async (d: DeliveryDriver) => {
+    const nextBranch = d.branch === 'cagllavice' ? 'qender' : 'cagllavice';
+    setDrivers((prev) => prev.map((x) => (x.id === d.id ? { ...x, branch: nextBranch } : x)));
+    try {
+      await setDriverBranch(d.id, nextBranch);
+    } catch {
+      setDrivers((prev) => prev.map((x) => (x.id === d.id ? { ...x, branch: d.branch } : x)));
+      toast.error('Ruajtja dështoi');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -295,7 +306,7 @@ const DriversManager = () => {
         <p className="text-sm text-muted-foreground py-4 text-center">Nuk ka shoferë. Shto njërin me butonin lart.</p>
       ) : (
         <div className="space-y-2">
-          {drivers.filter((d) => d.isActive).map((d) => (
+          {(profile === 'cagllavice' ? driversForBranch(drivers, 'cagllavice') : drivers).filter((d) => d.isActive).map((d) => (
             <div key={d.id} className={`bg-card rounded-2xl p-4 shadow-card border border-border/40 transition-opacity ${!d.isActive ? 'opacity-60' : ''}`}>
               {editingId === d.id ? (
                 <div className="space-y-2">
@@ -323,6 +334,14 @@ const DriversManager = () => {
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${d.isActive ? 'bg-emerald-500/15 text-emerald-600' : 'bg-secondary text-muted-foreground'}`}>
                         {d.isActive ? 'Aktiv' : 'Jo aktiv'}
                       </span>
+                      {profile === 'qendra' && (
+                        <button
+                          onClick={() => handleToggleBranch(d)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider transition-colors ${d.branch === 'cagllavice' ? 'bg-purple-500/15 text-purple-600' : 'bg-blue-500/15 text-blue-600'}`}
+                        >
+                          {d.branch === 'cagllavice' ? 'Çagllavicë' : 'Qendër'}
+                        </button>
+                      )}
                     </div>
                     {d.phone && (
                       <div className="flex items-center gap-2 mt-1">
@@ -590,6 +609,10 @@ const Admin = () => {
 
   // Harta tab — live driver list
   const [hartaDrivers, setHartaDrivers] = useState<DeliveryDriver[]>([]);
+  const hartaDriversFiltered = useMemo(
+    () => (profile === 'cagllavice' ? driversForBranch(hartaDrivers, 'cagllavice') : hartaDrivers),
+    [hartaDrivers, profile]
+  );
   useEffect(() => {
     if (activeTab !== 'harta') return;
     const refresh = () => fetchDrivers().then(setHartaDrivers).catch(console.error);
@@ -1429,8 +1452,8 @@ const Admin = () => {
         {activeTab === 'users' && <SubscribersList />}
         {activeTab === 'drivers' && (
           <div className="space-y-8">
-            <DriversKPI />
-            <DriversManager />
+            <DriversKPI branch={profile === 'cagllavice' ? 'cagllavice' : 'qender'} />
+            <DriversManager profile={profile!} />
           </div>
         )}
         {activeTab === 'harta' && (
@@ -1443,7 +1466,7 @@ const Admin = () => {
                 <div>
                   <h2 className="font-display font-bold text-lg">Harta Live e Shoferëve</h2>
                   <p className="text-xs text-muted-foreground">
-                    {hartaDrivers.filter((d) => d.lat != null).length} / {hartaDrivers.length} shoferë aktiv · rifresohet çdo 5s
+                    {hartaDriversFiltered.filter((d) => d.lat != null).length} / {hartaDriversFiltered.length} shoferë aktiv · rifresohet çdo 5s
                   </p>
                 </div>
               </div>
@@ -1454,10 +1477,10 @@ const Admin = () => {
                 <RefreshCw className="w-3.5 h-3.5" /> Rifresko
               </button>
             </div>
-            <DriverLocationMap drivers={hartaDrivers} height="600px" allowFullscreen showRestaurant />
+            <DriverLocationMap drivers={hartaDriversFiltered} height="600px" allowFullscreen showRestaurant />
             {/* Driver legend with distances */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {hartaDrivers.map((d) => {
+              {hartaDriversFiltered.map((d) => {
                 const dist = d.lat != null && d.lng != null
                   ? haversineKm(RESTAURANT_COORDS.lat, RESTAURANT_COORDS.lng, d.lat, d.lng)
                   : null;

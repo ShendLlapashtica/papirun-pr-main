@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, haversineKm, RESTAURANT_COORDS, subscribeAllDriverStates, type DeliveryDriver } from '@/lib/driversApi';
-import { fetchAllOrders, hardDeleteAllOrders, type OrderRecord } from '@/lib/ordersApi';
+import { fetchDrivers, setDriverPause, approvePause, driverShortCode, resetAllDriverTimers, haversineKm, RESTAURANT_COORDS, subscribeAllDriverStates, driversForBranch, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchAllOrders, hardDeleteAllOrders, type OrderRecord, type OrderLocation } from '@/lib/ordersApi';
 import { Star, Zap, Clock, X, ChevronRight, Coffee, CheckCheck, TrendingUp, CheckCircle2, AlertCircle, Trash2, Loader2, Phone } from 'lucide-react';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import {
@@ -375,7 +375,11 @@ function DriverDetailModal({ driver, completed, waitMs, isBusy, ect, avgRating, 
 
 // ── component ─────────────────────────────────────────────────────────────────
 
-export default function DriversKPI() {
+interface DriversKPIProps {
+  branch: OrderLocation;
+}
+
+export default function DriversKPI({ branch }: DriversKPIProps) {
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [tick, setTick] = useState(Date.now());
@@ -384,9 +388,9 @@ export default function DriversKPI() {
   const [cleaning, setCleaning] = useState(false);
 
   const load = useCallback(() => {
-    fetchDrivers().then(setDrivers).catch(console.error);
+    fetchDrivers().then((d) => setDrivers(driversForBranch(d, branch))).catch(console.error);
     fetchAllOrders().then(setOrders).catch(console.error);
-  }, []);
+  }, [branch]);
 
   useEffect(() => {
     load();

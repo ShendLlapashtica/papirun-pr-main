@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
+import { assignDriverToOrder, driversForBranch, type DeliveryDriver } from '@/lib/driversApi';
 import { type OrderRecord } from '@/lib/ordersApi';
 import { Loader2, Trash2 } from 'lucide-react';
 
@@ -16,6 +16,16 @@ export default function BulkAssignBar({ selectedIds, orders, drivers, onDone, on
   const [assigning, setAssigning] = useState(false);
 
   if (selectedIds.size === 0) return null;
+
+  const selectedBranches = new Set(
+    Array.from(selectedIds)
+      .map((id) => orders.find((o) => o.id === id)?.suggestedLocation)
+      .filter((b): b is NonNullable<typeof b> => !!b)
+  );
+  const isMixedBranch = selectedBranches.size > 1;
+  const eligibleDrivers = isMixedBranch
+    ? []
+    : driversForBranch(drivers.filter((d) => d.isActive), [...selectedBranches][0] ?? 'qender');
 
   const handleAssign = async (driver: DeliveryDriver) => {
     setAssigning(true);
@@ -48,7 +58,12 @@ export default function BulkAssignBar({ selectedIds, orders, drivers, onDone, on
           {assigning && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {drivers.filter((d) => d.isActive).map((d) => {
+          {isMixedBranch && (
+            <span className="text-xs text-destructive font-medium py-2">
+              Zgjedhja përfshin porosi nga të dy degët — zgjidh porosi vetëm nga një degë
+            </span>
+          )}
+          {eligibleDrivers.map((d) => {
             const emoji = d.isReturning ? '🏁' : d.isPaused ? '☕' : '✅';
             return (
               <button

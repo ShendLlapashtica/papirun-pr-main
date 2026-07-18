@@ -21,7 +21,7 @@ import ClientsOverviewMap from '@/components/admin/ClientsOverviewMap';
 import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
 import { generateInvoice } from '@/lib/invoiceGenerator';
-import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllDriverLocations, driverShortCode, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
+import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllDriverLocations, driverShortCode, haversineKm, RESTAURANT_COORDS, driversForBranch, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import CustomerDriverMap from '@/components/CustomerDriverMap';
@@ -671,7 +671,7 @@ const OrdersReview = ({
                     await sendOrderMessage(o.id, 'admin', autoMsg);
                     await updateOrderStatus(o.id, 'approved', '');
                     await setOrderEta(o.id, DEFAULT_ETA);
-                    const bestId = pickBestDriver(driversRef.current, all);
+                    const bestId = pickBestDriver(driversForBranch(driversRef.current, o.suggestedLocation), all);
                     if (bestId) {
                       const target = driversRef.current.find((d) => d.id === bestId);
                       if (target) await assignDriverToOrder(o.id, target.id, { customerName: o.customerName, address: o.deliveryAddress, total: o.total });
@@ -2132,7 +2132,7 @@ const OrdersReview = ({
                   {o.status === 'approved' && !o.assignedDriverId && drivers.length > 0 && (
                     <div className="flex items-center gap-1 flex-wrap pt-1.5 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
                       <span className="text-[10px] text-muted-foreground font-medium shrink-0">Cakto →</span>
-                      {drivers.filter((d) => d.isActive).map((d) => {
+                      {driversForBranch(drivers.filter((d) => d.isActive), o.suggestedLocation).map((d) => {
                         const emoji = d.isReturning ? '🏁' : d.isPaused ? '☕' : '✅';
                         return (
                           <button
@@ -2343,7 +2343,7 @@ const OrdersReview = ({
                             <Bike className="w-3 h-3" /> Shoferi
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {drivers.map((d) => {
+                            {driversForBranch(drivers, selected.suggestedLocation).map((d) => {
                               const isAssigned = selected.assignedDriverId === d.id;
                               return (
                                 <button key={d.id} onClick={async () => { try { await assignDriverToOrder(selected.id, d.id, { customerName: selected.customerName, address: selected.deliveryAddress, total: selected.total }); toast.success(`Shoferi ${d.name} u caktua`); } catch { toast.error('Gabim'); } }} className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all active:scale-95 ${isAssigned ? 'bg-blue-600 text-white shadow' : 'bg-secondary hover:bg-blue-500/10'}`}>
@@ -2635,7 +2635,7 @@ const OrdersReview = ({
                     <Bike className="w-3 h-3" /> Shoferi
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {drivers.map((d) => {
+                    {driversForBranch(drivers, selected.suggestedLocation).map((d) => {
                       const isAssigned = selected.assignedDriverId === d.id;
                       return (
                         <button

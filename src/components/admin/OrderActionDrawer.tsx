@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { fetchQuickReplies, type QuickReply } from '@/lib/quickRepliesApi';
 import { sendOrderMessage } from '@/lib/orderMessagesApi';
 import { updateOrderStatus, fetchAllOrders, softDeleteOrder, type OrderRecord } from '@/lib/ordersApi';
-import { fetchDrivers, assignDriverToOrder, type DeliveryDriver } from '@/lib/driversApi';
+import { fetchDrivers, assignDriverToOrder, driversForBranch, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import { fetchLocations } from '@/lib/locationsApi';
 
@@ -56,7 +56,7 @@ const OrderActionDrawer = ({ order, mode, onClose }: Props) => {
     setRouteSuggestions([]);
     fetchQuickReplies(mode!).then(setReplies).catch(() => setReplies([]));
     if (isApprove) {
-      fetchDrivers().then((d) => setDrivers(d.filter((x) => x.isActive))).catch(() => {});
+      fetchDrivers().then((d) => setDrivers(driversForBranch(d.filter((x) => x.isActive), order?.suggestedLocation ?? 'qender'))).catch(() => {});
       fetchAllOrders().then(setAllOrders).catch(() => {});
       if (order?.deliveryLat && order?.deliveryLng) {
         const destLat = order.deliveryLat;

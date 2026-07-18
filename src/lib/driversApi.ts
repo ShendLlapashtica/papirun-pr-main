@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { OrderLocation } from '@/lib/ordersApi';
 
 export interface DeliveryDriver {
   id: string;
@@ -18,6 +19,7 @@ export interface DeliveryDriver {
   lat: number | null;
   lng: number | null;
   color: string | null;
+  branch: OrderLocation;     // which physical location this driver serves — defaults to 'qender'
 }
 
 /** e.g. Adhurimi → "AD6", Endriti → "EN1" */
@@ -46,6 +48,7 @@ type Row = {
 const TABLE = 'delivery_drivers';
 const LOC_PREFIX = 'driver_loc_';
 const PAUSE_PREFIX = 'driver_pause_';
+const BRANCH_PREFIX = 'driver_branch_';
 
 // Default color palette — assigned round-robin when creating new drivers
 export const DRIVER_COLORS = [
@@ -105,6 +108,22 @@ interface PauseEntry {
   availableSince?: number;
 }
 type PauseMap = Record<string, PauseEntry>;
+type BranchMap = Record<string, OrderLocation>;
+
+async function fetchBranchMap(): Promise<BranchMap> {
+  const client = supabase as any;
+  const { data, error } = await client
+    .from('storefront_settings')
+    .select('key, value_json')
+    .like('key', `${BRANCH_PREFIX}%`);
+  if (error || !data) return {};
+  const map: BranchMap = {};
+  for (const row of data as { key: string; value_json: any }[]) {
+    const id = row.key.replace(BRANCH_PREFIX, '');
+    if (row.value_json?.branch === 'cagllavice') map[id] = 'cagllavice';
+  }
+  return map;
+}
 
 async function fetchLocMap(): Promise<LocMap> {
   const client = supabase as any;
@@ -147,7 +166,7 @@ async function fetchPauseMap(): Promise<PauseMap> {
 }
 
 // ── Row mapper ────────────────────────────────────────────────────────────────
-const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 0): DeliveryDriver => {
+const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 0, branchMap: BranchMap = {}): DeliveryDriver => {
   const loc = locMap[row.id];
   const pause: PauseEntry = pauseMap[row.id] ?? { paused: false };
   return {
@@ -168,6 +187,7 @@ const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 
     lat: loc?.lat ?? (row.lat !== undefined && row.lat !== null ? Number(row.lat) : null),
     lng: loc?.lng ?? (row.lng !== undefined && row.lng !== null ? Number(row.lng) : null),
     color: getDriverColor(row, index),
+    branch: branchMap[row.id] === 'cagllavice' ? 'cagllavice' : 'qender',
   };
 };
 
@@ -175,24 +195,26 @@ const mapRow = (row: Row, locMap: LocMap = {}, pauseMap: PauseMap = {}, index = 
 
 export const fetchDrivers = async (): Promise<DeliveryDriver[]> => {
   const client = supabase as any;
-  const [{ data, error }, locMap, pauseMap] = await Promise.all([
+  const [{ data, error }, locMap, pauseMap, branchMap] = await Promise.all([
     client.from(TABLE).select('*').order('name'),
     fetchLocMap(),
     fetchPauseMap(),
+    fetchBranchMap(),
   ]);
   if (error) throw error;
-  return (data as Row[]).map((row, i) => mapRow(row, locMap, pauseMap, i));
+  return (data as Row[]).map((row, i) => mapRow(row, locMap, pauseMap, i, branchMap));
 };
 
 export const fetchDriverById = async (id: string): Promise<DeliveryDriver | null> => {
   const client = supabase as any;
-  const [{ data, error }, locMap, pauseMap] = await Promise.all([
+  const [{ data, error }, locMap, pauseMap, branchMap] = await Promise.all([
     client.from(TABLE).select('*').eq('id', id).maybeSingle(),
     fetchLocMap(),
     fetchPauseMap(),
+    fetchBranchMap(),
   ]);
   if (error) throw error;
-  return data ? mapRow(data as Row, locMap, pauseMap) : null;
+  return data ? mapRow(data as Row, locMap, pauseMap, 0, branchMap) : null;
 };
 
 export const createDriver = async (
@@ -250,6 +272,24 @@ const _upsertPause = async (id: string, entry: PauseEntry) => {
 export const requestDriverPause = async (id: string) => {
   await _upsertPause(id, { paused: false, pendingApproval: true });
 };
+
+/** Admin: assign a driver to a branch (defaults to 'qender' when no row exists) */
+export const setDriverBranch = async (id: string, branch: OrderLocation) => {
+  const client = supabase as any;
+  const { error } = await client
+    .from('storefront_settings')
+    .upsert(
+      { key: `${BRANCH_PREFIX}${id}`, value_json: { branch, t: Date.now() } },
+      { onConflict: 'key' }
+    );
+  if (error) throw error;
+};
+
+/** Filters a driver list down to only those belonging to the given branch — the
+ * single place "does this driver belong to this branch" is decided everywhere
+ * a driver gets offered/assigned for an order. */
+export const driversForBranch = (drivers: DeliveryDriver[], branch: OrderLocation): DeliveryDriver[] =>
+  drivers.filter((d) => (d.branch === 'cagllavice') === (branch === 'cagllavice'));
 
 /** Driver: go on pause immediately, no admin approval needed */
 export const setDriverPause = async (id: string, paused: boolean) => {
@@ -333,8 +373,9 @@ export const fetchDriverLocation = async (
 
 export const deleteDriver = async (id: string) => {
   const client = supabase as any;
-  // Also remove their location entry
+  // Also remove their location and branch entries
   await (client as any).from('storefront_settings').delete().eq('key', `${LOC_PREFIX}${id}`).catch(() => {});
+  await (client as any).from('storefront_settings').delete().eq('key', `${BRANCH_PREFIX}${id}`).catch(() => {});
   const { error } = await client.from(TABLE).delete().eq('id', id);
   if (error) throw error;
 };
@@ -566,7 +607,7 @@ export const subscribeAllDriverStates = (onChange: () => void) => {
       { event: '*', schema: 'public', table: 'storefront_settings' },
       (payload: any) => {
         const key: string = payload?.new?.key || payload?.old?.key || '';
-        if (key.startsWith(LOC_PREFIX) || key.startsWith(PAUSE_PREFIX)) onChange();
+        if (key.startsWith(LOC_PREFIX) || key.startsWith(PAUSE_PREFIX) || key.startsWith(BRANCH_PREFIX)) onChange();
       }
     )
     .subscribe();
