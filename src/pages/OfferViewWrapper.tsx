@@ -42,7 +42,7 @@ const OfferViewWrapper = () => {
         onClose={() => setIsCheckoutOpen(false)}
         items={cart}
         total={cartTotal}
-        onSuccess={clearCart}
+        onSuccess={() => { clearCart(); setIsTrayOpen(false); }}
       />
     </>
   );

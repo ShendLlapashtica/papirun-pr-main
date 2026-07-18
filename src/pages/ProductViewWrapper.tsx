@@ -35,7 +35,7 @@ const ProductViewWrapper = () => {
         onUpdateNote={updateNote}
       />
 
-      <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} items={cart} total={cartTotal} onSuccess={clearCart} />
+      <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} items={cart} total={cartTotal} onSuccess={() => { clearCart(); setIsTrayOpen(false); }} />
     </>
   );
 };
