@@ -1732,49 +1732,45 @@ const Admin = () => {
               {language === 'sq' ? 'Eksporto CSV (Backup)' : 'Export CSV (Backup)'}
             </button>
 
-            {(['sandwich', 'salad', 'fajita', 'sides', 'drink'] as const).map((cat) => {
-              const catItemsRaw = items.filter((i) => i.category === cat);
-              if (catItemsRaw.length === 0) return null;
-              const catItems = [...catItemsRaw].sort(
-                (a, b) => (productOrderCounts[b.id] || 0) - (productOrderCounts[a.id] || 0)
-              );
-              const catLabel = cat === 'sandwich' ? (language === 'sq' ? 'Sanduiçe' : 'Sandwiches')
-                : cat === 'salad' ? (language === 'sq' ? 'Sallata' : 'Salads')
-                : cat === 'fajita' ? (language === 'sq' ? 'Fajita' : 'Fajitas')
-                : cat === 'drink' ? (language === 'sq' ? 'Pijet' : 'Drinks')
-                : (language === 'sq' ? 'Supë & Ekstra' : 'Soup & Extras');
+            {(() => {
+              // Single global ranking across ALL categories (products.sort_order),
+              // so any product can be moved above/below any other regardless of
+              // category. Matches menu-baseline-2026-07-18 display data exactly;
+              // only the ranking mechanism changed.
+              const flatItems = items;
+              const CAT_BADGE: Record<string, { emoji: string; sq: string; en: string }> = {
+                salad:    { emoji: '🥗', sq: 'Sallata',       en: 'Salads' },
+                fajita:   { emoji: '🌯', sq: 'Fajita',        en: 'Fajitas' },
+                sandwich: { emoji: '🥪', sq: 'Sanduiçe',      en: 'Sandwiches' },
+                sides:    { emoji: '🍲', sq: 'Supë & Ekstra', en: 'Soup & Extras' },
+                drink:    { emoji: '🥤', sq: 'Pijet',         en: 'Drinks' },
+              };
 
               const moveItem = async (itemId: string, direction: 'up' | 'down') => {
-                const idx = catItems.findIndex(i => i.id === itemId);
+                const idx = flatItems.findIndex(i => i.id === itemId);
                 if (idx < 0) return;
                 const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-                if (swapIdx < 0 || swapIdx >= catItems.length) return;
-                
-                const allItems = [...items];
-                const aIdx = allItems.findIndex(i => i.id === catItems[idx].id);
-                const bIdx = allItems.findIndex(i => i.id === catItems[swapIdx].id);
-                
-                // swap sort orders
-                const newSortA = swapIdx;
-                const newSortB = idx;
-                
-                // swap in local state
-                [allItems[aIdx], allItems[bIdx]] = [allItems[bIdx], allItems[aIdx]];
-                setItems(allItems);
-                
-                // persist to DB
+                if (swapIdx < 0 || swapIdx >= flatItems.length) return;
+
+                const reordered = [...flatItems];
+                [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+                setItems(reordered);
+
+                // Renumber every item's sort_order to its new global position.
+                // Keeps ranks unique and collision-free from here on — the old
+                // per-category logic reset ranks to 0,1,2... inside each category,
+                // which is what caused categories to silently stomp on each
+                // other's numbers and made cross-category ordering impossible.
                 try {
-                  await updateProductSortOrder(catItems[idx].id, newSortA);
-                  await updateProductSortOrder(catItems[swapIdx].id, newSortB);
+                  await Promise.all(reordered.map((it, i) => updateProductSortOrder(it.id, i)));
                 } catch (err) {
                   console.error('Failed to update sort order:', err);
                 }
               };
 
               return (
-                <div key={cat} className="space-y-3">
-                  <h2 className="text-lg font-display font-bold text-primary mt-4 mb-1">{catLabel}</h2>
-                  {catItems.map((item, catIdx) => (
+                <div className="space-y-3">
+                  {flatItems.map((item, idx) => (
               <div
                 key={item.id}
                 className={`bg-card rounded-2xl p-4 shadow-card transition-all ${
@@ -1786,7 +1782,7 @@ const Admin = () => {
                   <div className="flex flex-col gap-0.5 shrink-0 pt-2">
                     <button
                       onClick={() => moveItem(item.id, 'up')}
-                      disabled={catIdx === 0}
+                      disabled={idx === 0}
                       className="p-1 rounded hover:bg-secondary disabled:opacity-20 transition-colors"
                       title={language === 'sq' ? 'Lart' : 'Move up'}
                     >
@@ -1794,7 +1790,7 @@ const Admin = () => {
                     </button>
                     <button
                       onClick={() => moveItem(item.id, 'down')}
-                      disabled={catIdx === catItems.length - 1}
+                      disabled={idx === flatItems.length - 1}
                       className="p-1 rounded hover:bg-secondary disabled:opacity-20 transition-colors"
                       title={language === 'sq' ? 'Poshtë' : 'Move down'}
                     >
@@ -2091,6 +2087,9 @@ const Admin = () => {
                             {item.name[language]}
                           </h3>
                           <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                              {CAT_BADGE[item.category]?.emoji} {CAT_BADGE[item.category]?.[language] ?? item.category}
+                            </span>
                             {(productOrderCounts[item.id] ?? 0) > 0 && (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
                                 📦 {(productOrderCounts[item.id] || 0).toLocaleString()}
@@ -2141,10 +2140,10 @@ const Admin = () => {
                   </div>
                 </div>
               </div>
-            ))}
+                  ))}
                 </div>
               );
-            })}
+            })()}
           </div>
         )}
 
