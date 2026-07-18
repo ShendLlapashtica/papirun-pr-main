@@ -23,11 +23,6 @@ export const DEFAULT_CATEGORY_ORDER: string[] = ['salad', 'fajita', 'sandwich', 
 export const CAGLLAVICE_UNAVAILABLE_KEY = 'cagllavice_unavailable_ids';
 export const DEFAULT_CAGLLAVICE_UNAVAILABLE: string[] = [];
 
-// Temporary "ignore business hours" override — lets an admin place/accept
-// test orders outside normal hours without it staying on by accident.
-export const ORDERS_FORCE_OPEN_KEY = 'orders_force_open';
-export const DEFAULT_ORDERS_FORCE_OPEN = false;
-
 export interface StorefrontOffer extends OfferItem {
   isActive: boolean;
   sortOrder: number;

@@ -12,7 +12,7 @@ import { createOrder, detectOrderSource, suggestOrderLocation } from '@/lib/orde
 import { setActiveOrderId, clearActiveOrderId } from '@/components/OrderTrackingPill';
 import { fetchAddresses, deleteAddress, type SavedAddress } from '@/lib/addressesApi';
 import { fetchStorefrontSetting } from '@/lib/storefrontApi';
-import { WHATSAPP_FALLBACK_KEY, ORDERS_FORCE_OPEN_KEY, DEFAULT_ORDERS_FORCE_OPEN } from '@/lib/storefrontApi';
+import { WHATSAPP_FALLBACK_KEY } from '@/lib/storefrontApi';
 import { fetchLocations, isLocationOpenNow, formatNextOpenStatus, type StorefrontLocation } from '@/lib/locationsApi';
 import { getSavedLocationChoice } from '@/lib/locationGate';
 
@@ -41,21 +41,12 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [whatsappFallbackEnabled, setWhatsappFallbackEnabled] = useState(true);
   const [locations, setLocations] = useState<StorefrontLocation[]>([]);
-  const [forceOpen, setForceOpen] = useState(DEFAULT_ORDERS_FORCE_OPEN);
 
   useEffect(() => {
     fetchStorefrontSetting<boolean>(WHATSAPP_FALLBACK_KEY, true)
       .then(setWhatsappFallbackEnabled)
       .catch(() => {});
   }, []);
-
-  // Admin can temporarily disable the closed-hours block for testing.
-  useEffect(() => {
-    if (!isOpen) return;
-    fetchStorefrontSetting<boolean>(ORDERS_FORCE_OPEN_KEY, DEFAULT_ORDERS_FORCE_OPEN)
-      .then(setForceOpen)
-      .catch(() => {});
-  }, [isOpen]);
 
   // Fetch business hours while checkout is open, so we can show "Mbyllur Tani" instead
   // of letting the customer submit an order that the backend will just auto-reject.
@@ -138,7 +129,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   const currentLocation = locations.length > 0
     ? locations.find((l) => l.id === gateBranch)
     : undefined;
-  const isClosedNow = !forceOpen && !!currentLocation && !isLocationOpenNow(currentLocation);
+  const isClosedNow = !!currentLocation && !isLocationOpenNow(currentLocation);
 
   const resetForm = () => {
     setFormData({ name: '', phone: '', address: '', notes: '' });
