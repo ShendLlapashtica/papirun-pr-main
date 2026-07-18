@@ -14,6 +14,7 @@ import { fetchAddresses, deleteAddress, type SavedAddress } from '@/lib/addresse
 import { fetchStorefrontSetting } from '@/lib/storefrontApi';
 import { WHATSAPP_FALLBACK_KEY } from '@/lib/storefrontApi';
 import { fetchLocations, isLocationOpenNow, formatNextOpenStatus, type StorefrontLocation } from '@/lib/locationsApi';
+import { getSavedLocationChoice } from '@/lib/locationGate';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -121,8 +122,12 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   const hasLocation = selectedPosition !== null && formData.address.trim().length > 0;
   const isFormValid = formData.name.trim() && formData.phone.trim() && hasLocation;
 
+  // The gate's explicit pick is the source of truth; only fall back to the
+  // address/geolocation guess if somehow no gate choice was saved.
+  const gateBranch = getSavedLocationChoice()?.branch
+    ?? suggestOrderLocation(selectedPosition?.[0] ?? null, selectedPosition?.[1] ?? null, formData.address);
   const currentLocation = locations.length > 0
-    ? locations.find((l) => l.id === suggestOrderLocation(selectedPosition?.[0] ?? null, selectedPosition?.[1] ?? null, formData.address))
+    ? locations.find((l) => l.id === gateBranch)
     : undefined;
   const isClosedNow = !!currentLocation && !isLocationOpenNow(currentLocation);
 
@@ -164,6 +169,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
         deliveryAddress: savedFormData.address.trim(),
         deliveryLat: savedPosition?.[0] ?? null,
         deliveryLng: savedPosition?.[1] ?? null,
+        locationId: gateBranch,
         items: savedItems,
         subtotal: savedTotal,
         deliveryFee,

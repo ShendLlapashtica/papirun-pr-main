@@ -60,8 +60,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   let status: 'pending' | 'rejected' = 'pending';
+  const locationId = b.locationId ?? suggestLocationId(b.deliveryLat ?? null, b.deliveryLng ?? null, String(b.deliveryAddress ?? ''));
   try {
-    const locationId = b.locationId ?? suggestLocationId(b.deliveryLat ?? null, b.deliveryLng ?? null, String(b.deliveryAddress ?? ''));
     if (!(await isOpenNow(locationId))) status = 'rejected';
   } catch (e) {
     console.error('hours check failed, defaulting to open:', e);
@@ -75,6 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     delivery_lat: b.deliveryLat ?? null,
     delivery_lng: b.deliveryLng ?? null,
     location_id: b.locationId ?? null,
+    suggested_location: locationId,
     items: b.items,
     subtotal: Number(b.subtotal),
     delivery_fee: Number(b.deliveryFee ?? 0),

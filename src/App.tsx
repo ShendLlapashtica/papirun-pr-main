@@ -20,6 +20,7 @@ import DriverPanel from "./pages/DriverPanel";
 import InvoicePage from "./pages/InvoicePage";
 import Privacy from "./pages/Privacy";
 import OrderTrackingPill from "@/components/OrderTrackingPill";
+import LocationGate from "@/components/locationGate/LocationGate";
 import { prewarmGeo } from "@/lib/geoCache";
 
 // Fire location request immediately — before any React component mounts.
@@ -68,6 +69,7 @@ const App = () => (
                 </Routes>
                 {/* Global pending overlay + status pill — visible on every route */}
                 <OrderTrackingPill />
+                <LocationGate />
               </TooltipProvider>
             </CartProvider>
           </FavoritesProvider>
