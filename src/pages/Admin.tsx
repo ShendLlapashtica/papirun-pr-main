@@ -457,7 +457,7 @@ const Admin = () => {
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editSnapshot, setEditSnapshot] = useState<MenuItem | null>(null);
   const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'harta' | 'databaze'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'menu' | 'cagmenu' | 'extras' | 'content' | 'offers' | 'users' | 'drivers' | 'harta' | 'databaze'>('orders');
   const [typingCount, setTypingCount] = useState(0);
   const [unreadOrders, setUnreadOrders] = useState<Array<{ id: string; name: string; count: number; urgent: boolean }>>([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
@@ -824,6 +824,16 @@ const Admin = () => {
     }
   };
 
+  const toggleCagllaviceAvailability = async (id: string) => {
+    const target = items.find((item) => item.id === id);
+    if (!target) return;
+    try {
+      await handleUpdate(id, { isAvailableOnCagllavice: !target.isAvailableOnCagllavice });
+    } catch {
+      toast.error(language === 'sq' ? 'Ruajtja dështoi' : 'Save failed');
+    }
+  };
+
   const addNewItem = async (overrides?: Partial<MenuItem>) => {
     const newItem: MenuItem = {
       id: `new-${Date.now()}`,
@@ -839,6 +849,7 @@ const Admin = () => {
       rating: 0,
       reviewCount: 0,
       isAvailable: true,
+      isAvailableOnCagllavice: true,
       ...overrides,
     };
     setItems((prev) => [newItem, ...prev]);
@@ -1361,7 +1372,7 @@ const Admin = () => {
         {/* Main tabs (big navbar) */}
         <div className="flex gap-2 mb-4 overflow-x-auto -mx-1 px-1">
           {(profile === 'cagllavice'
-            ? ['orders', 'drivers', 'harta'] as const
+            ? ['orders', 'drivers', 'harta', 'cagmenu'] as const
             : ['orders', 'drivers', 'harta', 'menu', 'offers', 'content', 'databaze', 'users'] as const
           ).map((tab) => (
             <button
@@ -1378,6 +1389,7 @@ const Admin = () => {
                 : tab === 'drivers' ? (language === 'sq' ? 'Shoferët' : 'Drivers')
                 : tab === 'harta' ? '🗺 Harta'
                 : tab === 'menu' ? (language === 'sq' ? 'Menuja' : 'Menu')
+                : tab === 'cagmenu' ? (language === 'sq' ? 'Menuja' : 'Menu')
                 : tab === 'offers' ? (language === 'sq' ? 'Ofertat' : 'Offers')
                 : tab === 'databaze' ? 'Databaze'
                 : (language === 'sq' ? 'Tekstet' : 'Content')}
@@ -2144,6 +2156,47 @@ const Admin = () => {
                 </div>
               );
             })()}
+          </div>
+        )}
+
+        {/* Cagllavicë-only minimal menu view: single toggle per product, no edit/price/delete access */}
+        {activeTab === 'cagmenu' && (
+          <div className="space-y-2">
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border"
+              >
+                {item.image && (
+                  <img
+                    src={item.image}
+                    alt={item.name[language]}
+                    className="w-12 h-12 object-contain rounded-xl bg-white flex-shrink-0"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{item.name[language]}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{item.category}</p>
+                </div>
+                <button
+                  onClick={() => toggleCagllaviceAvailability(item.id)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
+                    item.isAvailableOnCagllavice
+                      ? 'bg-accent text-accent-foreground'
+                      : 'bg-destructive/10 text-destructive'
+                  }`}
+                >
+                  {item.isAvailableOnCagllavice ? (
+                    <Eye className="w-3 h-3" />
+                  ) : (
+                    <EyeOff className="w-3 h-3" />
+                  )}
+                  {item.isAvailableOnCagllavice
+                    ? (language === 'sq' ? 'Në Çagllavicë' : 'At Cagllavicë')
+                    : (language === 'sq' ? 'Jo në Çagllavicë' : 'Not at Cagllavicë')}
+                </button>
+              </div>
+            ))}
           </div>
         )}
 

@@ -19,6 +19,7 @@ export interface MenuItem {
   rating: number;
   reviewCount: number;
   isAvailable: boolean;
+  isAvailableOnCagllavice: boolean;
 }
 
 export interface CartItem extends MenuItem {

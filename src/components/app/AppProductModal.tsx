@@ -125,6 +125,11 @@ const AppProductModal = ({ item, isOpen, onClose }: Props) => {
               <div className="mb-3">
                 <h1 className="font-display font-bold text-xl leading-tight">{item.name[language]}</h1>
                 <p className="text-lg font-bold text-primary mt-1">€{item.price.toFixed(2)}</p>
+                {item.isAvailable && !item.isAvailableOnCagllavice && (
+                  <span className="inline-block mt-2 px-3 py-1 rounded-full bg-secondary text-[10px] font-bold uppercase tracking-wider">
+                    {language === 'sq' ? 'Vetëm në Papirun Qendër' : 'Only at Papirun Qendër'}
+                  </span>
+                )}
               </div>
 
               <p className="text-sm text-muted-foreground leading-relaxed mb-4">{item.description[language]}</p>

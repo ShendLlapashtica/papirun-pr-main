@@ -141,6 +141,11 @@ const AppProductView = () => {
               {language === 'sq' ? 'E shitur' : 'Sold out'}
             </span>
           )}
+          {item.isAvailable && !item.isAvailableOnCagllavice && (
+            <span className="px-3 py-1 rounded-full app-glass-chip text-[10px] font-bold uppercase tracking-wider">
+              {language === 'sq' ? 'Vetëm në Papirun Qendër' : 'Only at Papirun Qendër'}
+            </span>
+          )}
         </div>
         <h1 className="font-display font-semibold text-[28px] leading-[1.15] tracking-tight text-[#1A1A1A]">
           {item.name[language]}

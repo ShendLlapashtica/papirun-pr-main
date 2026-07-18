@@ -85,6 +85,13 @@ const MenuCard = ({ item, index = 0, onAddToCart, revealed = true, onImageReady 
             </span>
           </div>
         )}
+
+        {/* Cagllavicë-unavailable badge — informational only, item stays orderable */}
+        {item.isAvailable && !item.isAvailableOnCagllavice && (
+          <span className="absolute top-2 left-2 px-2 py-1 bg-background/90 rounded-full text-[10px] sm:text-xs font-medium shadow-soft">
+            {language === 'sq' ? 'Vetëm në Papirun Qendër' : 'Only at Papirun Qendër'}
+          </span>
+        )}
       </div>
 
       {/* Content */}

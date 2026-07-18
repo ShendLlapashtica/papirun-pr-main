@@ -21,6 +21,7 @@ const baseItem: MenuItem = {
   rating: 4.5,
   reviewCount: 20,
   isAvailable: true,
+  isAvailableOnCagllavice: true,
 };
 
 describe('diffMenuItem', () => {
@@ -61,6 +62,7 @@ describe('diffMenuItem', () => {
       rating: 4.5,
       reviewCount: 20,
       isAvailable: false,
+      isAvailableOnCagllavice: false,
     };
     expect(diffMenuItem(baseItem, after)).toEqual({
       name: after.name,
@@ -72,6 +74,7 @@ describe('diffMenuItem', () => {
       extras: after.extras,
       crunchLevel: after.crunchLevel,
       isAvailable: after.isAvailable,
+      isAvailableOnCagllavice: after.isAvailableOnCagllavice,
     });
   });
 });

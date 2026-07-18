@@ -83,6 +83,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.9,
     reviewCount: 89,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'beef-salad',
@@ -101,6 +102,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.8,
     reviewCount: 67,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'grill-chicken-salad',
@@ -119,6 +121,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.7,
     reviewCount: 54,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'cold-chicken-salad',
@@ -137,6 +140,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.6,
     reviewCount: 42,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'falafel-plate',
@@ -155,6 +159,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.8,
     reviewCount: 61,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'salad-mix',
@@ -173,6 +178,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.5,
     reviewCount: 31,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   // Fajitas
   {
@@ -192,6 +198,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.9,
     reviewCount: 78,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'falafel-fajita',
@@ -210,6 +217,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.8,
     reviewCount: 55,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   // Sandwiches
   {
@@ -229,6 +237,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.6,
     reviewCount: 38,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'chicken-pesto',
@@ -247,6 +256,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.7,
     reviewCount: 45,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'tuna',
@@ -265,6 +275,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.5,
     reviewCount: 29,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'roast-beef',
@@ -283,6 +294,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.8,
     reviewCount: 52,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'cold-chicken-sandwich',
@@ -301,6 +313,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.5,
     reviewCount: 24,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   {
     id: 'veggie',
@@ -319,6 +332,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.4,
     reviewCount: 21,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
   // Sides
   {
@@ -338,6 +352,7 @@ export const menuItems: MenuItem[] = [
     rating: 4.9,
     reviewCount: 92,
     isAvailable: true,
+    isAvailableOnCagllavice: true,
   },
 ];
 
