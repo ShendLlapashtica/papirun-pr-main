@@ -6,6 +6,7 @@ import type { MenuItem } from '@/types/menu';
 import type { SelectedExtra } from '@/types/menuExtra';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLiveMenuExtras, useLiveMenuItems, useLiveCategoryOrder } from '@/hooks/useLiveStorefrontData';
+import { useViewerBranch, filterMenuItemsForBranch } from '@/lib/locationGate';
 import MenuCard from '@/components/MenuCard';
 import SearchBar from '@/components/SearchBar';
 import Header from '@/components/Header';
@@ -29,9 +30,11 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
   const [discoverSearch, setDiscoverSearch] = useState('');
   const [discoverCategory, setDiscoverCategory] = useState('all');
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
-  const { items: menuItems } = useLiveMenuItems();
+  const { items: rawMenuItems } = useLiveMenuItems();
   const menuExtras = useLiveMenuExtras();
   const categoryOrder = useLiveCategoryOrder();
+  const viewerBranch = useViewerBranch();
+  const menuItems = useMemo(() => filterMenuItemsForBranch(rawMenuItems, viewerBranch), [rawMenuItems, viewerBranch]);
 
   const item = menuItems.find((m) => m.id === id);
 
@@ -69,7 +72,7 @@ const ProductView = ({ cart, cartCount, onAddToCart, onCartClick }: ProductViewP
     }
   }, [item?.id, availableExtras]);
 
-  const isLoading = menuItems.length === 0;
+  const isLoading = rawMenuItems.length === 0;
 
   // Must be before early return for hooks rules
   const allOtherItems = useMemo(

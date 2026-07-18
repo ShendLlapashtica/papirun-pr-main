@@ -4,6 +4,7 @@ import type { MenuItem } from '@/types/menu';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCart } from '@/contexts/CartContext';
 import { useLiveMenuItems, useOfertaEnabled, useLiveVisibleOffers, useLiveCategoryOrder } from '@/hooks/useLiveStorefrontData';
+import { useViewerBranch, filterMenuItemsForBranch } from '@/lib/locationGate';
 import SEO from '@/components/SEO';
 import Header from '@/components/Header';
 import HeroSection from '@/components/HeroSection';
@@ -26,12 +27,13 @@ const Index = () => {
   const { items: menuItems, isLoading: isMenuLoading } = useLiveMenuItems();
   const isOfertaEnabled = useOfertaEnabled();
   const categoryOrder = useLiveCategoryOrder();
+  const viewerBranch = useViewerBranch();
   const menuRef = useRef<HTMLElement>(null);
   const { cart, cartCount, isTrayOpen, isCheckoutOpen, setIsTrayOpen, setIsCheckoutOpen, addToCart, updateQuantity, updateNote, removeFromCart, clearCart } = useCart();
 
   const cartTotal = getCartTotal(cart);
 
-  const visibleItems = useMemo(() => menuItems, [menuItems]);
+  const visibleItems = useMemo(() => filterMenuItemsForBranch(menuItems, viewerBranch), [menuItems, viewerBranch]);
 
   const filteredItems = useMemo(() => {
     let items = visibleItems;

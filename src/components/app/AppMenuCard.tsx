@@ -84,12 +84,6 @@ const AppMenuCard = ({ item, index = 0, onAddToCart, onCardClick }: AppMenuCardP
               </span>
             </div>
           )}
-
-          {item.isAvailable && !item.isAvailableOnCagllavice && (
-            <span className="absolute top-2 left-2 px-2 py-1 bg-white/90 text-[#1A1A1A] shadow-sm rounded-full text-[9px] font-bold uppercase tracking-wider">
-              {language === 'sq' ? 'Vetëm në Qendër' : 'Only at Qendër'}
-            </span>
-          )}
         </div>
       </div>
 
