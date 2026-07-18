@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, Component, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map, KeyRound, Bell, Moon } from 'lucide-react';
+import { Lock, LogOut, Save, Eye, EyeOff, Upload, Package, Plus, Trash2, Image, ToggleLeft, ToggleRight, X, Check, ChevronUp, ChevronDown, Type, Phone, Edit2, HardDrive, RefreshCw, AlertTriangle, Map, KeyRound, Bell, Moon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchDrivers, createDriver, updateDriver, deleteDriver, ensureRealDrivers, subscribeAllDriverLocations, haversineKm, RESTAURANT_COORDS, type DeliveryDriver } from '@/lib/driversApi';
 import DriverLocationMap from '@/components/DriverLocationMap';
@@ -2178,23 +2178,26 @@ const Admin = () => {
                   <p className="font-semibold text-sm truncate">{item.name[language]}</p>
                   <p className="text-xs text-muted-foreground capitalize">{item.category}</p>
                 </div>
-                <button
-                  onClick={() => toggleCagllaviceAvailability(item.id)}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
-                    item.isAvailableOnCagllavice
-                      ? 'bg-accent text-accent-foreground'
-                      : 'bg-destructive/10 text-destructive'
-                  }`}
-                >
-                  {item.isAvailableOnCagllavice ? (
-                    <Eye className="w-3 h-3" />
-                  ) : (
-                    <EyeOff className="w-3 h-3" />
-                  )}
-                  {item.isAvailableOnCagllavice
-                    ? (language === 'sq' ? 'Në Çagllavicë' : 'At Cagllavicë')
-                    : (language === 'sq' ? 'Jo në Çagllavicë' : 'Not at Cagllavicë')}
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {language === 'sq' ? 'Në Çagllavicë' : 'At Cagllavicë'}
+                  </span>
+                  <button
+                    onClick={() => toggleCagllaviceAvailability(item.id)}
+                    aria-label={language === 'sq' ? 'Në Çagllavicë' : 'At Cagllavicë'}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                      item.isAvailableOnCagllavice
+                        ? 'bg-accent text-accent-foreground'
+                        : 'bg-destructive/10 text-destructive'
+                    }`}
+                  >
+                    {item.isAvailableOnCagllavice ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <X className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
