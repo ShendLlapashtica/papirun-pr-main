@@ -75,7 +75,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     delivery_lat: b.deliveryLat ?? null,
     delivery_lng: b.deliveryLng ?? null,
     location_id: b.locationId ?? null,
-    suggested_location: locationId,
     items: b.items,
     subtotal: Number(b.subtotal),
     delivery_fee: Number(b.deliveryFee ?? 0),
