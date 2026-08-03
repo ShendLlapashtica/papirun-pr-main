@@ -126,6 +126,7 @@ interface GroupedOrderItem {
     qty: number;
     removed: string[];
     extras: Array<{ name: { sq: string; en: string }; price: number }>;
+    note?: string;
   }>;
 }
 
@@ -137,11 +138,13 @@ function groupOrderItems(items: any[]): GroupedOrderItem[] {
     }
     const entry = map.get(it.id)!;
     entry.totalQty += it.quantity ?? 1;
-    if ((it.removedIngredients?.length ?? 0) > 0 || (it.addedExtras?.length ?? 0) > 0) {
+    const note = it.customerNote?.trim() || undefined;
+    if ((it.removedIngredients?.length ?? 0) > 0 || (it.addedExtras?.length ?? 0) > 0 || note) {
       entry.modifiedItems.push({
         qty: it.quantity ?? 1,
         removed: it.removedIngredients ?? [],
         extras: it.addedExtras ?? [],
+        note,
       });
     }
   }
@@ -185,6 +188,9 @@ const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(
                     + {ex.name?.sq || ex.name?.en} (+€{Number(ex.price || 0).toFixed(2)})
                   </span>
                 ))}
+                {m.note && (
+                  <span className="w-full text-[11px] italic text-amber-600 dark:text-amber-400">📝 {m.note}</span>
+                )}
               </div>
             ))}
           </div>
@@ -202,7 +208,8 @@ const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(
     it.id === next.items[i]?.id &&
     it.quantity === next.items[i]?.quantity &&
     (it.removedIngredients?.length ?? 0) === (next.items[i]?.removedIngredients?.length ?? 0) &&
-    (it.addedExtras?.length ?? 0) === (next.items[i]?.addedExtras?.length ?? 0)
+    (it.addedExtras?.length ?? 0) === (next.items[i]?.addedExtras?.length ?? 0) &&
+    (it.customerNote?.trim() || '') === (next.items[i]?.customerNote?.trim() || '')
   );
 });
 
@@ -217,7 +224,8 @@ function formatOrderListText(items: any[]): string {
           ...m.removed.map(r => `Pa ${r}`),
           ...m.extras.map(e => `+ ${e.name?.sq || e.name?.en}`),
         ];
-        return `  ↳ ${m.qty}x ${parts.join(' · ')}`;
+        const note = m.note ? ` 📝 ${m.note}` : '';
+        return `  ↳ ${m.qty}x ${parts.join(' · ')}${note}`;
       });
       line += '\n' + subs.join('\n');
     }
@@ -2082,6 +2090,9 @@ const OrdersReview = ({
                                 + {ex.name?.sq || ex.name?.en}
                               </span>
                             ))}
+                            {m.note && (
+                              <span className="w-full text-[10px] italic text-amber-600 dark:text-amber-400">📝 {m.note}</span>
+                            )}
                           </div>
                         ))}
                       </div>
