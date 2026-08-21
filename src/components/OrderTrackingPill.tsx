@@ -476,37 +476,25 @@ const OrderTrackingPill = () => {
             }}
           />
 
-          {/* Sage spinner */}
+          {/* Sage bouncing dots */}
           <motion.div
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 22 }}
-            className="relative w-40 h-40 sm:w-48 sm:h-48 mb-10"
+            className="relative w-40 h-40 sm:w-48 sm:h-48 mb-10 flex items-center justify-center gap-4"
           >
-            {/* Soft pulse ring */}
-            <motion.div
-              className="absolute inset-0 rounded-full"
-              style={{ border: '1px solid hsl(var(--primary) / 0.25)' }}
-              animate={{ scale: [1, 1.18, 1], opacity: [0.6, 0, 0.6] }}
-              transition={{ duration: 2.6, repeat: Infinity, ease: 'easeOut' }}
-            />
-            {/* Track */}
-            <div
-              className="absolute inset-2 rounded-full"
-              style={{ border: '4px solid hsl(var(--primary) / 0.12)' }}
-            />
-            {/* Spinning sage arc */}
-            <motion.div
-              className="absolute inset-2 rounded-full"
-              style={{
-                border: '4px solid transparent',
-                borderTopColor: 'hsl(var(--primary))',
-                borderRightColor: 'hsl(var(--primary) / 0.55)',
-                boxShadow: '0 0 30px hsl(var(--primary) / 0.35)',
-              }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
-            />
+            {[0, 1, 2].map((i) => (
+              <motion.span
+                key={i}
+                className="block w-4 h-4 sm:w-5 sm:h-5 rounded-full"
+                style={{
+                  background: 'hsl(var(--primary))',
+                  boxShadow: '0 0 20px hsl(var(--primary) / 0.35)',
+                }}
+                animate={{ y: [0, -22, 0] }}
+                transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut', delay: i * 0.15 }}
+              />
+            ))}
           </motion.div>
 
           {/* Heading + helper */}
