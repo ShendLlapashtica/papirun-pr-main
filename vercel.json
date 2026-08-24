@@ -23,12 +23,19 @@
     },
     "api/keep-alive.ts": {
       "memory": 128
+    },
+    "api/reset-availability.ts": {
+      "memory": 128
     }
   },
   "crons": [
     {
       "path": "/api/keep-alive",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/reset-availability",
+      "schedule": "0 0 * * *"
     }
   ]
 }
