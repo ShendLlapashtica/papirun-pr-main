@@ -1369,7 +1369,7 @@ const OrdersReview = ({
         {(() => {
           const ALARM_MS = 60_000;
           const unaccepted = orders.filter(
-            (o) => o.assignedDriverId && o.status === 'approved' && !isInHistory(o) && assignTimes[o.id] && now - assignTimes[o.id] > ALARM_MS
+            (o) => (caglOnly || !isCagllavice(o)) && o.assignedDriverId && o.status === 'approved' && !isInHistory(o) && assignTimes[o.id] && now - assignTimes[o.id] > ALARM_MS
           );
           if (unaccepted.length === 0) return null;
           const driverName = (o: OrderRecord) => drivers.find((d) => d.id === o.assignedDriverId)?.name ?? 'Shoferi';
