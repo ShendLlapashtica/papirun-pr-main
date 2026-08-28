@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import ConversationalAuth from '@/components/auth/ConversationalAuth';
-import { useLanguage } from '@/contexts/LanguageContext';
 
 // App-specific login — post-auth destination is /home (app shell).
 // The web login at /login goes to / instead.
@@ -10,7 +9,6 @@ import { useLanguage } from '@/contexts/LanguageContext';
 const Login2 = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const { language } = useLanguage();
 
   useEffect(() => {
     if (user) navigate('/home', { replace: true });
@@ -30,15 +28,6 @@ const Login2 = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         <ConversationalAuth />
-      </div>
-      <div className="pb-8 px-6 flex justify-center">
-        <button
-          type="button"
-          onClick={() => navigate('/home')}
-          className="app-glass w-full max-w-sm px-6 py-3 rounded-full text-sm font-semibold text-[#1A1A1A] active:scale-95 transition-all"
-        >
-          {language === 'sq' ? 'Vazhdo pa llogari →' : 'Continue without account →'}
-        </button>
       </div>
     </div>
   );
