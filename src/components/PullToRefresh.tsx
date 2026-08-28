@@ -66,7 +66,15 @@ const PullToRefresh = ({
           <Loader2 className={`w-4 h-4 text-primary ${refreshing ? 'animate-spin' : ''}`} />
         </div>
       </div>
-      <div style={{ transform: `translateY(${pull}px)`, transition: pull === 0 ? 'transform 0.2s' : 'none' }}>
+      <div
+        style={{
+          // transform must be 'none' at rest — any other value (even translateY(0px))
+          // makes this div the containing block for position:fixed descendants,
+          // which breaks full-screen modals and fixed bars rendered inside {children}.
+          transform: pull === 0 ? 'none' : `translateY(${pull}px)`,
+          transition: pull === 0 ? 'transform 0.2s' : 'none',
+        }}
+      >
         {children}
       </div>
     </>
