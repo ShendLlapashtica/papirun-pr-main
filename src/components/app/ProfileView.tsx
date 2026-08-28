@@ -131,7 +131,7 @@ const ProfileView = () => {
 
       {/* Tabs */}
       <div className="grid grid-cols-4 gap-1.5 mb-4">
-        <TabBtn id="favorites" icon={Heart} label="Favorites" />
+        <TabBtn id="favorites" icon={Heart} label={language === 'sq' ? 'Favoritet' : 'Favorites'} />
         <TabBtn id="addresses" icon={MapPin} label="Adresat" />
         <TabBtn id="reorder" icon={RotateCcw} label="Riporosit" />
         <TabBtn id="settings" icon={SettingsIcon} label="Cilësimet" />

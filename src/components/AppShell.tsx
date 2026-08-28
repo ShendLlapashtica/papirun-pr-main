@@ -102,14 +102,21 @@ const AppShell = ({ children }: { children: ReactNode }) => {
         className="app-shell-sage mx-auto h-[100dvh] overflow-y-auto overflow-x-hidden scrollbar-hide pb-32 relative scroll-touch"
         style={{
           maxWidth: '430px',
-          paddingTop: 'env(safe-area-inset-top)',
           background: 'hsl(var(--app-background))',
           boxShadow: '0 0 0 1px hsl(var(--app-border))',
           touchAction: 'pan-y',
         }}
       >
-        {/* Glassmorphic header — Web parity */}
-        <header className="sticky top-0 z-40 px-3.5 pt-2 pb-2">
+        {/* Glassmorphic header — Web parity.
+            Owns the safe-area top padding (not the shell) so it pins flush to the
+            real top on notched phones; z-50 keeps it above the sticky category bar. */}
+        <header
+          className="sticky top-0 z-50 px-3.5 pb-2 backdrop-blur-xl"
+          style={{
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.5rem)',
+            background: 'hsl(var(--app-background) / 0.72)',
+          }}
+        >
           <div className="app-glass rounded-[28px] px-3.5 py-2.5 flex items-center justify-between gap-3">
             {/* Brand */}
             <button

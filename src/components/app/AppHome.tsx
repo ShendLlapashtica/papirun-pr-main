@@ -168,8 +168,12 @@ const AppHome = () => {
         <OpenClosedBar />
       </div>
 
-      {/* Premium sticky category selector */}
-      <div className="sticky top-[env(safe-area-inset-top,0)] z-40 bg-background/80 backdrop-blur-xl border-b border-border/40 mb-4 px-4 py-3 -mx-0">
+      {/* Premium sticky category selector — pins just below the sticky header
+          (header height ≈ 78px + safe-area), never on top of it */}
+      <div
+        className="sticky z-40 bg-background/80 backdrop-blur-xl border-b border-border/40 mb-4 px-4 py-3 -mx-0"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 78px)' }}
+      >
         <div ref={categoryScrollRef} className="flex items-center gap-2.5 overflow-x-auto scrollbar-hide snap-x">
           {categories.map((c) => {
             const isActive = activeCategory === c.id;
