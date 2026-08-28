@@ -216,10 +216,11 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   return (
     <>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} />
           <div
             className="relative w-full max-w-lg bg-background rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden max-h-[92vh] flex flex-col"
+            style={{ maxHeight: '92dvh' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-background flex items-center justify-between p-4 sm:p-6 border-b border-border z-10 shrink-0">
@@ -229,7 +230,10 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div
+              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6"
+              style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+            >
               <div className="bg-secondary/50 rounded-xl p-3 sm:p-4">
                 <h3 className="font-semibold text-sm mb-2 sm:mb-3">{t.checkout.orderSummary}</h3>
                 <div className="space-y-2">

@@ -212,7 +212,7 @@ const ArchivedChats = ({ orders }: { orders: OrderRecord[] }) => {
                 ) : rows.length === 0 ? (
                   <p className="text-[11px] text-muted-foreground py-2 text-center">Asnjë mesazh i arkivuar.</p>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="flex flex-col gap-1.5">
                     {rows.map((m) => (
                       <div
                         key={m.id}

@@ -115,7 +115,7 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-background rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] flex flex-col">
+      <div className="relative w-full max-w-md bg-background rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] flex flex-col" style={{ maxHeight: '92dvh' }}>
         <div className="flex items-center justify-between p-4 border-b border-border/50 shrink-0">
           <div>
             <h2 className="font-display font-bold text-base">
@@ -194,7 +194,7 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
           </div>
         </div>
 
-        <div className="p-4 border-t border-border/50 space-y-3 shrink-0">
+        <div className="p-4 border-t border-border/50 space-y-3 shrink-0" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {/* Mbaro biseden — user can end the chat and trigger the rating form */}
           {['approved', 'preparing', 'out_for_delivery'].includes(status) && order && (
             <button
