@@ -123,7 +123,7 @@ const AppHome = () => {
   const firstName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || '';
 
   return (
-    <div className="pb-8 will-change-transform relative min-h-screen">
+    <div className="pb-8 relative min-h-screen">
       {/* Dynamic ambient background glow */}
       <div className="absolute top-0 left-0 right-0 h-96 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none -z-10" />
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/20 blur-[120px] pointer-events-none -z-10 animate-pulse-soft" />
@@ -132,9 +132,6 @@ const AppHome = () => {
       <div className="px-4 pt-5 pb-4">
         <div className="relative overflow-hidden rounded-[32px] p-6 text-white shadow-2xl"
              style={{ background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.8) 100%)' }}>
-          
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay" />
-          
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-1 opacity-90">
               <UtensilsCrossed className="w-4 h-4" />
