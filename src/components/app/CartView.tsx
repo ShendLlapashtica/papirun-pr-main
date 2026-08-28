@@ -27,7 +27,7 @@ const CartView = () => {
   const itemCount = cart.reduce((s, i) => s + i.quantity, 0);
 
   return (
-    <div className="px-4 pt-3 pb-40" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="px-4 pt-3 pb-60" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
       {/* Header card */}
       <div
         className="rounded-[28px] px-4 py-3.5 mb-3 flex items-center gap-3 border border-white/50"
@@ -229,31 +229,35 @@ const CartView = () => {
             })}
           </div>
 
-          {/* Sticky total bar — sits above the BottomNav */}
+          {/* Fixed total bar — always pinned above the BottomNav, regardless of cart length */}
           <div
-            className="sticky rounded-[28px] px-4 py-4 mt-5 border border-white/55"
-            style={{
-              bottom: 'calc(env(safe-area-inset-bottom) + 96px)',
-              background: 'rgba(255,255,255,0.62)',
-              backdropFilter: 'blur(28px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-              boxShadow: '0 12px 32px -16px rgba(0,0,0,0.18)',
-            }}
+            className="fixed left-1/2 -translate-x-1/2 z-40 w-full pointer-events-none"
+            style={{ maxWidth: '430px', bottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[13px] font-semibold" style={{ color: '#0F1311B3' }}>{t.tray.total}</span>
-              <span className="font-display font-bold text-[24px] tracking-tight" style={{ color: SLATE }}>
-                €{total.toFixed(2)}
-              </span>
-            </div>
-            <button
-              onClick={() => setIsCheckoutOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-[14px] font-bold text-white active:scale-[0.98] transition-transform"
-              style={{ background: SLATE, boxShadow: '0 10px 24px -10px rgba(15,19,17,0.45)' }}
+            <div
+              className="mx-4 rounded-[28px] px-4 py-4 border border-white/55 pointer-events-auto"
+              style={{
+                background: 'rgba(255,255,255,0.62)',
+                backdropFilter: 'blur(28px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+                boxShadow: '0 12px 32px -16px rgba(0,0,0,0.18)',
+              }}
             >
-              <ShoppingBag className="w-4 h-4" strokeWidth={2.4} />
-              {language === 'sq' ? 'Vazhdo në checkout' : t.tray.checkout}
-            </button>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[13px] font-semibold" style={{ color: '#0F1311B3' }}>{t.tray.total}</span>
+                <span className="font-display font-bold text-[24px] tracking-tight" style={{ color: SLATE }}>
+                  €{total.toFixed(2)}
+                </span>
+              </div>
+              <button
+                onClick={() => setIsCheckoutOpen(true)}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-[14px] font-bold text-white active:scale-[0.98] transition-transform"
+                style={{ background: SLATE, boxShadow: '0 10px 24px -10px rgba(15,19,17,0.45)' }}
+              >
+                <ShoppingBag className="w-4 h-4" strokeWidth={2.4} />
+                {language === 'sq' ? 'Vazhdo në checkout' : t.tray.checkout}
+              </button>
+            </div>
           </div>
         </>
       )}

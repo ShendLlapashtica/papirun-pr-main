@@ -304,7 +304,7 @@ const ProfileView = () => {
           </div>
 
           <div className="text-center pt-3 pb-1">
-            <img src={logo} alt="Papirun" className="w-10 h-10 mx-auto rounded-xl mb-2 opacity-70" />
+            <img src={logo} alt="Papirun" className="w-10 h-10 mx-auto rounded-xl mb-2 opacity-70 object-cover" />
             <p className="text-[10px] text-[hsl(var(--app-muted-text))]">Papirun · House of Crunch · v1.0</p>
           </div>
         </div>

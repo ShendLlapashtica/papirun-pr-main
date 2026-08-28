@@ -22,7 +22,7 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
       <img
         src={logo}
         alt="Papirun"
-        className="w-28 h-28 rounded-3xl shadow-card animate-in fade-in zoom-in-90 duration-700"
+        className="w-28 h-28 rounded-3xl shadow-card object-cover animate-in fade-in zoom-in-90 duration-700"
       />
       <h1 className="font-display font-bold text-2xl mt-5 text-foreground animate-in fade-in slide-in-from-bottom-2 duration-700 delay-150">
         Papirun
