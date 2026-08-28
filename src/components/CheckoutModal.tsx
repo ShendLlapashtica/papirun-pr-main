@@ -15,6 +15,7 @@ import { fetchStorefrontSetting } from '@/lib/storefrontApi';
 import { WHATSAPP_FALLBACK_KEY } from '@/lib/storefrontApi';
 import { fetchLocations, isLocationOpenNow, formatNextOpenStatus, type StorefrontLocation } from '@/lib/locationsApi';
 import { getSavedLocationChoice } from '@/lib/locationGate';
+import { openExternal } from '@/lib/native';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -208,7 +209,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
       ? `https://www.google.com/maps?q=${lat},${lng}`
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.address)}`;
     const msg = `🍔 *Porosi e Re*\nKlienti: ${formData.name}\nTel: ${formData.phone}\n\n${foodSummary}\n\nTotali: €${total.toFixed(2)}\nAdresa: ${formData.address}\nLokacioni: ${mapsLink}\nShenime: ${formData.notes.trim() || '-'}`;
-    window.open(`https://wa.me/${WHATSAPP_FALLBACK}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+    openExternal(`https://wa.me/${WHATSAPP_FALLBACK}?text=${encodeURIComponent(msg)}`);
   };
 
   if (!isOpen && !trackingOrderId) return null;

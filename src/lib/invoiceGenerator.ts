@@ -3,7 +3,12 @@ import logo from '@/assets/logo.png';
 
 export const generateInvoice = (order: OrderRecord, autoDownload = false) => {
   const w = window.open('', '_blank');
-  if (!w) return;
+  if (!w) {
+    // Popup blocked, or running inside a WebView (Capacitor) where scriptable
+    // popups don't exist — fall back to the in-app invoice page.
+    window.location.assign(`/invoice/${order.id}`);
+    return;
+  }
 
   const createdAt = new Date(order.createdAt);
   const dateStr = createdAt.toLocaleDateString('sq-AL', { day: '2-digit', month: 'long', year: 'numeric' });

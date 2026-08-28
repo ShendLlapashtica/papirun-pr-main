@@ -32,6 +32,15 @@ export const nativeShare = async (opts: { title?: string; text?: string; url?: s
   return false;
 };
 
+/* ----------------------------- EXTERNAL LINKS ----------------------------- */
+
+// All outbound links (WhatsApp, Google Maps, …) must go through here.
+// Web: normal new-tab open. Native build swaps this for the Capacitor
+// Browser/App-launcher plugin — window.open is unreliable in WebViews.
+export const openExternal = (url: string) => {
+  window.open(url, '_blank', 'noopener,noreferrer');
+};
+
 /* ----------------------------- BACK BUTTON LOCK ----------------------------- */
 
 export const lockBackButton = async () => { /* web — no-op */ };

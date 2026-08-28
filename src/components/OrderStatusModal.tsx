@@ -7,6 +7,7 @@ import OrderChat from '@/components/OrderChat';
 import { clearActiveOrderId } from '@/components/OrderTrackingPill';
 import { rateDriver } from '@/lib/driversApi';
 import { generateInvoice } from '@/lib/invoiceGenerator';
+import { openExternal } from '@/lib/native';
 
 interface Props {
   orderId: string;
@@ -297,14 +298,13 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
           
           <div className="space-y-2">
             {status === 'rejected' && (
-              <a
-                href={`https://wa.me/${WHATSAPP_FALLBACK}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openExternal(`https://wa.me/${WHATSAPP_FALLBACK}`)}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[hsl(142,70%,40%)] text-white text-sm font-semibold"
               >
                 <MessageCircle className="w-4 h-4" /> {language === 'sq' ? 'WhatsApp' : 'WhatsApp'}
-              </a>
+              </button>
             )}
             {canDelete && (
               <button onClick={handleDelete} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-destructive/10 text-destructive text-sm font-semibold">

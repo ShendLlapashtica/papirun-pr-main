@@ -45,8 +45,17 @@ export default function InvoicePage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '32px 16px', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#f5f5f0', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 'calc(16px + env(safe-area-inset-top)) 16px 32px', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
+        {window.history.length > 1 && (
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e5e5e0', borderRadius: 20, padding: '8px 16px', fontSize: 13, fontWeight: 600, color: '#5a7a5f', marginBottom: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            ← Kthehu
+          </button>
+        )}
         <div style={{ background: '#fff', borderRadius: 20, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.09)' }}>
           {/* Header */}
           <div style={{ background: 'linear-gradient(135deg,#5a7a5f 0%,#749d79 100%)', padding: '28px 28px 24px', color: '#fff' }}>

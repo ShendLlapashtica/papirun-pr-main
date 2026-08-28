@@ -22,6 +22,7 @@ import Privacy from "./pages/Privacy";
 import OrderTrackingPill from "@/components/OrderTrackingPill";
 import LocationGate from "@/components/locationGate/LocationGate";
 import { prewarmGeo } from "@/lib/geoCache";
+import { isNative } from "@/lib/native";
 
 // Fire location request immediately — before any React component mounts.
 // By the time the user adds items and opens checkout, the position is cached.
@@ -40,8 +41,11 @@ const App = () => (
                 <Toaster />
                 <Sonner />
                 <Routes>
-                  {/* Public storefront — no auth required */}
-                  <Route path="/" element={<Index />} />
+                  {/* Public storefront — no auth required.
+                      Native (Capacitor) builds boot straight into the app shell:
+                      isNative() is false on web, so this is a no-op until the
+                      native bridge is swapped in. */}
+                  <Route path="/" element={isNative() ? <Navigate to="/home" replace /> : <Index />} />
                   {/* Dedicated login/signup pages — web vs app */}
                   <Route path="/login" element={<Login />} />
                   <Route path="/login2" element={<Login2 />} />
