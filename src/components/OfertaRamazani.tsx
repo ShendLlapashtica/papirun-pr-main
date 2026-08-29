@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLiveVisibleOffers, useOfferBadgeText } from '@/hooks/useLiveStorefrontData';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getOptimizedImage } from '@/lib/utils';
@@ -66,6 +66,8 @@ function StyledOfferCard({ offer }: { offer: StorefrontOffer }) {
 
 const OfertaRamazani = () => {
   const navigate = useNavigate();
+  // App-channel isolation: from /home the shell must never leak to web routes.
+  const inApp = useLocation().pathname.startsWith('/home');
   const { t } = useLanguage();
   const { offers, isLoading } = useLiveVisibleOffers();
   const badgeText = useOfferBadgeText();
@@ -95,7 +97,7 @@ const OfertaRamazani = () => {
             return (
               <div
                 key={offer.id}
-                onClick={() => navigate(`/offer/${offer.id}`)}
+                onClick={() => navigate(inApp ? `/app/offer/${offer.id}` : `/offer/${offer.id}`)}
                 className="group cursor-pointer rounded-2xl overflow-hidden shadow-card transition-all duration-300 hover:shadow-hover hover:-translate-y-1"
               >
                 <div className="relative aspect-[9/16] overflow-hidden">

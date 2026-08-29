@@ -14,6 +14,7 @@ import Admin from "./pages/Admin";
 import Home from "./pages/Home";
 import ProductViewWrapper from "./pages/ProductViewWrapper";
 import AppProductPage from "./pages/AppProductPage";
+import AppOfferPage from "./pages/AppOfferPage";
 import OfferViewWrapper from "./pages/OfferViewWrapper";
 import NotFound from "./pages/NotFound";
 import DriverPanel from "./pages/DriverPanel";
@@ -61,6 +62,8 @@ const App = () => (
                   {/* App product page */}
                   <Route path="/app/product/:id" element={<AppProductPage />} />
                   <Route path="/offer/:id" element={<OfferViewWrapper />} />
+                  {/* App offer page — app channel never leaves the shell */}
+                  <Route path="/app/offer/:id" element={<AppOfferPage />} />
                   <Route path="/driver" element={<DriverPanel />} />
                   <Route path="/driver-dashboard" element={<Navigate to="/driver" replace />} />
                   <Route path="/Driverpanel" element={<Navigate to="/driver" replace />} />

@@ -81,7 +81,8 @@ const ProfileView = () => {
   const handleSignOut = async () => {
     if (!window.confirm(language === 'sq' ? 'A doni të dilni nga llogaria?' : 'Sign out?')) return;
     await signOut();
-    navigate('/');
+    // App-channel isolation: sign-out returns to the app login, never the web storefront.
+    navigate('/login2');
   };
 
   const TabBtn = ({ id, icon: Icon, label }: { id: Tab; icon: any; label: string }) => {

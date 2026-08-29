@@ -9,6 +9,8 @@ import { getOptimizedImage } from '@/lib/utils';
 interface OfferViewProps {
   cartCount: number;
   onCartClick: () => void;
+  /** App-channel mode: no web Header, back goes to /home. Keeps the app shell fully isolated. */
+  inApp?: boolean;
 }
 
 function extractTime(description: string): string {
@@ -16,7 +18,7 @@ function extractTime(description: string): string {
   return match ? match[1] : '';
 }
 
-const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
+const OfferView = ({ cartCount, onCartClick, inApp = false }: OfferViewProps) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { language } = useLanguage();
@@ -34,7 +36,7 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
   if (!offer) {
     return (
       <div className="min-h-screen bg-background">
-        <Header cartCount={cartCount} onCartClick={onCartClick} />
+        {!inApp && <Header cartCount={cartCount} onCartClick={onCartClick} />}
         <div className="flex items-center justify-center h-[60vh]">
           <p className="text-muted-foreground">
             {language === 'sq' ? 'Oferta nuk u gjet' : 'Offer not found'}
@@ -51,12 +53,12 @@ const OfferView = ({ cartCount, onCartClick }: OfferViewProps) => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header cartCount={cartCount} onCartClick={onCartClick} />
+      {!inApp && <Header cartCount={cartCount} onCartClick={onCartClick} />}
 
       <main>
         <div className="container mx-auto px-4 pt-4 sm:pt-8">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(inApp ? '/home' : '/')}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4 sm:mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
