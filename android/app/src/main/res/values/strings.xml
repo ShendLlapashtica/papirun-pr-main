@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Papirun</string>
+    <string name="title_activity_main">Papirun</string>
+    <string name="package_name">net.papirun.app</string>
+    <string name="custom_url_scheme">net.papirun.app</string>
+</resources>

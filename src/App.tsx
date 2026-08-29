@@ -23,11 +23,15 @@ import Privacy from "./pages/Privacy";
 import OrderTrackingPill from "@/components/OrderTrackingPill";
 import LocationGate from "@/components/locationGate/LocationGate";
 import { prewarmGeo } from "@/lib/geoCache";
-import { isNative } from "@/lib/native";
+import { isNative, initStatusBar, initAndroidBackButton } from "@/lib/native";
 
 // Fire location request immediately — before any React component mounts.
 // By the time the user adds items and opens checkout, the position is cached.
 prewarmGeo();
+
+// Native-only setup — both are no-ops on web.
+initStatusBar();
+initAndroidBackButton();
 
 const queryClient = new QueryClient();
 
