@@ -5,6 +5,23 @@ import { haversineKm, RESTAURANT_COORDS, CAGLLAVICE_COORDS } from '@/lib/drivers
 export type OrderStatus = 'pending' | 'approved' | 'preparing' | 'out_for_delivery' | 'rejected' | 'completed' | 'histori';
 export type OrderSource = 'web' | 'app';
 export type OrderLocation = 'qender' | 'cagllavice';
+export type PaymentMethod = 'cash' | 'pos';
+
+/**
+ * POS orders are tagged with this exact line inside `notes` by /api/place-order.
+ * No DB column involved — the admin UI derives its mini POS flag from this
+ * marker and strips it from the visible note text. Must stay byte-identical
+ * to the literal in api/place-order.ts.
+ */
+export const POS_NOTES_MARKER = '💳 Pagesa: POS (Me Kartele)';
+
+/** Customer note with the POS marker line removed — the flag carries that info instead. */
+export const stripPosMarker = (notes: string | null | undefined): string =>
+  (notes ?? '')
+    .split('\n')
+    .filter((line) => line.trim() !== POS_NOTES_MARKER)
+    .join('\n')
+    .trim();
 
 export function suggestOrderLocation(lat: number | null, lng: number | null, address = ''): OrderLocation {
   const addr = address.toLowerCase();
@@ -39,6 +56,7 @@ export interface OrderRecord {
   notes: string;
   statusHistory: OrderStatusEvent[];
   source: OrderSource;
+  paymentMethod: PaymentMethod;
   prepEtaMinutes: number | null;
   isVisible: boolean;
   assignedDriverId?: string | null;
@@ -97,6 +115,8 @@ const mapRow = (row: Row): OrderRecord => ({
   notes: row.notes,
   statusHistory: Array.isArray(row.status_history) ? row.status_history : [],
   source: (row.source ?? 'web') as OrderSource,
+  // Derived from the notes marker (no DB column for this) — see POS_NOTES_MARKER
+  paymentMethod: (row.notes ?? '').includes(POS_NOTES_MARKER) ? 'pos' : 'cash',
   prepEtaMinutes: row.prep_eta_minutes,
   isVisible: row.is_visible !== false,
   assignedDriverId: row.assigned_driver_id,
@@ -124,6 +144,7 @@ export interface CreateOrderInput {
   total: number;
   notes?: string;
   source?: OrderSource;
+  paymentMethod?: PaymentMethod;
 }
 
 export const detectOrderSource = (): OrderSource => {
@@ -155,6 +176,7 @@ export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord>
       total: input.total,
       notes: input.notes ?? '',
       source: input.source ?? detectOrderSource(),
+      paymentMethod: input.paymentMethod ?? 'cash',
     }),
   });
   if (!res.ok) {

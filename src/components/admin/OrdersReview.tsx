@@ -11,9 +11,11 @@ import {
   setOrderEta,
   hardDeleteOrder,
   hardDeleteOrdersBatch,
+  stripPosMarker,
   type OrderRecord,
   type OrderStatus,
 } from '@/lib/ordersApi';
+import { groupOrderItems, type GroupedOrderItem } from '@/lib/orderItemsGrouping';
 import OrderChat from '@/components/OrderChat';
 import OrderActionDrawer from '@/components/admin/OrderActionDrawer';
 import BulkAssignBar from '@/components/admin/BulkAssignBar';
@@ -116,42 +118,18 @@ const CopyButton: React.FC<{ text: string; size?: 'sm' | 'md' }> = ({ text, size
   );
 };
 
-interface GroupedOrderItem {
-  id: string;
-  name?: { sq: string; en: string };
-  category?: string;
-  image?: string;
-  totalQty: number;
-  modifiedItems: Array<{
-    qty: number;
-    removed: string[];
-    extras: Array<{ name: { sq: string; en: string }; price: number }>;
-    note?: string;
-  }>;
-}
+/** Mini POS flag — shown ONLY when the customer picked POS (Me Kartele); cash shows nothing. */
+const PosFlag: React.FC<{ method?: string; size?: 'sm' | 'md' }> = ({ method, size = 'sm' }) => {
+  if (method !== 'pos') return null;
+  const cls = size === 'md' ? 'text-[11px] px-2 py-0.5' : 'text-[10px] px-1.5 py-0.5';
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-400/30 ${cls}`}>
+      💳 POS (Me Kartele)
+    </span>
+  );
+};
 
-function groupOrderItems(items: any[]): GroupedOrderItem[] {
-  const map = new Map<string, GroupedOrderItem>();
-  for (const it of items) {
-    if (!map.has(it.id)) {
-      map.set(it.id, { id: it.id, name: it.name, category: it.category, image: it.image, totalQty: 0, modifiedItems: [] });
-    }
-    const entry = map.get(it.id)!;
-    entry.totalQty += it.quantity ?? 1;
-    const note = it.customerNote?.trim() || undefined;
-    if ((it.removedIngredients?.length ?? 0) > 0 || (it.addedExtras?.length ?? 0) > 0 || note) {
-      entry.modifiedItems.push({
-        qty: it.quantity ?? 1,
-        removed: it.removedIngredients ?? [],
-        extras: it.addedExtras ?? [],
-        note,
-      });
-    }
-  }
-  return Array.from(map.values());
-}
-
-const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(({ items, total }) => {
+const OrderItemsReceipt: React.FC<{ items: any[]; total: number; payment?: string }> = React.memo(({ items, total, payment }) => {
   const grouped = groupOrderItems(items);
   const listText = formatOrderListText(items);
   return (
@@ -196,14 +174,14 @@ const OrderItemsReceipt: React.FC<{ items: any[]; total: number }> = React.memo(
           </div>
         </div>
       ))}
-      <div className="flex justify-between items-baseline font-bold pt-2 border-t border-border/50 mt-2">
-        <span className="text-sm dark:text-slate-400">Totali</span>
+      <div className="flex justify-between items-center font-bold pt-2 border-t border-border/50 mt-2">
+        <span className="flex items-center gap-1.5 text-sm dark:text-slate-400">Totali <PosFlag method={payment} size="md" /></span>
         <span className="text-primary text-lg dark:text-emerald-400">€{total.toFixed(2)}</span>
       </div>
     </div>
   );
 }, (prev, next) => {
-  if (prev.items.length !== next.items.length) return false;
+  if (prev.items.length !== next.items.length || prev.payment !== next.payment) return false;
   return prev.items.every((it, i) =>
     it.id === next.items[i]?.id &&
     it.quantity === next.items[i]?.quantity &&
@@ -1836,7 +1814,9 @@ const OrdersReview = ({
             const anyTyping = clientTyping || staffTyping;
             const anyTypingBanner = anyTyping || clientRecent || staffRecent;
             const typingRole = clientTyping ? 'Klienti' : staffTyping ? 'Stafi' : clientRecent ? 'Klienti' : 'Stafi';
-            const hasNote = !!(o.notes?.trim());
+            // POS marker line renders as the mini flag, not as note text
+            const noteText = stripPosMarker(o.notes);
+            const hasNote = !!noteText;
             const msgEntry = newMsgMap[o.id];
             const hasNewMsg = !!(msgEntry && msgEntry.count > 0);
             const msgUrgent = hasNewMsg && (now - msgEntry!.firstMsgTs) > 3 * 60 * 1000;
@@ -2061,7 +2041,7 @@ const OrdersReview = ({
                   {hasNote && (
                     <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/8 border border-amber-400/20 text-amber-900 dark:text-amber-100 text-[11px]">
                       <span className="w-4 h-4 rounded bg-amber-500/20 flex items-center justify-center shrink-0 mt-px text-[10px]">📋</span>
-                      <span className="italic leading-snug line-clamp-2">{o.notes}</span>
+                      <span className="italic leading-snug line-clamp-2">{noteText}</span>
                     </div>
                   )}
 
@@ -2097,8 +2077,9 @@ const OrdersReview = ({
                         ))}
                       </div>
                     ))}
-                    <div className="flex justify-end pt-1 border-t border-border/20 mt-1">
-                      <span className="text-primary font-bold text-[13px]">€{o.total.toFixed(2)}</span>
+                    <div className="flex justify-between items-center pt-1 border-t border-border/20 mt-1">
+                      <PosFlag method={o.paymentMethod} />
+                      <span className="text-primary font-bold text-[13px] ml-auto">€{o.total.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -2256,7 +2237,7 @@ const OrdersReview = ({
                         </button>
                       </div>
 
-                      <OrderItemsReceipt items={selected.items} total={selected.total} />
+                      <OrderItemsReceipt items={selected.items} total={selected.total} payment={selected.paymentMethod} />
 
                       <div className="flex items-start gap-2 text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -2295,13 +2276,13 @@ const OrdersReview = ({
                         );
                       })()}
 
-                      {selected.notes && (
+                      {stripPosMarker(selected.notes) && (
                         <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 dark:border-amber-500/30 rounded-xl px-3 py-2">
                           <div className="flex items-center justify-between mb-0.5">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Shënim klienti</p>
-                            <CopyButton text={selected.notes!} />
+                            <CopyButton text={stripPosMarker(selected.notes)} />
                           </div>
-                          <p className="italic text-foreground/90 text-xs">{selected.notes}</p>
+                          <p className="italic text-foreground/90 text-xs">{stripPosMarker(selected.notes)}</p>
                         </div>
                       )}
 
@@ -2523,7 +2504,7 @@ const OrdersReview = ({
               </div>
 
               {/* Order receipt */}
-              <OrderItemsReceipt items={selected.items} total={selected.total} />
+              <OrderItemsReceipt items={selected.items} total={selected.total} payment={selected.paymentMethod} />
 
               <div className="flex items-start gap-2 text-muted-foreground dark:text-slate-400">
                 <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -2562,13 +2543,13 @@ const OrdersReview = ({
                 );
               })()}
 
-              {selected.notes && (
+              {stripPosMarker(selected.notes) && (
                 <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300/50 dark:border-amber-500/30 rounded-xl px-3 py-2">
                   <div className="flex items-center justify-between mb-0.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Shënim klienti</p>
-                    <CopyButton text={selected.notes!} />
+                    <CopyButton text={stripPosMarker(selected.notes)} />
                   </div>
-                  <p className="italic text-foreground/90 text-xs">{selected.notes}</p>
+                  <p className="italic text-foreground/90 text-xs">{stripPosMarker(selected.notes)}</p>
                 </div>
               )}
 
