@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { MessageCircle, X, Send, Loader2, MapPin, AlertTriangle, Bookmark } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, MapPin, AlertTriangle, Bookmark, Banknote, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CartItem } from '@/types/menu';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -8,6 +8,7 @@ import { getIngredientName } from '@/data/ingredientTranslations';
 import AddressMapPicker from '@/components/checkout/AddressMapPicker';
 // OrderStatusModal handled globally via OrderTrackingPill
 import { getCartLineTotal } from '@/lib/cartPricing';
+import { groupCartLines } from '@/lib/orderItemsGrouping';
 import { createOrder, detectOrderSource, suggestOrderLocation } from '@/lib/ordersApi';
 import { setActiveOrderId, clearActiveOrderId } from '@/components/OrderTrackingPill';
 import { fetchAddresses, deleteAddress, type SavedAddress } from '@/lib/addressesApi';
@@ -35,6 +36,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
   const deliveryFee = isTakeaway ? 0 : (total < 10 ? 2 : 0);
   const finalTotal = total + deliveryFee;
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', notes: '' });
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'pos'>('cash');
   const [selectedPosition, setSelectedPosition] = useState<[number, number] | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [trackingOrderId] = useState<string | null>(null);
@@ -133,6 +135,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
 
   const resetForm = () => {
     setFormData({ name: '', phone: '', address: '', notes: '' });
+    setPaymentMethod('cash');
     setSelectedPosition(null);
   };
 
@@ -154,6 +157,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
     setActiveOrderId(optimisticId);
     onSuccess();
     const savedFormData = { ...formData };
+    const savedPayment = paymentMethod;
     const savedPosition = selectedPosition;
     const savedItems = [...items];
     const savedTotal = total;
@@ -176,6 +180,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
         total: finalTotal,
         notes: savedFormData.notes.trim(),
         source: detectOrderSource(),
+        paymentMethod: savedPayment,
       });
       // Persist guest info for autofill next time
       try { localStorage.setItem(GUEST_INFO_KEY, JSON.stringify({ name: savedFormData.name.trim(), phone: savedFormData.phone.trim() })); } catch {}
@@ -207,7 +212,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
     const mapsLink = lat !== null && lng !== null
       ? `https://www.google.com/maps?q=${lat},${lng}`
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.address)}`;
-    const msg = `🍔 *Porosi e Re*\nKlienti: ${formData.name}\nTel: ${formData.phone}\n\n${foodSummary}\n\nTotali: €${total.toFixed(2)}\nAdresa: ${formData.address}\nLokacioni: ${mapsLink}\nShenime: ${formData.notes.trim() || '-'}`;
+    const msg = `🍔 *Porosi e Re*\nKlienti: ${formData.name}\nTel: ${formData.phone}\n\n${foodSummary}\n\nTotali: €${total.toFixed(2)}\nPagesa: ${paymentMethod === 'pos' ? 'POS (Me Kartele)' : 'Cash'}\nAdresa: ${formData.address}\nLokacioni: ${mapsLink}\nShenime: ${formData.notes.trim() || '-'}`;
     window.open(`https://wa.me/${WHATSAPP_FALLBACK}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
   };
 
@@ -233,25 +238,32 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
               <div className="bg-secondary/50 rounded-xl p-3 sm:p-4">
                 <h3 className="font-semibold text-sm mb-2 sm:mb-3">{t.checkout.orderSummary}</h3>
                 <div className="space-y-2">
-                  {items.map((item, idx) => (
-                    <div key={`${item.id}-${idx}`}>
+                  {/* Grouped exactly like the admin panel: one header per product,
+                      "↳" sub-lines only for units with changes */}
+                  {groupCartLines(items).map((g) => (
+                    <div key={g.id}>
                       <div className="flex justify-between text-xs sm:text-sm">
-                        <span>{item.quantity}x {item.name[language]}</span>
-                        <span className="text-primary font-medium">€{getCartLineTotal(item).toFixed(2)}</span>
+                        <span className="font-medium">{g.totalQty}x {g.name[language]}</span>
+                        <span className="text-primary font-medium">
+                          €{g.lines.reduce((sum, line) => sum + getCartLineTotal(line), 0).toFixed(2)}
+                        </span>
                       </div>
-                      {((item.removedIngredients?.length ?? 0) > 0 || (item.addedExtras?.length ?? 0) > 0) && (
-                        <div className="flex flex-wrap gap-1 mt-0.5 ml-4">
-                          {item.removedIngredients?.map((ing) => (
-                            <span key={ing} className="text-[10px] text-destructive">Pa {getIngredientName(ing, language)}</span>
-                          ))}
-                          {item.addedExtras?.map((ext) => (
-                            <span key={ext.id} className="text-[10px] text-accent-foreground">Me {ext.name[language]} (+€{ext.price.toFixed(2)})</span>
-                          ))}
-                        </div>
-                      )}
-                      {item.customerNote?.trim() && (
-                        <p className="text-[10px] text-muted-foreground ml-4 mt-0.5 italic">📝 {item.customerNote}</p>
-                      )}
+                      {g.lines.map((item, li) => (
+                        ((item.removedIngredients?.length ?? 0) > 0 || (item.addedExtras?.length ?? 0) > 0 || item.customerNote?.trim()) ? (
+                          <div key={`${g.id}-${li}`} className="flex flex-wrap items-center gap-1 mt-0.5 ml-4">
+                            <span className="text-[10px] text-muted-foreground">↳ {item.quantity}x</span>
+                            {item.removedIngredients?.map((ing) => (
+                              <span key={ing} className="text-[10px] text-destructive">Pa {getIngredientName(ing, language)}</span>
+                            ))}
+                            {item.addedExtras?.map((ext) => (
+                              <span key={ext.id} className="text-[10px] text-accent-foreground">Me {ext.name[language]} (+€{ext.price.toFixed(2)})</span>
+                            ))}
+                            {item.customerNote?.trim() && (
+                              <span className="w-full text-[10px] text-muted-foreground italic">📝 {item.customerNote}</span>
+                            )}
+                          </div>
+                        ) : null
+                      ))}
                     </div>
                   ))}
                   <div className="border-t border-border pt-2 mt-2 space-y-1.5">
@@ -374,6 +386,43 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
                     rows={2}
                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 transition-all resize-none"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5">
+                    {language === 'sq' ? 'Mënyra e pagesës' : 'Payment method'}
+                  </label>
+                  <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-secondary">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('cash')}
+                      className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all active:scale-[0.97] ${
+                        paymentMethod === 'cash'
+                          ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      <Banknote className="w-4 h-4" /> Cash
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('pos')}
+                      className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all active:scale-[0.97] ${
+                        paymentMethod === 'pos'
+                          ? 'bg-background text-foreground shadow-sm ring-1 ring-border/50'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      <CreditCard className="w-4 h-4" /> POS (Me Kartele)
+                    </button>
+                  </div>
+                  {paymentMethod === 'pos' && (
+                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                      {language === 'sq'
+                        ? (isTakeaway ? 'Paguani me kartelë në lokal.' : 'Shoferi sjell POS-in — paguani me kartelë te dera.')
+                        : (isTakeaway ? 'Pay by card at the restaurant.' : 'The driver brings a POS terminal — pay by card at the door.')}
+                    </p>
+                  )}
                 </div>
               </div>
 

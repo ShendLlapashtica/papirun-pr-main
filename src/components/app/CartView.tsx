@@ -6,6 +6,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { getIngredientName } from '@/data/ingredientTranslations';
 import { getCartLineTotal, getCartTotal } from '@/lib/cartPricing';
 import { getCartItemKey } from '@/lib/cartItemKey';
+import { groupCartLines } from '@/lib/orderItemsGrouping';
+import type { CartItem } from '@/types/menu';
 import CheckoutModal from '@/components/CheckoutModal';
 import { getOptimizedImage } from '@/lib/utils';
 
@@ -95,12 +97,117 @@ const CartView = () => {
       ) : (
         <>
           <div className="space-y-3">
-            {cart.map((item) => {
-              const itemKey = getCartItemKey(item);
-              const isEditingNote = editingNoteKey === itemKey;
-              return (
+            {groupCartLines(cart).map((g) => {
+              // One variant's editable body (badges, note, stepper, price, delete).
+              // `sub` renders it as an indented "↳" row inside a grouped product card —
+              // mirroring the admin panel's grouped receipt.
+              const renderLineBody = (item: CartItem, sub: boolean) => {
+                const itemKey = getCartItemKey(item);
+                const isEditingNote = editingNoteKey === itemKey;
+                return (
+                  <div className="flex-1 min-w-0">
+                    {(sub || (item.removedIngredients?.length ?? 0) > 0 || (item.addedExtras?.length ?? 0) > 0) && (
+                      <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                        {sub && (
+                          <span className="text-[10px] font-bold shrink-0" style={{ color: '#0F1311A0' }}>
+                            ↳ {item.quantity}x
+                          </span>
+                        )}
+                        {item.removedIngredients?.map((ing) => (
+                          <span
+                            key={ing}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-semibold"
+                          >
+                            Pa {getIngredientName(ing, language)}
+                          </span>
+                        ))}
+                        {item.addedExtras?.map((ext) => (
+                          <span
+                            key={ext.id}
+                            className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                            style={{ background: `${SAGE}22`, color: SLATE }}
+                          >
+                            + {ext.name[language]}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {isEditingNote ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        defaultValue={item.customerNote || ''}
+                        placeholder={language === 'sq' ? 'psh. me shumë sos…' : 'e.g. extra sauce…'}
+                        className="w-full mt-1.5 text-[11px] px-2.5 py-1.5 rounded-lg bg-white/70 border border-white/60 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                        onBlur={(e) => { updateNote(itemKey, e.target.value); setEditingNoteKey(null); }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            updateNote(itemKey, (e.target as HTMLInputElement).value);
+                            setEditingNoteKey(null);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setEditingNoteKey(itemKey)}
+                        className="flex items-center gap-1 mt-1.5 text-[10.5px] font-semibold"
+                        style={{ color: '#0F1311A0' }}
+                      >
+                        <MessageSquare className="w-2.5 h-2.5" strokeWidth={2.6} />
+                        {item.customerNote?.trim()
+                          ? <span className="italic truncate">📝 {item.customerNote}</span>
+                          : <span>{language === 'sq' ? '+ Shto shënim' : '+ Add note'}</span>}
+                      </button>
+                    )}
+
+                    <div className="flex items-center justify-between mt-2.5">
+                      <div
+                        className="flex items-center gap-1 rounded-full p-1 border border-white/50"
+                        style={{ background: 'rgba(255,255,255,0.65)' }}
+                      >
+                        <button
+                          onClick={() => updateQuantity(itemKey, item.quantity - 1)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/70"
+                          style={{ color: SLATE }}
+                          aria-label="-"
+                        >
+                          <Minus className="w-3.5 h-3.5" strokeWidth={2.6} />
+                        </button>
+                        <span className="w-5 text-center text-[12px] font-bold" style={{ color: SLATE }}>
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => updateQuantity(itemKey, item.quantity + 1)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white active:scale-90 transition-transform"
+                          style={{ background: SAGE, boxShadow: '0 4px 10px -4px rgba(116,157,121,0.6)' }}
+                          aria-label="+"
+                        >
+                          <Plus className="w-3.5 h-3.5" strokeWidth={2.8} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[15px] font-bold tracking-tight" style={{ color: SLATE }}>
+                          €{getCartLineTotal(item).toFixed(2)}
+                        </span>
+                        {sub && (
+                          <button
+                            onClick={() => removeFromCart(itemKey)}
+                            className="p-1.5 rounded-full text-destructive/80 hover:bg-destructive/10 shrink-0"
+                            aria-label="Hiq"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" strokeWidth={2.4} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              };
+
+              const cardShell = (children: React.ReactNode, key: string) => (
                 <div
-                  key={itemKey}
+                  key={key}
                   className="rounded-[28px] p-3.5 animate-slide-up border border-white/50"
                   style={{
                     background: 'rgba(255,255,255,0.55)',
@@ -109,28 +216,40 @@ const CartView = () => {
                     boxShadow: '0 8px 24px -12px rgba(0,0,0,0.12)',
                   }}
                 >
-                  <div className="flex gap-3.5">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/app/product/${item.id}`)}
-                      className="rounded-2xl overflow-hidden shrink-0 ring-1 ring-white/60"
-                      style={{ background: 'rgba(255,255,255,0.55)' }}
-                    >
-                      <img
-                        src={getOptimizedImage(item.image)}
-                        alt={item.name[language]}
-                        className="w-16 h-16 object-contain bg-white p-1.5"
-                      />
-                    </button>
+                  {children}
+                </div>
+              );
 
+              const thumb = (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/app/product/${g.id}`)}
+                  className="rounded-2xl overflow-hidden shrink-0 ring-1 ring-white/60"
+                  style={{ background: 'rgba(255,255,255,0.55)' }}
+                >
+                  <img
+                    src={getOptimizedImage(g.image)}
+                    alt={g.name[language]}
+                    className="w-16 h-16 object-contain bg-white p-1.5"
+                  />
+                </button>
+              );
+
+              // Single variant of this product → the classic card, unchanged
+              if (g.lines.length === 1) {
+                const item = g.lines[0];
+                const itemKey = getCartItemKey(item);
+                return cardShell(
+                  <div className="flex gap-3.5">
+                    {thumb}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <button
-                          onClick={() => navigate(`/app/product/${item.id}`)}
+                          onClick={() => navigate(`/app/product/${g.id}`)}
                           className="text-left flex items-center gap-1 min-w-0"
                         >
                           <h4 className="font-bold text-[14px] truncate tracking-tight" style={{ color: SLATE }}>
-                            {item.name[language]}
+                            {g.name[language]}
                           </h4>
                           <Eye className="w-3 h-3 shrink-0" style={{ color: '#0F131180' }} />
                         </button>
@@ -142,89 +261,38 @@ const CartView = () => {
                           <Trash2 className="w-3.5 h-3.5" strokeWidth={2.4} />
                         </button>
                       </div>
-
-                      {((item.removedIngredients?.length ?? 0) > 0 || (item.addedExtras?.length ?? 0) > 0) && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {item.removedIngredients?.map((ing) => (
-                            <span
-                              key={ing}
-                              className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-semibold"
-                            >
-                              Pa {getIngredientName(ing, language)}
-                            </span>
-                          ))}
-                          {item.addedExtras?.map((ext) => (
-                            <span
-                              key={ext.id}
-                              className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-                              style={{ background: `${SAGE}22`, color: SLATE }}
-                            >
-                              + {ext.name[language]}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {isEditingNote ? (
-                        <input
-                          autoFocus
-                          type="text"
-                          defaultValue={item.customerNote || ''}
-                          placeholder={language === 'sq' ? 'psh. me shumë sos…' : 'e.g. extra sauce…'}
-                          className="w-full mt-1.5 text-[11px] px-2.5 py-1.5 rounded-lg bg-white/70 border border-white/60 focus:outline-none focus:ring-1 focus:ring-primary/30"
-                          onBlur={(e) => { updateNote(itemKey, e.target.value); setEditingNoteKey(null); }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              updateNote(itemKey, (e.target as HTMLInputElement).value);
-                              setEditingNoteKey(null);
-                            }
-                          }}
-                        />
-                      ) : (
-                        <button
-                          onClick={() => setEditingNoteKey(itemKey)}
-                          className="flex items-center gap-1 mt-1.5 text-[10.5px] font-semibold"
-                          style={{ color: '#0F1311A0' }}
-                        >
-                          <MessageSquare className="w-2.5 h-2.5" strokeWidth={2.6} />
-                          {item.customerNote?.trim()
-                            ? <span className="italic truncate">📝 {item.customerNote}</span>
-                            : <span>{language === 'sq' ? '+ Shto shënim' : '+ Add note'}</span>}
-                        </button>
-                      )}
-
-                      <div className="flex items-center justify-between mt-2.5">
-                        <div
-                          className="flex items-center gap-1 rounded-full p-1 border border-white/50"
-                          style={{ background: 'rgba(255,255,255,0.65)' }}
-                        >
-                          <button
-                            onClick={() => updateQuantity(itemKey, item.quantity - 1)}
-                            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/70"
-                            style={{ color: SLATE }}
-                            aria-label="-"
-                          >
-                            <Minus className="w-3.5 h-3.5" strokeWidth={2.6} />
-                          </button>
-                          <span className="w-5 text-center text-[12px] font-bold" style={{ color: SLATE }}>
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() => updateQuantity(itemKey, item.quantity + 1)}
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-white active:scale-90 transition-transform"
-                            style={{ background: SAGE, boxShadow: '0 4px 10px -4px rgba(116,157,121,0.6)' }}
-                            aria-label="+"
-                          >
-                            <Plus className="w-3.5 h-3.5" strokeWidth={2.8} />
-                          </button>
-                        </div>
-                        <span className="text-[15px] font-bold tracking-tight" style={{ color: SLATE }}>
-                          €{getCartLineTotal(item).toFixed(2)}
-                        </span>
-                      </div>
+                      {renderLineBody(item, false)}
                     </div>
+                  </div>,
+                  itemKey
+                );
+              }
+
+              // Several variants (e.g. plain + "pa domate") → admin-style group:
+              // "2x Sanduiç" header, each variant as an indented ↳ block with its own controls
+              return cardShell(
+                <>
+                  <div className="flex items-center gap-3.5">
+                    {thumb}
+                    <button
+                      onClick={() => navigate(`/app/product/${g.id}`)}
+                      className="text-left flex items-center gap-1 min-w-0"
+                    >
+                      <h4 className="font-bold text-[14px] truncate tracking-tight" style={{ color: SLATE }}>
+                        {g.totalQty}x {g.name[language]}
+                      </h4>
+                      <Eye className="w-3 h-3 shrink-0" style={{ color: '#0F131180' }} />
+                    </button>
                   </div>
-                </div>
+                  <div className="mt-2 pl-3 ml-6 space-y-3" style={{ borderLeft: '2px solid rgba(15,19,17,0.12)' }}>
+                    {g.lines.map((item) => (
+                      <div key={getCartItemKey(item)}>
+                        {renderLineBody(item, true)}
+                      </div>
+                    ))}
+                  </div>
+                </>,
+                `group-${g.id}`
               );
             })}
           </div>

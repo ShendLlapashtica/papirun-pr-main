@@ -7,6 +7,7 @@ import { getIngredientName } from '@/data/ingredientTranslations';
 import { cn, getOptimizedImage } from '@/lib/utils';
 import { getCartLineTotal, getCartTotal } from '@/lib/cartPricing';
 import { getCartItemKey } from '@/lib/cartItemKey';
+import { groupCartLines } from '@/lib/orderItemsGrouping';
 
 interface TrayProps {
   items: CartItem[];
@@ -114,111 +115,172 @@ const Tray = ({ items, isOpen, onClose, onUpdateQuantity, onRemove, onCheckout, 
               <p className="text-sm text-muted-foreground/70">{t.tray.emptySubtext}</p>
             </div>
           ) : (
-            items.map((item) => {
-              const itemKey = getCartItemKey(item);
-              const isEditingNote = editingNoteKey === itemKey;
-
-              return (
-              <SwipeableItem key={itemKey} onSwipeRight={() => onRemove(itemKey)}>
-                <div className="tray-item animate-slide-up">
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => openProduct(item.id)}
-                      className="rounded-xl overflow-hidden shrink-0"
-                    >
-                      <img src={getOptimizedImage(item.image)} alt={item.name[language]} className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-contain bg-white" />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <h4
-                          className="font-medium text-xs sm:text-sm truncate cursor-pointer hover:text-primary transition-colors"
-                          onClick={() => openProduct(item.id)}
-                        >
-                          {item.name[language]}
-                        </h4>
-                        <button
-                          onClick={() => openProduct(item.id)}
-                          className="p-0.5 rounded-full text-muted-foreground hover:text-primary transition-colors shrink-0"
-                          title={language === 'sq' ? 'Shiko produktin' : 'View product'}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
+            groupCartLines(items).map((g) => {
+              // Shared inner body of one cart line (badges, note, price, stepper).
+              // `sub` = rendered as an indented "↳" variant row under a group header,
+              // exactly like the admin panel's grouped receipt.
+              const renderLineBody = (item: CartItem, sub: boolean) => {
+                const itemKey = getCartItemKey(item);
+                const isEditingNote = editingNoteKey === itemKey;
+                return (
+                  <div className="flex-1 min-w-0">
+                    {sub && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground font-medium shrink-0">↳ {item.quantity}x</span>
+                        {item.removedIngredients?.map((ing) => (
+                          <span key={ing} className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive">
+                            Pa {getIngredientName(ing, language)}
+                          </span>
+                        ))}
+                        {item.addedExtras?.map((ext) => (
+                          <span key={ext.id} className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
+                            Me {ext.name[language]} (+€{ext.price.toFixed(2)})
+                          </span>
+                        ))}
                       </div>
+                    )}
+                    {!sub && ((item.removedIngredients && item.removedIngredients.length > 0) || (item.addedExtras && item.addedExtras.length > 0)) && (
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {item.removedIngredients?.map((ing) => (
+                          <span key={ing} className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive">
+                            Pa {getIngredientName(ing, language)}
+                          </span>
+                        ))}
+                        {item.addedExtras?.map((ext) => (
+                          <span key={ext.id} className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
+                            Me {ext.name[language]} (+€{ext.price.toFixed(2)})
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
-                      {((item.removedIngredients && item.removedIngredients.length > 0) || (item.addedExtras && item.addedExtras.length > 0)) && (
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          {item.removedIngredients?.map((ing) => (
-                            <span key={ing} className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive">
-                              Pa {getIngredientName(ing, language)}
-                            </span>
-                          ))}
-                          {item.addedExtras?.map((ext) => (
-                            <span key={ext.id} className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
-                              Me {ext.name[language]} (+€{ext.price.toFixed(2)})
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Customer note display/edit */}
-                      {isEditingNote ? (
-                        <div className="mt-1">
-                          <input
-                            autoFocus
-                            type="text"
-                            defaultValue={item.customerNote || ''}
-                            placeholder={language === 'sq' ? 'psh. me shume sos...' : 'e.g. extra sauce...'}
-                            className="w-full text-[10px] px-2 py-1 rounded-lg bg-secondary border-0 focus:ring-1 focus:ring-primary/30"
-                            onBlur={(e) => {
-                              onUpdateNote?.(itemKey, e.target.value);
+                    {/* Customer note display/edit */}
+                    {isEditingNote ? (
+                      <div className="mt-1">
+                        <input
+                          autoFocus
+                          type="text"
+                          defaultValue={item.customerNote || ''}
+                          placeholder={language === 'sq' ? 'psh. me shume sos...' : 'e.g. extra sauce...'}
+                          className="w-full text-[10px] px-2 py-1 rounded-lg bg-secondary border-0 focus:ring-1 focus:ring-primary/30"
+                          onBlur={(e) => {
+                            onUpdateNote?.(itemKey, e.target.value);
+                            setEditingNoteKey(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              onUpdateNote?.(itemKey, (e.target as HTMLInputElement).value);
                               setEditingNoteKey(null);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                onUpdateNote?.(itemKey, (e.target as HTMLInputElement).value);
-                                setEditingNoteKey(null);
-                              }
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setEditingNoteKey(itemKey)}
-                          className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground hover:text-primary transition-colors"
-                        >
-                          <MessageSquare className="w-2.5 h-2.5" />
-                          {item.customerNote?.trim()
-                            ? <span className="italic">📝 {item.customerNote}</span>
-                            : <span>{language === 'sq' ? '+ Shto shënim' : '+ Add note'}</span>
-                          }
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setEditingNoteKey(itemKey)}
+                        className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <MessageSquare className="w-2.5 h-2.5" />
+                        {item.customerNote?.trim()
+                          ? <span className="italic">📝 {item.customerNote}</span>
+                          : <span>{language === 'sq' ? '+ Shto shënim' : '+ Add note'}</span>
+                        }
+                      </button>
+                    )}
+
+                    <p className="text-primary font-semibold text-xs sm:text-sm">€{getCartLineTotal(item).toFixed(2)}</p>
+
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 bg-background rounded-full p-1">
+                        <button onClick={() => onUpdateQuantity(itemKey, item.quantity - 1)} className="p-1 rounded-full hover:bg-muted transition-colors">
+                          <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
                         </button>
-                      )}
-
-                      <p className="text-primary font-semibold text-xs sm:text-sm">€{getCartLineTotal(item).toFixed(2)}</p>
-
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="flex items-center gap-1.5 sm:gap-2 bg-background rounded-full p-1">
-                          <button onClick={() => onUpdateQuantity(itemKey, item.quantity - 1)} className="p-1 rounded-full hover:bg-muted transition-colors">
-                            <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </button>
-                          <span className="w-5 sm:w-6 text-center text-xs sm:text-sm font-medium">{item.quantity}</span>
-                          <button onClick={() => onUpdateQuantity(itemKey, item.quantity + 1)} className="p-1 rounded-full hover:bg-muted transition-colors">
-                            <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => onRemove(itemKey)}
-                          className="p-1.5 rounded-full text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="w-5 sm:w-6 text-center text-xs sm:text-sm font-medium">{item.quantity}</span>
+                        <button onClick={() => onUpdateQuantity(itemKey, item.quantity + 1)} className="p-1 rounded-full hover:bg-muted transition-colors">
+                          <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                         </button>
                       </div>
+                      <button
+                        onClick={() => onRemove(itemKey)}
+                        className="p-1.5 rounded-full text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </button>
                     </div>
                   </div>
+                );
+              };
+
+              const thumb = (
+                <button
+                  type="button"
+                  onClick={() => openProduct(g.id)}
+                  className="rounded-xl overflow-hidden shrink-0"
+                >
+                  <img src={getOptimizedImage(g.image)} alt={g.name[language]} className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-contain bg-white" />
+                </button>
+              );
+
+              const nameRow = (labelQty: number | null) => (
+                <div className="flex items-center gap-1">
+                  <h4
+                    className="font-medium text-xs sm:text-sm truncate cursor-pointer hover:text-primary transition-colors"
+                    onClick={() => openProduct(g.id)}
+                  >
+                    {labelQty !== null ? `${labelQty}x ` : ''}{g.name[language]}
+                  </h4>
+                  <button
+                    onClick={() => openProduct(g.id)}
+                    className="p-0.5 rounded-full text-muted-foreground hover:text-primary transition-colors shrink-0"
+                    title={language === 'sq' ? 'Shiko produktin' : 'View product'}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              </SwipeableItem>
-            )})
+              );
+
+              // Single variant of this product → exactly the classic line
+              if (g.lines.length === 1) {
+                const item = g.lines[0];
+                const itemKey = getCartItemKey(item);
+                return (
+                  <SwipeableItem key={itemKey} onSwipeRight={() => onRemove(itemKey)}>
+                    <div className="tray-item animate-slide-up">
+                      <div className="flex gap-3">
+                        {thumb}
+                        <div className="flex-1 min-w-0">
+                          {nameRow(null)}
+                          {renderLineBody(item, false)}
+                        </div>
+                      </div>
+                    </div>
+                  </SwipeableItem>
+                );
+              }
+
+              // Several variants (e.g. plain + "pa domate") → admin-style group:
+              // "2x Sanduiç" header, each variant as an indented ↳ sub-row with its own controls
+              return (
+                <div key={`group-${g.id}`} className="tray-item animate-slide-up">
+                  <div className="flex items-center gap-3">
+                    {thumb}
+                    {nameRow(g.totalQty)}
+                  </div>
+                  <div className="mt-2 pl-4 space-y-2.5 border-l-2 border-border/50 ml-6">
+                    {g.lines.map((item) => {
+                      const itemKey = getCartItemKey(item);
+                      return (
+                        <SwipeableItem key={itemKey} onSwipeRight={() => onRemove(itemKey)}>
+                          <div className="flex gap-2">
+                            {renderLineBody(item, true)}
+                          </div>
+                        </SwipeableItem>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
 
