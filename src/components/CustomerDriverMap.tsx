@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -104,9 +105,11 @@ export default function CustomerDriverMap({
     }
   };
 
-  // Init map once
+  // Init map — re-created on fullscreen toggle: fullscreen renders through a body
+  // portal (ancestor backdrop-filter/transform would trap position:fixed inside
+  // the admin card), which remounts the DOM node Leaflet is bound to.
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    if (!containerRef.current) return;
     injectPulseCSS();
 
     const midLat = (driverLat + customerLat) / 2;
@@ -160,7 +163,15 @@ export default function CustomerDriverMap({
       routeLineRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isFullscreen]);
+
+  // Esc leaves fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsFullscreen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isFullscreen]);
 
   // Move driver marker and refresh road route whenever driver position changes
   useEffect(() => {
@@ -174,7 +185,7 @@ export default function CustomerDriverMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driverLat, driverLng, customerLat, customerLng]);
 
-  return (
+  const content = (
     <div className={`relative overflow-hidden border border-border/40 ${isFullscreen ? 'fixed inset-0 z-[600] rounded-none' : 'rounded-xl'}`}>
       {/* Driver + ETA badge */}
       <div className="absolute top-2 left-2 right-2 z-[400] flex items-center gap-2 bg-background/92 backdrop-blur-md rounded-full px-3 py-1.5 shadow-md border border-border/40 text-xs font-semibold">
@@ -187,13 +198,10 @@ export default function CustomerDriverMap({
           {etaMinutes !== null ? `~${etaMinutes} min` : '⏳'}
         </span>
       </div>
-      <div ref={containerRef} style={{ height: isFullscreen ? '100vh' : '200px', width: '100%' }} />
+      <div ref={containerRef} style={{ height: isFullscreen ? '100dvh' : '200px', width: '100%' }} />
       {allowFullscreen && (
         <button
-          onClick={() => {
-            setIsFullscreen((f) => !f);
-            setTimeout(() => mapRef.current?.invalidateSize(), 50);
-          }}
+          onClick={() => setIsFullscreen((f) => !f)}
           className="absolute bottom-2 right-2 z-[401] w-8 h-8 rounded-lg bg-background/80 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-background transition-colors"
           title={isFullscreen ? 'Minimizo' : 'Ekran i plotë'}
         >
@@ -202,4 +210,7 @@ export default function CustomerDriverMap({
       )}
     </div>
   );
+
+  // Fullscreen escapes ancestor containing blocks (backdrop-filter/transform) via a body portal
+  return isFullscreen ? createPortal(content, document.body) : content;
 }
