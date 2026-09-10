@@ -23,11 +23,6 @@ export const DEFAULT_CATEGORY_ORDER: string[] = ['salad', 'fajita', 'sandwich', 
 export const CAGLLAVICE_UNAVAILABLE_KEY = 'cagllavice_unavailable_ids';
 export const DEFAULT_CAGLLAVICE_UNAVAILABLE: string[] = [];
 
-// When true, Qendër works Çagllavicë's orders: they appear in the Qendër admin
-// view (same order, never duplicated) and the customer sees
-// "Porosia juaj po përpunohet nga Papirun Qendër!". Toggled from the admin panel.
-export const QENDER_HANDLES_CAGLLAVICE_KEY = 'qender_handles_cagllavice';
-
 export interface StorefrontOffer extends OfferItem {
   isActive: boolean;
   sortOrder: number;
