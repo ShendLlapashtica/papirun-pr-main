@@ -23,6 +23,7 @@ import ClientsOverviewMap from '@/components/admin/ClientsOverviewMap';
 import DeliveryRouteMap from '@/components/admin/DeliveryRouteMap';
 import ArchivedChatView from '@/components/admin/ArchivedChatView';
 import { generateInvoice } from '@/lib/invoiceGenerator';
+import { fetchStorefrontSetting, upsertStorefrontSetting, QENDER_HANDLES_CAGLLAVICE_KEY } from '@/lib/storefrontApi';
 import { assignDriverToOrder, fetchDrivers, fetchOrderAssignTimes, subscribeAllDriverLocations, driverShortCode, haversineKm, RESTAURANT_COORDS, driversForBranch, type DeliveryDriver } from '@/lib/driversApi';
 import { pickBestDriver } from '@/components/admin/DriversKPI';
 import DriverLocationMap from '@/components/DriverLocationMap';
@@ -83,9 +84,15 @@ const isCagllavice = (o: OrderRecord): boolean => {
   return false;
 };
 
-const matchesLocationFilter = (o: OrderRecord, loc: 'all' | 'qender' | 'cagllavice'): boolean => {
+const matchesLocationFilter = (
+  o: OrderRecord,
+  loc: 'all' | 'qender' | 'cagllavice',
+  qenderCoversCagllavice = false,
+): boolean => {
   if (loc === 'cagllavice') return isCagllavice(o);
-  if (loc === 'qender') return !isCagllavice(o);
+  // Forwarding mode: Qendër works Çagllavicë's orders too, so its view shows
+  // everything (each Çagllavicë order keeps its blue "C Çagllavicë" chip).
+  if (loc === 'qender') return qenderCoversCagllavice ? true : !isCagllavice(o);
   return true;
 };
 
@@ -416,6 +423,24 @@ const OrdersReview = ({
   const [showRruges, setShowRruges] = useState(false);
   const [rrugesFilter, setRrugesFilter] = useState<'delivering' | 'returning'>('delivering');
   const [locationFilter, setLocationFilter] = useState<'all' | 'qender' | 'cagllavice'>('all');
+  // Forwarding mode — Qendër works Çagllavicë's orders (settings row, admin-toggled)
+  const [qenderHandlesCagl, setQenderHandlesCagl] = useState(false);
+  useEffect(() => {
+    fetchStorefrontSetting<boolean>(QENDER_HANDLES_CAGLLAVICE_KEY, false)
+      .then(setQenderHandlesCagl)
+      .catch(() => {});
+  }, []);
+  const toggleQenderHandlesCagl = async () => {
+    const next = !qenderHandlesCagl;
+    setQenderHandlesCagl(next); // optimistic
+    try {
+      await upsertStorefrontSetting(QENDER_HANDLES_CAGLLAVICE_KEY, next);
+      toast.success(next ? 'Qendra tani i përpunon porositë e Çagllavicës' : 'Çagllavica i përpunon porositë e veta');
+    } catch {
+      setQenderHandlesCagl(!next); // revert on failure
+      toast.error('Gabim — ndryshimi nuk u ruajt');
+    }
+  };
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -722,18 +747,18 @@ const OrdersReview = ({
   const effectiveLocFilter = caglOnly ? 'cagllavice' : locationFilter;
 
   const counts = useMemo(() => {
-    const visible = timeFilteredByCreated.filter((o) => !isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter));
+    const visible = timeFilteredByCreated.filter((o) => !isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter, qenderHandlesCagl));
     return {
       pending: visible.filter((o) => o.status === 'pending').length,
       approved: visible.filter((o) => ['approved', 'preparing', 'out_for_delivery', 'completed'].includes(o.status)).length,
-      history: timeFilteredByCreated.filter((o) => isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter)).length,
+      history: timeFilteredByCreated.filter((o) => isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter, qenderHandlesCagl)).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeFilteredByCreated, archivedIds, effectiveLocFilter]);
 
   const historyCounts = useMemo(() => {
-    const histByCreated = timeFilteredByCreated.filter((o) => isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter));
-    const histByResolved = timeFilteredByResolved.filter((o) => isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter));
+    const histByCreated = timeFilteredByCreated.filter((o) => isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter, qenderHandlesCagl));
+    const histByResolved = timeFilteredByResolved.filter((o) => isInHistory(o) && matchesLocationFilter(o, effectiveLocFilter, qenderHandlesCagl));
     return {
       completed: histByResolved.filter((o) => o.status === 'completed').length,
       rejected: histByResolved.filter((o) => o.status === 'rejected').length,
@@ -782,7 +807,7 @@ const OrdersReview = ({
         }
       })();
       if (!matchesStatus) return false;
-      if (!matchesLocationFilter(o, effectiveLocFilter)) return false;
+      if (!matchesLocationFilter(o, effectiveLocFilter, qenderHandlesCagl)) return false;
       if (!q) return true;
       const itemsStr = o.items.map((i: any) => `${i.name?.sq || ''} ${i.name?.en || ''}`).join(' ').toLowerCase();
       return (
@@ -1282,6 +1307,21 @@ const OrdersReview = ({
               </button>
             );
           })}
+
+          {/* Forwarding switch — only the Qendër/main admin can flip it */}
+          {!caglOnly && (
+            <button
+              onClick={toggleQenderHandlesCagl}
+              title="Kur është aktive, porositë e Çagllavicës shfaqen edhe në pamjen e Qendrës dhe klienti njoftohet se Qendra po e përpunon porosinë"
+              className={`ml-auto shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border ${
+                qenderHandlesCagl
+                  ? 'bg-blue-500/15 text-blue-600 border-blue-400/40 ring-2 ring-offset-1 ring-blue-400/30 shadow-sm'
+                  : 'bg-secondary/60 text-muted-foreground border-border/40 hover:bg-secondary'
+              }`}
+            >
+              {qenderHandlesCagl ? '✓ Qendra ⇐ Çagllavica' : 'Qendra ⇐ Çagllavica'}
+            </button>
+          )}
         </div>
 
         {(filter === 'custom' || statusFilter === 'history') && (

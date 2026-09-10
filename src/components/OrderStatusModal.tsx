@@ -7,6 +7,7 @@ import OrderChat from '@/components/OrderChat';
 import { clearActiveOrderId } from '@/components/OrderTrackingPill';
 import { rateDriver } from '@/lib/driversApi';
 import { generateInvoice } from '@/lib/invoiceGenerator';
+import { fetchStorefrontSetting, QENDER_HANDLES_CAGLLAVICE_KEY } from '@/lib/storefrontApi';
 
 interface Props {
   orderId: string;
@@ -61,6 +62,13 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
   const [endingConvo, setEndingConvo] = useState(false);
   const thankYouTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { language } = useLanguage();
+  // Forwarding mode — Çagllavicë customers are told Qendër handles their order
+  const [qenderCovers, setQenderCovers] = useState(false);
+  useEffect(() => {
+    fetchStorefrontSetting<boolean>(QENDER_HANDLES_CAGLLAVICE_KEY, false)
+      .then(setQenderCovers)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!isOpen || !orderId) return;
@@ -174,6 +182,14 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
               <div className="mt-2 flex items-center gap-1.5 text-xs text-primary bg-primary/5 rounded-lg px-2.5 py-1.5">
                 <Clock className="w-3.5 h-3.5" />
                 {language === 'sq' ? `Gati për ~${order.prepEtaMinutes} min` : `Ready in ~${order.prepEtaMinutes} min`}
+              </div>
+            )}
+            {/* Forwarding notice — Çagllavicë order being worked by Qendër */}
+            {qenderCovers && order?.suggestedLocation === 'cagllavice' && order.status !== 'rejected' && (
+              <div className="mt-2 text-xs font-semibold text-primary bg-primary/8 border border-primary/15 rounded-lg px-2.5 py-1.5">
+                {language === 'sq'
+                  ? 'Porosia juaj po përpunohet nga Papirun Qendër!'
+                  : 'Your order is being processed by Papirun Qendër!'}
               </div>
             )}
           </div>
