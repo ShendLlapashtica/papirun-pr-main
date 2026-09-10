@@ -177,6 +177,14 @@ const OrderStatusModal = ({ orderId, isOpen, onClose }: Props) => {
                 {language === 'sq' ? `Gati për ~${order.prepEtaMinutes} min` : `Ready in ~${order.prepEtaMinutes} min`}
               </div>
             )}
+            {/* Forwarded to Qendra — Çagllavicë handed this order over */}
+            {order?.forwardedToQender && order.status !== 'rejected' && (
+              <div className="mt-2 text-xs font-semibold text-primary bg-primary/8 border border-primary/15 rounded-lg px-2.5 py-1.5">
+                {language === 'sq'
+                  ? 'Porosia juaj po përpunohet nga Papirun Qendër!'
+                  : 'Your order is being processed by Papirun Qendër!'}
+              </div>
+            )}
           </div>
 
           {/* Chat — visually hidden when locked AND empty (still mounted to fetch count) */}

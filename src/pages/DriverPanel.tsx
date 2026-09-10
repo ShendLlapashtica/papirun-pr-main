@@ -31,7 +31,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const raw = atob(base64);
   return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
 }
-import { driverUpdateOrderStatus, suggestOrderLocation, POS_NOTES_MARKER, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
+import { driverUpdateOrderStatus, suggestOrderLocation, POS_NOTES_MARKER, FORWARDED_NOTES_MARKER, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import OrderChat from '@/components/OrderChat';
 import DriverLocationMap from '@/components/DriverLocationMap';
 import DriverManual from '@/components/DriverManual';
@@ -89,6 +89,7 @@ const mapOrderRow = (row: any): OrderRecord => ({
   statusHistory: Array.isArray(row.status_history) ? row.status_history : [],
   source: (row.source ?? 'web') as any,
   paymentMethod: String(row.notes ?? '').includes(POS_NOTES_MARKER) ? 'pos' : 'cash',
+  forwardedToQender: String(row.notes ?? '').includes(FORWARDED_NOTES_MARKER),
   prepEtaMinutes: row.prep_eta_minutes,
   isVisible: row.is_visible !== false,
   assignedDriverId: row.assigned_driver_id ?? null,

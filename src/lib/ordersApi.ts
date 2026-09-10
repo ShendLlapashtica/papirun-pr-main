@@ -15,11 +15,22 @@ export type PaymentMethod = 'cash' | 'pos';
  */
 export const POS_NOTES_MARKER = '💳 Pagesa: POS (Me Kartele)';
 
-/** Customer note with the POS marker line removed — the flag carries that info instead. */
+/**
+ * Set when Çagllavicë hands one specific order over to Qendra: the order's
+ * location_id flips to 'qender' (so it re-files under Qendra everywhere) and
+ * this line is appended to notes so the customer's tracking can say
+ * "Porosia juaj po përpunohet nga Papirun Qendër!".
+ */
+export const FORWARDED_NOTES_MARKER = '📍 Porosia u kalua te Qendra';
+
+/** Customer note with internal marker lines removed — badges/notices carry that info instead. */
 export const stripPosMarker = (notes: string | null | undefined): string =>
   (notes ?? '')
     .split('\n')
-    .filter((line) => line.trim() !== POS_NOTES_MARKER)
+    .filter((line) => {
+      const t = line.trim();
+      return t !== POS_NOTES_MARKER && t !== FORWARDED_NOTES_MARKER;
+    })
     .join('\n')
     .trim();
 
@@ -57,6 +68,8 @@ export interface OrderRecord {
   statusHistory: OrderStatusEvent[];
   source: OrderSource;
   paymentMethod: PaymentMethod;
+  /** True when Çagllavicë handed this order to Qendra (see FORWARDED_NOTES_MARKER) */
+  forwardedToQender: boolean;
   prepEtaMinutes: number | null;
   isVisible: boolean;
   assignedDriverId?: string | null;
@@ -115,8 +128,9 @@ const mapRow = (row: Row): OrderRecord => ({
   notes: row.notes,
   statusHistory: Array.isArray(row.status_history) ? row.status_history : [],
   source: (row.source ?? 'web') as OrderSource,
-  // Derived from the notes marker (no DB column for this) — see POS_NOTES_MARKER
+  // Derived from notes markers (no DB columns for these) — see the marker constants
   paymentMethod: (row.notes ?? '').includes(POS_NOTES_MARKER) ? 'pos' : 'cash',
+  forwardedToQender: (row.notes ?? '').includes(FORWARDED_NOTES_MARKER),
   prepEtaMinutes: row.prep_eta_minutes,
   isVisible: row.is_visible !== false,
   assignedDriverId: row.assigned_driver_id,
@@ -216,6 +230,22 @@ export const setOrderEta = async (id: string, minutes: number | null) => {
 export const deleteOrder = async (id: string) => {
   const client = supabase as any;
   const { error } = await client.from(TABLE).update({ status: 'histori', is_visible: false }).eq('id', id);
+  if (error) throw error;
+};
+
+/**
+ * Çagllavicë hands ONE specific order over to Qendra: same order (never a
+ * copy) re-files under Qendra in every admin view and vanishes from
+ * Çagllavicë's, and the customer's tracking starts showing
+ * "Porosia juaj po përpunohet nga Papirun Qendër!". Realtime pushes the
+ * change to both panels and the customer instantly.
+ */
+export const forwardOrderToQender = async (order: Pick<OrderRecord, 'id' | 'notes'>) => {
+  const notes = (order.notes ?? '').includes(FORWARDED_NOTES_MARKER)
+    ? order.notes
+    : `${order.notes ? `${order.notes}\n` : ''}${FORWARDED_NOTES_MARKER}`;
+  const client = supabase as any;
+  const { error } = await client.from(TABLE).update({ location_id: 'qender', notes }).eq('id', order.id);
   if (error) throw error;
 };
 
