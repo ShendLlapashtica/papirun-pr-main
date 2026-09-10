@@ -218,11 +218,18 @@ const OrderTrackingPill = () => {
     }
   }, [order?.status, order?.id, order?.assignedDriverId]);
 
-  // Auto-dismiss terminal states — rejected waits 5 min so user can read; completed auto-closes after 8 s
+  // Auto-dismiss terminal states — completed closes after 8 s; rejected lives exactly
+  // 1 minute TOTAL, anchored to the rejection timestamp itself (not to mount), so a
+  // page refresh can't restart the clock and the red banner never lingers for hours.
   useEffect(() => {
     if (!order) return;
     if (TERMINAL.includes(order.status) && !showRating) {
-      const delay = order.status === 'rejected' ? 300_000 : 8_000;
+      let delay = 8_000;
+      if (order.status === 'rejected') {
+        const rejectedAt = order.statusHistory?.find((e) => e.status === 'rejected')?.at ?? order.updatedAt;
+        const elapsed = Date.now() - new Date(rejectedAt).getTime();
+        delay = Math.max(0, 60_000 - (Number.isFinite(elapsed) ? elapsed : 0));
+      }
       const t = setTimeout(() => {
         clearActiveId();
         setHidden(true);
@@ -583,6 +590,10 @@ const OrderTrackingPill = () => {
 
   return (
     <>
+      {/* Centering lives on a plain wrapper: framer-motion owns the transform on the
+          pill itself, so Tailwind translate classes there get overwritten and the pill
+          drifted right — hiding its X off-screen on narrow phones. */}
+      <div className="fixed inset-x-0 top-1/2 -translate-y-1/2 z-[55] flex justify-center px-4 pointer-events-none">
       <AnimatePresence>
         {!showModal && <motion.div
           key="order-pill"
@@ -590,7 +601,7 @@ const OrderTrackingPill = () => {
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: -16, opacity: 0, scale: 0.92 }}
           transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[55] flex items-stretch rounded-full backdrop-blur-xl overflow-hidden"
+          className="flex items-stretch rounded-full backdrop-blur-xl overflow-hidden pointer-events-auto"
           style={{
             maxWidth: 'calc(100vw - 32px)',
             background: pillBg,
@@ -641,6 +652,7 @@ const OrderTrackingPill = () => {
           </button>
         </motion.div>}
       </AnimatePresence>
+      </div>
 
       {orderId && showModal && (
         <div className="fixed bottom-0 left-0 right-0 z-[60] p-3 pointer-events-none">
