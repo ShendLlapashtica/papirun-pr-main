@@ -10,6 +10,7 @@ import OrderChat from '@/components/OrderChat';
 import CustomerDriverMap from '@/components/CustomerDriverMap';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
+import { fetchStorefrontSetting, QENDER_HANDLES_CAGLLAVICE_KEY } from '@/lib/storefrontApi';
 
 const GOOGLE_REVIEW_URL = 'https://search.google.com/local/writereview?placeid=ChIJIcfXheaeVBMRHkjfl6e6kf8';
 
@@ -57,6 +58,13 @@ const OrderTrackingPill = () => {
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [driverInfo, setDriverInfo] = useState<{ code: string; color: string } | null>(null);
+  // Forwarding mode — when on, Çagllavicë customers are told Qendër handles their order
+  const [qenderCovers, setQenderCovers] = useState(false);
+  useEffect(() => {
+    fetchStorefrontSetting<boolean>(QENDER_HANDLES_CAGLLAVICE_KEY, false)
+      .then(setQenderCovers)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => { setAutoShowEnabled(true); }, [orderId]);
 
@@ -677,6 +685,14 @@ const OrderTrackingPill = () => {
                 </button>
               </div>
             </div>
+            {/* Forwarding notice — Çagllavicë order being worked by Qendër */}
+            {qenderCovers && order?.suggestedLocation === 'cagllavice' && !isRejected && (
+              <div className="px-4 py-2 bg-primary/8 border-b border-primary/15 text-xs font-semibold text-primary">
+                {language === 'sq'
+                  ? 'Porosia juaj po përpunohet nga Papirun Qendër!'
+                  : 'Your order is being processed by Papirun Qendër!'}
+              </div>
+            )}
             {/* Rejection banner with admin note */}
             {isRejected && (
               <div className="px-4 py-3 bg-red-50 dark:bg-red-950/40 border-b border-red-100 dark:border-red-900/40">
