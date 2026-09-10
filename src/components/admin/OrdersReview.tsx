@@ -72,8 +72,14 @@ const STATUS_LABEL: Record<string, string> = {
 type FilterKey = 'hour' | 'today' | 'week' | 'month' | 'custom' | 'all';
 type StatusFilter = 'active' | 'pending' | 'approved' | 'history';
 
-// Çagllavicë detection — uses suggestedLocation when set, falls back to address/coord for old orders
+// Çagllavicë detection — the customer's explicit branch pick at the location
+// gate (stored as orders.location_id) is authoritative: an order placed "as
+// Çagllavicë" belongs to Çagllavicë no matter where the delivery pin sits.
+// Geography (suggestedLocation → address text → coordinate box) is only the
+// fallback for old orders that carry no stored pick.
 const isCagllavice = (o: OrderRecord): boolean => {
+  if (o.locationId === 'cagllavice') return true;
+  if (o.locationId === 'qender') return false;
   if (o.suggestedLocation) return o.suggestedLocation === 'cagllavice';
   const addr = (o.deliveryAddress || '').toLowerCase();
   if (addr.includes('çagllavic') || addr.includes('cagllavic')) return true;
