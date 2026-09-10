@@ -2022,7 +2022,9 @@ const OrdersReview = ({
                   )}
 
                   {/* ── Row 1: Name + status ── */}
-                  <div className="flex items-start justify-between gap-2 pr-16">
+                  {/* pr widens when the "→ Qendra" chip is in the action cluster so the
+                      status chip (Konfirmuar etc.) flows left of it instead of underneath */}
+                  <div className={`flex items-start justify-between gap-2 ${isCagl && !isArchived && !isDeleting ? 'pr-40' : 'pr-16'}`}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <h3 className="font-bold text-base leading-tight truncate dark:text-white">{o.customerName || 'Anonim'}</h3>
