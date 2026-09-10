@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Loader2, Car, Maximize2, Minimize2 } from 'lucide-react';
@@ -49,6 +50,8 @@ const DeliveryRouteMap = ({ customerLat, customerLng, customerLabel }: Props) =>
   const [routes, setRoutes] = useState<RouteResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  // Bumped whenever the Leaflet map is (re)created so the draw effect re-runs
+  const [mapEpoch, setMapEpoch] = useState(0);
 
   // load bases
   useEffect(() => {
@@ -57,9 +60,11 @@ const DeliveryRouteMap = ({ customerLat, customerLng, customerLabel }: Props) =>
       .catch(() => setBases([]));
   }, []);
 
-  // init map
+  // init map — re-created on fullscreen toggle: the fullscreen view is portaled
+  // to <body> (ancestor backdrop-filter/overflow would trap position:fixed
+  // inside the admin card), which remounts the DOM node Leaflet is bound to.
   useEffect(() => {
-    if (!mapElRef.current || mapRef.current) return;
+    if (!mapElRef.current) return;
     const map = L.map(mapElRef.current, {
       zoomControl: true,
       attributionControl: false,
@@ -69,8 +74,19 @@ const DeliveryRouteMap = ({ customerLat, customerLng, customerLabel }: Props) =>
     }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; };
-  }, []);
+    setMapEpoch((v) => v + 1);
+    setTimeout(() => map.invalidateSize(), 60);
+    return () => { map.remove(); mapRef.current = null; layerRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullscreen]);
+
+  // Esc leaves fullscreen
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFullscreen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fullscreen]);
 
   // compute routes when bases/customer change
   useEffect(() => {
@@ -151,18 +167,16 @@ const DeliveryRouteMap = ({ customerLat, customerLng, customerLabel }: Props) =>
       const bounds = L.latLngBounds(points);
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
     }
-  }, [routes, fastestId, customerLat, customerLng, customerLabel]);
+  }, [routes, fastestId, customerLat, customerLng, customerLabel, mapEpoch]);
 
-  return (
-    <div className={`relative overflow-hidden border border-border/40 bg-secondary/30 ${fullscreen ? 'fixed inset-0 z-[500] rounded-none' : 'rounded-2xl'}`}>
-      <div ref={mapElRef} className={`w-full ${fullscreen ? 'h-screen' : 'h-64'}`} style={{ background: 'hsl(var(--secondary))' }} />
+  const content = (
+    <div className={`relative overflow-hidden border border-border/40 bg-secondary/30 ${fullscreen ? 'fixed inset-0 z-[600] rounded-none' : 'rounded-2xl'}`}>
+      <div ref={mapElRef} className={`w-full ${fullscreen ? 'h-[100dvh]' : 'h-64'}`} style={{ background: 'hsl(var(--secondary))' }} />
 
       {/* Fullscreen toggle */}
       <button
-        onClick={() => {
-          setFullscreen((f) => !f);
-          setTimeout(() => mapRef.current?.invalidateSize(), 50);
-        }}
+        onClick={() => setFullscreen((f) => !f)}
+        title={fullscreen ? 'Minimizo' : 'Ekran i plotë'}
         className="absolute bottom-2 right-2 z-[401] w-8 h-8 rounded-lg bg-background/80 backdrop-blur-md shadow-sm flex items-center justify-center hover:bg-background transition-colors"
       >
         {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -201,6 +215,9 @@ const DeliveryRouteMap = ({ customerLat, customerLng, customerLabel }: Props) =>
       </div>
     </div>
   );
+
+  // Fullscreen escapes the admin card's backdrop-filter containing block via a body portal
+  return fullscreen ? createPortal(content, document.body) : content;
 };
 
 export default DeliveryRouteMap;
