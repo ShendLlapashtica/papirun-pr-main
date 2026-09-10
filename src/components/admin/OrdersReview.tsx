@@ -12,6 +12,7 @@ import {
   hardDeleteOrder,
   hardDeleteOrdersBatch,
   stripPosMarker,
+  forwardOrderToQender,
   type OrderRecord,
   type OrderStatus,
 } from '@/lib/ordersApi';
@@ -1063,6 +1064,18 @@ const OrdersReview = ({
 
   const handlePrint = (o: OrderRecord) => { generateInvoice(o); };
 
+  // Çagllavicë hands one specific order to Qendra (the Arban case): same order,
+  // re-files under Qendra everywhere, gone from Çagllavicë, customer notified.
+  const handleForwardToQender = async (o: OrderRecord) => {
+    if (!window.confirm(`Kaloje porosinë e "${o.customerName || 'klientit'}" te Qendra?\nÇagllavica nuk do ta shohë më.`)) return;
+    try {
+      await forwardOrderToQender(o);
+      toast.success('Porosia kaloi te Qendra');
+    } catch {
+      toast.error('Gabim — porosia nuk u kalua');
+    }
+  };
+
   const handleCloseChat = async (orderId: string) => {
     setCloseChatTarget(null);
     try {
@@ -1886,6 +1899,15 @@ const OrdersReview = ({
                   </div>
                 )}
                 <div className="absolute top-2 right-2 z-10 flex items-center gap-3">
+                  {isCagl && !isArchived && !isDeleting && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleForwardToQender(o); }}
+                      className="text-[10px] font-bold uppercase tracking-wider px-2 h-7 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-all active:scale-90 border border-blue-400/30"
+                      title="Kaloje këtë porosi te Qendra — Çagllavica nuk do ta shohë më"
+                    >
+                      → Qendra
+                    </button>
+                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); togglePriority(o.id); }}
                     className={`w-7 h-7 rounded-full flex items-center justify-center transition-all active:scale-90 ${

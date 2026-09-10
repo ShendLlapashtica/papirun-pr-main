@@ -677,6 +677,14 @@ const OrderTrackingPill = () => {
                 </button>
               </div>
             </div>
+            {/* Forwarded to Qendra — Çagllavicë handed this order over */}
+            {order?.forwardedToQender && !isRejected && (
+              <div className="px-4 py-2 bg-primary/8 border-b border-primary/15 text-xs font-semibold text-primary">
+                {language === 'sq'
+                  ? 'Porosia juaj po përpunohet nga Papirun Qendër!'
+                  : 'Your order is being processed by Papirun Qendër!'}
+              </div>
+            )}
             {/* Rejection banner with admin note */}
             {isRejected && (
               <div className="px-4 py-3 bg-red-50 dark:bg-red-950/40 border-b border-red-100 dark:border-red-900/40">
