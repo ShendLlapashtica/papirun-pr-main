@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { toast } from 'sonner';
 import { assignDriverToOrder, RESTAURANT_COORDS, driversForBranch, type DeliveryDriver } from '@/lib/driversApi';
-import { type OrderRecord } from '@/lib/ordersApi';
+import { resolveOrderBranch, type OrderRecord } from '@/lib/ordersApi';
 import { X } from 'lucide-react';
 
 interface Props {
@@ -130,8 +130,9 @@ export default function ClientsOverviewMap({ orders, drivers, onClose }: Props) 
       {selectedIds.size > 0 && (() => {
         const selectedBranches = new Set(
           Array.from(selectedIds)
-            .map((id) => orders.find((o) => o.id === id)?.suggestedLocation)
-            .filter((b): b is NonNullable<typeof b> => !!b)
+            .map((id) => orders.find((o) => o.id === id))
+            .filter((o): o is OrderRecord => !!o)
+            .map((o) => resolveOrderBranch(o))
         );
         const isMixedBranch = selectedBranches.size > 1;
         const eligibleDrivers = isMixedBranch

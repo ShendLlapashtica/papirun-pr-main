@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { assignDriverToOrder, driversForBranch, type DeliveryDriver } from '@/lib/driversApi';
-import { type OrderRecord } from '@/lib/ordersApi';
+import { resolveOrderBranch, type OrderRecord } from '@/lib/ordersApi';
 import { Loader2, Trash2 } from 'lucide-react';
 
 interface Props {
@@ -19,8 +19,9 @@ export default function BulkAssignBar({ selectedIds, orders, drivers, onDone, on
 
   const selectedBranches = new Set(
     Array.from(selectedIds)
-      .map((id) => orders.find((o) => o.id === id)?.suggestedLocation)
-      .filter((b): b is NonNullable<typeof b> => !!b)
+      .map((id) => orders.find((o) => o.id === id))
+      .filter((o): o is OrderRecord => !!o)
+      .map((o) => resolveOrderBranch(o))
   );
   const isMixedBranch = selectedBranches.size > 1;
   const eligibleDrivers = isMixedBranch
