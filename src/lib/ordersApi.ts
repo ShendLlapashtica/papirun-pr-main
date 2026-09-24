@@ -80,6 +80,24 @@ export interface OrderRecord {
   updatedAt: string;
 }
 
+/**
+ * Single source of truth for which branch an order belongs to — the customer's
+ * explicit pick at the location gate (locationId) is authoritative; geography
+ * (suggestedLocation → address text → coordinate box) is only the fallback for
+ * old orders with no stored pick. Every place that needs "is this a Çagllavicë
+ * order" (admin filing, driver-assignment eligibility) must go through this —
+ * reading suggestedLocation directly skips the customer's pick and offers
+ * every branch's drivers instead of just the order's own.
+ */
+export function resolveOrderBranch(
+  o: Pick<OrderRecord, 'locationId' | 'suggestedLocation' | 'deliveryAddress' | 'deliveryLat' | 'deliveryLng'>
+): OrderLocation {
+  if (o.locationId === 'cagllavice') return 'cagllavice';
+  if (o.locationId === 'qender') return 'qender';
+  if (o.suggestedLocation) return o.suggestedLocation;
+  return suggestOrderLocation(o.deliveryLat, o.deliveryLng, o.deliveryAddress);
+}
+
 type Row = {
   id: string;
   user_id: string | null;

@@ -13,6 +13,7 @@ import {
   hardDeleteOrdersBatch,
   stripPosMarker,
   forwardOrderToQender,
+  resolveOrderBranch,
   type OrderRecord,
   type OrderStatus,
 } from '@/lib/ordersApi';
@@ -78,17 +79,7 @@ type StatusFilter = 'active' | 'pending' | 'approved' | 'history';
 // Çagllavicë" belongs to Çagllavicë no matter where the delivery pin sits.
 // Geography (suggestedLocation → address text → coordinate box) is only the
 // fallback for old orders that carry no stored pick.
-const isCagllavice = (o: OrderRecord): boolean => {
-  if (o.locationId === 'cagllavice') return true;
-  if (o.locationId === 'qender') return false;
-  if (o.suggestedLocation) return o.suggestedLocation === 'cagllavice';
-  const addr = (o.deliveryAddress || '').toLowerCase();
-  if (addr.includes('çagllavic') || addr.includes('cagllavic')) return true;
-  if (o.deliveryLat !== null && o.deliveryLng !== null) {
-    return o.deliveryLat >= 42.585 && o.deliveryLat <= 42.650 && o.deliveryLng >= 21.040 && o.deliveryLng <= 21.115;
-  }
-  return false;
-};
+const isCagllavice = (o: OrderRecord): boolean => resolveOrderBranch(o) === 'cagllavice';
 
 const matchesLocationFilter = (o: OrderRecord, loc: 'all' | 'qender' | 'cagllavice'): boolean => {
   if (loc === 'cagllavice') return isCagllavice(o);
@@ -664,7 +655,7 @@ const OrdersReview = ({
                     await sendOrderMessage(o.id, 'admin', autoMsg);
                     await updateOrderStatus(o.id, 'approved', '');
                     await setOrderEta(o.id, DEFAULT_ETA);
-                    const bestId = pickBestDriver(driversForBranch(driversRef.current, o.suggestedLocation), all);
+                    const bestId = pickBestDriver(driversForBranch(driversRef.current, resolveOrderBranch(o)), all);
                     if (bestId) {
                       const target = driversRef.current.find((d) => d.id === bestId);
                       if (target) await assignDriverToOrder(o.id, target.id, { customerName: o.customerName, address: o.deliveryAddress, total: o.total });
@@ -2154,7 +2145,7 @@ const OrdersReview = ({
                   {o.status === 'approved' && !o.assignedDriverId && drivers.length > 0 && (
                     <div className="flex items-center gap-1 flex-wrap pt-1.5 border-t border-border/30" onClick={(e) => e.stopPropagation()}>
                       <span className="text-[10px] text-muted-foreground font-medium shrink-0">Cakto →</span>
-                      {driversForBranch(drivers.filter((d) => d.isActive), o.suggestedLocation).map((d) => {
+                      {driversForBranch(drivers.filter((d) => d.isActive), resolveOrderBranch(o)).map((d) => {
                         const emoji = d.isReturning ? '🏁' : d.isPaused ? '☕' : '✅';
                         return (
                           <button
@@ -2365,7 +2356,7 @@ const OrdersReview = ({
                             <Bike className="w-3 h-3" /> Shoferi
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {driversForBranch(drivers, selected.suggestedLocation).map((d) => {
+                            {driversForBranch(drivers, resolveOrderBranch(selected)).map((d) => {
                               const isAssigned = selected.assignedDriverId === d.id;
                               return (
                                 <button key={d.id} onClick={async () => { try { await assignDriverToOrder(selected.id, d.id, { customerName: selected.customerName, address: selected.deliveryAddress, total: selected.total }); toast.success(`Shoferi ${d.name} u caktua`); } catch { toast.error('Gabim'); } }} className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all active:scale-95 ${isAssigned ? 'bg-blue-600 text-white shadow' : 'bg-secondary hover:bg-blue-500/10'}`}>
@@ -2657,7 +2648,7 @@ const OrdersReview = ({
                     <Bike className="w-3 h-3" /> Shoferi
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {driversForBranch(drivers, selected.suggestedLocation).map((d) => {
+                    {driversForBranch(drivers, resolveOrderBranch(selected)).map((d) => {
                       const isAssigned = selected.assignedDriverId === d.id;
                       return (
                         <button
