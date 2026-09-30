@@ -14,6 +14,7 @@ import {
   stripPosMarker,
   forwardOrderToQender,
   resolveOrderBranch,
+  isLiveDriverOrder,
   type OrderRecord,
   type OrderStatus,
 } from '@/lib/ordersApi';
@@ -743,7 +744,7 @@ const OrdersReview = ({
   const rrugesDelivering = useMemo(() => {
     const byDriver = new Map<string, OrderRecord[]>();
     for (const o of orders) {
-      if (o.status !== 'out_for_delivery' || !o.assignedDriverId) continue;
+      if (!isLiveDriverOrder(o) || o.status !== 'out_for_delivery' || !o.assignedDriverId) continue;
       const list = byDriver.get(o.assignedDriverId) ?? [];
       list.push(o);
       byDriver.set(o.assignedDriverId, list);
