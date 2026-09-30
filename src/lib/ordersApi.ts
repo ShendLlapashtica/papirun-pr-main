@@ -310,6 +310,17 @@ export const driverUpdateOrderStatus = async (id: string, status: OrderStatus): 
   if (error) throw error;
 };
 
+export const isLiveDriverOrder = (
+  order: Pick<OrderRecord, 'createdAt' | 'isVisible'>,
+  now = new Date(),
+): boolean => {
+  const createdAt = new Date(order.createdAt);
+  return order.isVisible !== false && !Number.isNaN(createdAt.getTime()) &&
+    createdAt.getFullYear() === now.getFullYear() &&
+    createdAt.getMonth() === now.getMonth() &&
+    createdAt.getDate() === now.getDate();
+};
+
 /** Driver: archive all active orders at midnight via RPC — bypasses RLS */
 export const driverArchiveActiveOrders = async (): Promise<void> => {
   const client = supabase as any;
