@@ -12,7 +12,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
 
 const GOOGLE_REVIEW_URL_QENDER = 'https://search.google.com/local/writereview?placeid=ChIJIcfXheaeVBMRHkjfl6e6kf8';
-const GOOGLE_REVIEW_URL_CAGLLAVICE = 'https://search.google.com/local/writereview?placeid=18415705580264966174';
+const GOOGLE_REVIEW_URL_CAGLLAVICE = 'https://www.google.com/maps/place/Papirun/@42.5665831,21.1305063,11z/data=!4m6!3m5!1s0x13549ee685d7c721:0xff91baa797df481e!8m2!3d42.6588012!4d21.1597793!16s%2Fg%2F11b5plhg8c';
 
 const STORAGE_KEY = 'papirun_active_order_id';
 
