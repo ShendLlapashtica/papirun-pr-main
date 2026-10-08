@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Bike, ChefHat, MessageCircle, X as XIcon, Star, Download } from 'lucide-react';
-import { fetchOrder, subscribeOrderRealtime, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
+import { fetchOrder, subscribeOrderRealtime, resolveOrderBranch, type OrderRecord, type OrderStatus } from '@/lib/ordersApi';
 import { rateDriver, fetchDriverLocation, subscribeDriverLocation, fetchDriverById, driverShortCode } from '@/lib/driversApi';
 import { generateInvoice } from '@/lib/invoiceGenerator';
 import OrderStatusModal from '@/components/OrderStatusModal';
@@ -11,7 +11,8 @@ import CustomerDriverMap from '@/components/CustomerDriverMap';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { haptic, lockBackButton, unlockBackButton } from '@/lib/native';
 
-const GOOGLE_REVIEW_URL = 'https://search.google.com/local/writereview?placeid=ChIJIcfXheaeVBMRHkjfl6e6kf8';
+const GOOGLE_REVIEW_URL_QENDER = 'https://search.google.com/local/writereview?placeid=ChIJIcfXheaeVBMRHkjfl6e6kf8';
+const GOOGLE_REVIEW_URL_CAGLLAVICE = 'https://search.google.com/local/writereview?placeid=18415705580264966174';
 
 const STORAGE_KEY = 'papirun_active_order_id';
 
@@ -309,6 +310,7 @@ const OrderTrackingPill = () => {
       setHidden(true);
       setOrderId(null);
     };
+    const reviewUrl = resolveOrderBranch(order) === 'cagllavice' ? GOOGLE_REVIEW_URL_CAGLLAVICE : GOOGLE_REVIEW_URL_QENDER;
     return (
       <AnimatePresence>
         <motion.div
@@ -332,7 +334,7 @@ const OrderTrackingPill = () => {
               Do e vlerësonim shumë nga ana juaj një Review në Google — ndihmon shumë biznesin tonë!
             </p>
             <a
-              href={GOOGLE_REVIEW_URL}
+              href={reviewUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={finish}
