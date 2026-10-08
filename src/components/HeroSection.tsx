@@ -35,8 +35,8 @@ const HeroSection = ({ onViewMenu }: HeroSectionProps) => {
           />
 
           {/* Mobile overlay */}
-          <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent" />
-          <div className="lg:hidden absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+          <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent pointer-events-none" />
+          <div className="lg:hidden absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
 
           {/* Mobile content */}
           <div className="lg:hidden absolute inset-0 flex items-end">
