@@ -557,7 +557,9 @@ const OrderTrackingPill = () => {
     label = language === 'sq' ? 'Po përgatitet' : 'Preparing';
   } else if (status === 'out_for_delivery') {
     icon = <Bike className="w-4 h-4" strokeWidth={2.4} />;
-    label = language === 'sq' ? 'Në rrugë te ti' : 'On the way';
+    label = order?.isTakeaway
+      ? (language === 'sq' ? 'Gati për marrje' : 'Ready for pickup')
+      : (language === 'sq' ? 'Në rrugë te ti' : 'On the way');
   } else if (isRejected) {
     icon = <XCircle className="w-4 h-4" strokeWidth={2.4} />;
     label = language === 'sq' ? 'Porosia u refuzua' : 'Order rejected';
@@ -632,6 +634,11 @@ const OrderTrackingPill = () => {
             )}
             <span className="flex items-center justify-center shrink-0">{icon}</span>
             <span className="text-sm font-semibold truncate tracking-tight">{label}</span>
+            {order?.isTakeaway && (
+              <span className="text-[10px] font-bold uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.18)' }}>
+                🥡 {language === 'sq' ? 'Merr vetë' : 'Takeaway'}
+              </span>
+            )}
             {isApproved && (
               <span className="flex items-center gap-1 ml-1 pl-2.5 border-l" style={{ borderColor: 'hsl(var(--primary) / 0.35)' }}>
                 <MessageCircle className="w-3.5 h-3.5 shrink-0" strokeWidth={2.4} />

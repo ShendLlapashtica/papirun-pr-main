@@ -68,13 +68,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Customer's payment preference (cash is the default and adds nothing).
-  // POS is carried as a marker line in notes — no schema involvement; the
-  // admin UI derives its mini flag from this exact string. Must stay
-  // byte-identical to POS_NOTES_MARKER in src/lib/ordersApi.ts.
+  // POS and takeaway are carried as marker lines in notes — no schema
+  // involvement; the admin UI derives its mini flags from these exact
+  // strings. Must stay byte-identical to POS_NOTES_MARKER / TAKEAWAY_NOTES_MARKER
+  // in src/lib/ordersApi.ts.
   const notes = String(b.notes ?? '');
   const notesWithPayment = b.paymentMethod === 'pos'
     ? `${notes ? `${notes}\n` : ''}💳 Pagesa: POS (Me Kartele)`
     : notes;
+  const notesWithTakeaway = b.isTakeaway
+    ? `${notesWithPayment ? `${notesWithPayment}\n` : ''}🥡 Merr vetë (Takeaway)`
+    : notesWithPayment;
 
   const payload = {
     user_id: b.userId ?? null,
@@ -88,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     subtotal: Number(b.subtotal),
     delivery_fee: Number(b.deliveryFee ?? 0),
     total: Number(b.total),
-    notes: notesWithPayment,
+    notes: notesWithTakeaway,
     status,
     admin_note: status === 'rejected' ? 'Auto-refuzuar: jashte orarit te punes' : '',
     source: b.source ?? 'web',

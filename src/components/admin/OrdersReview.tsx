@@ -128,7 +128,18 @@ const PosFlag: React.FC<{ method?: string; size?: 'sm' | 'md' }> = ({ method, si
   );
 };
 
-const OrderItemsReceipt: React.FC<{ items: any[]; total: number; payment?: string }> = React.memo(({ items, total, payment }) => {
+/** Mini takeaway flag — shown ONLY when the customer checked "Merr vetë"; delivery orders show nothing. */
+const TakeawayFlag: React.FC<{ isTakeaway?: boolean; size?: 'sm' | 'md' }> = ({ isTakeaway, size = 'sm' }) => {
+  if (!isTakeaway) return null;
+  const cls = size === 'md' ? 'text-[11px] px-2 py-0.5' : 'text-[10px] px-1.5 py-0.5';
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-400/30 ${cls}`}>
+      🥡 Merr vetë
+    </span>
+  );
+};
+
+const OrderItemsReceipt: React.FC<{ items: any[]; total: number; payment?: string; isTakeaway?: boolean }> = React.memo(({ items, total, payment, isTakeaway }) => {
   const grouped = groupOrderItems(items);
   const listText = formatOrderListText(items);
   return (
@@ -174,13 +185,13 @@ const OrderItemsReceipt: React.FC<{ items: any[]; total: number; payment?: strin
         </div>
       ))}
       <div className="flex justify-between items-center font-bold pt-2 border-t border-border/50 mt-2">
-        <span className="flex items-center gap-1.5 text-sm dark:text-slate-400">Totali <PosFlag method={payment} size="md" /></span>
+        <span className="flex items-center gap-1.5 text-sm dark:text-slate-400">Totali <PosFlag method={payment} size="md" /> <TakeawayFlag isTakeaway={isTakeaway} size="md" /></span>
         <span className="text-primary text-lg dark:text-emerald-400">€{total.toFixed(2)}</span>
       </div>
     </div>
   );
 }, (prev, next) => {
-  if (prev.items.length !== next.items.length || prev.payment !== next.payment) return false;
+  if (prev.items.length !== next.items.length || prev.payment !== next.payment || prev.isTakeaway !== next.isTakeaway) return false;
   return prev.items.every((it, i) =>
     it.id === next.items[i]?.id &&
     it.quantity === next.items[i]?.quantity &&
@@ -2100,7 +2111,10 @@ const OrdersReview = ({
                       </div>
                     ))}
                     <div className="flex justify-between items-center pt-1 border-t border-border/20 mt-1">
-                      <PosFlag method={o.paymentMethod} />
+                      <div className="flex items-center gap-1.5">
+                        <PosFlag method={o.paymentMethod} />
+                        <TakeawayFlag isTakeaway={o.isTakeaway} />
+                      </div>
                       <span className="text-primary font-bold text-[13px] ml-auto">€{o.total.toFixed(2)}</span>
                     </div>
                   </div>
@@ -2259,7 +2273,7 @@ const OrdersReview = ({
                         </button>
                       </div>
 
-                      <OrderItemsReceipt items={selected.items} total={selected.total} payment={selected.paymentMethod} />
+                      <OrderItemsReceipt items={selected.items} total={selected.total} payment={selected.paymentMethod} isTakeaway={selected.isTakeaway} />
 
                       <div className="flex items-start gap-2 text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
@@ -2526,7 +2540,7 @@ const OrdersReview = ({
               </div>
 
               {/* Order receipt */}
-              <OrderItemsReceipt items={selected.items} total={selected.total} payment={selected.paymentMethod} />
+              <OrderItemsReceipt items={selected.items} total={selected.total} payment={selected.paymentMethod} isTakeaway={selected.isTakeaway} />
 
               <div className="flex items-start gap-2 text-muted-foreground dark:text-slate-400">
                 <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
