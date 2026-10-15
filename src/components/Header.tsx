@@ -50,7 +50,7 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
     setLanguage(language === 'sq' ? 'en' : 'sq');
   };
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: { preventDefault: () => void }) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       // Navigate to home with search query as URL param
@@ -186,10 +186,12 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
-                type="text"
+                type="search"
+                enterKeyHint="search"
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(e); }}
                 placeholder={t.hero.searchPlaceholder}
                 className="w-full pl-11 pr-10 py-2.5 rounded-xl bg-secondary border-0 text-sm focus:ring-2 focus:ring-primary/20 transition-all"
               />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Settings as SettingsIcon, Search, Globe, X } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import logo from '@/assets/logo.png';
@@ -70,7 +70,7 @@ const AppShell = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const handleSearchSubmit = (e: FormEvent) => {
+  const handleSearchSubmit = (e: { preventDefault: () => void }) => {
     e.preventDefault();
     const q = searchQuery.trim();
     const next = new URLSearchParams(params);
@@ -167,9 +167,11 @@ const AppShell = ({ children }: { children: ReactNode }) => {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/60 pointer-events-none" />
                 <input
                   type="search"
+                  enterKeyHint="search"
                   autoFocus
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(e); }}
                   placeholder={t.hero.searchPlaceholder}
                   className="app-glass w-full pl-10 pr-10 py-2.5 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />

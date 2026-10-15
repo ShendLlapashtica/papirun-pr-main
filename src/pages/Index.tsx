@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { reviews } from '@/data/menuData';
 import type { MenuItem } from '@/types/menu';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -29,6 +30,7 @@ const Index = () => {
   const categoryOrder = useLiveCategoryOrder();
   const viewerBranch = useViewerBranch();
   const menuRef = useRef<HTMLElement>(null);
+  const [urlParams] = useSearchParams();
   const { cart, cartCount, isTrayOpen, isCheckoutOpen, setIsTrayOpen, setIsCheckoutOpen, addToCart, updateQuantity, updateNote, removeFromCart, clearCart } = useCart();
 
   const cartTotal = getCartTotal(cart);
@@ -53,6 +55,19 @@ const Index = () => {
     setActiveCategory('all');
     menuRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Header's expandable search navigates to /?search=... — pick that up here
+  // and actually apply + reveal it. Previously this param was never read, so
+  // submitting a search from the header silently did nothing.
+  useEffect(() => {
+    const q = urlParams.get('search');
+    if (q && q !== searchQuery) {
+      setSearchQuery(q);
+      setActiveCategory('all');
+      setTimeout(() => menuRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlParams]);
 
   const CATEGORY_LABELS: Record<string, string> = {
     salad: t.categories.salads,
