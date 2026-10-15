@@ -839,16 +839,6 @@ const Admin = () => {
     }
   };
 
-  const toggleAvailability = async (id: string) => {
-    const target = items.find((item) => item.id === id);
-    if (!target) return;
-    try {
-      await handleUpdate(id, { isAvailable: !target.isAvailable });
-    } catch {
-      toast.error(language === 'sq' ? 'Ruajtja dështoi' : 'Save failed');
-    }
-  };
-
   const toggleCagllaviceAvailability = async (id: string) => {
     const target = items.find((item) => item.id === id);
     if (!target) return;
@@ -1816,7 +1806,7 @@ const Admin = () => {
               <div
                 key={item.id}
                 className={`bg-card rounded-2xl p-4 shadow-card transition-all ${
-                  !item.isAvailable ? 'opacity-60' : ''
+                  !item.isAvailableOnCagllavice ? 'opacity-60' : ''
                 }`}
               >
                 <div className="flex items-start gap-3 sm:gap-4">
@@ -2157,21 +2147,22 @@ const Admin = () => {
                             {language === 'sq' ? 'Ndrysho' : 'Edit'}
                           </button>
                           <button
-                            onClick={() => toggleAvailability(item.id)}
+                            onClick={() => toggleCagllaviceAvailability(item.id)}
+                            title={language === 'sq' ? 'Vetëm Çagllavicë — Qendra e sheh gjithmonë' : 'Çagllavicë only — Qendër always sees it'}
                             className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                              item.isAvailable
+                              item.isAvailableOnCagllavice
                                 ? 'bg-accent text-accent-foreground'
                                 : 'bg-destructive/10 text-destructive'
                             }`}
                           >
-                            {item.isAvailable ? (
+                            {item.isAvailableOnCagllavice ? (
                               <Eye className="w-3 h-3" />
                             ) : (
                               <EyeOff className="w-3 h-3" />
                             )}
-                            {item.isAvailable
-                              ? language === 'sq' ? 'Aktiv' : 'Active'
-                              : language === 'sq' ? 'Jo aktiv' : 'Hidden'}
+                            {item.isAvailableOnCagllavice
+                              ? language === 'sq' ? 'Aktiv në Çagllavicë' : 'Active in Çagllavicë'
+                              : language === 'sq' ? 'Jo aktiv në Çagllavicë' : 'Hidden in Çagllavicë'}
                           </button>
                           <span className="text-xs text-muted-foreground">
                             {item.likes} {language === 'sq' ? 'pelqime' : 'likes'}
