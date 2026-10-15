@@ -158,6 +158,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
     onSuccess();
     const savedFormData = { ...formData };
     const savedPayment = paymentMethod;
+    const savedIsTakeaway = isTakeaway;
     const savedPosition = selectedPosition;
     const savedItems = [...items];
     const savedTotal = total;
@@ -181,6 +182,7 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
         notes: savedFormData.notes.trim(),
         source: detectOrderSource(),
         paymentMethod: savedPayment,
+        isTakeaway: savedIsTakeaway,
       });
       // Persist guest info for autofill next time
       try { localStorage.setItem(GUEST_INFO_KEY, JSON.stringify({ name: savedFormData.name.trim(), phone: savedFormData.phone.trim() })); } catch {}

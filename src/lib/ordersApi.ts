@@ -23,13 +23,23 @@ export const POS_NOTES_MARKER = '💳 Pagesa: POS (Me Kartele)';
  */
 export const FORWARDED_NOTES_MARKER = '📍 Porosia u kalua te Qendra';
 
+/**
+ * Set when the customer checks "Merr vetë (Takeaway)" at checkout. No DB
+ * column involved — same no-DDL marker pattern as POS/forwarded. Written by
+ * /api/place-order.ts; must stay byte-identical to the literal there.
+ * Previously the checkbox only ever waived the delivery fee client-side and
+ * was never sent to the server at all, so no admin/driver/customer screen
+ * could tell a takeaway order apart from a delivery one.
+ */
+export const TAKEAWAY_NOTES_MARKER = '🥡 Merr vetë (Takeaway)';
+
 /** Customer note with internal marker lines removed — badges/notices carry that info instead. */
 export const stripPosMarker = (notes: string | null | undefined): string =>
   (notes ?? '')
     .split('\n')
     .filter((line) => {
       const t = line.trim();
-      return t !== POS_NOTES_MARKER && t !== FORWARDED_NOTES_MARKER;
+      return t !== POS_NOTES_MARKER && t !== FORWARDED_NOTES_MARKER && t !== TAKEAWAY_NOTES_MARKER;
     })
     .join('\n')
     .trim();
@@ -70,6 +80,8 @@ export interface OrderRecord {
   paymentMethod: PaymentMethod;
   /** True when Çagllavicë handed this order to Qendra (see FORWARDED_NOTES_MARKER) */
   forwardedToQender: boolean;
+  /** True when the customer checked "Merr vetë" at checkout (see TAKEAWAY_NOTES_MARKER) */
+  isTakeaway: boolean;
   prepEtaMinutes: number | null;
   isVisible: boolean;
   assignedDriverId?: string | null;
@@ -149,6 +161,7 @@ const mapRow = (row: Row): OrderRecord => ({
   // Derived from notes markers (no DB columns for these) — see the marker constants
   paymentMethod: (row.notes ?? '').includes(POS_NOTES_MARKER) ? 'pos' : 'cash',
   forwardedToQender: (row.notes ?? '').includes(FORWARDED_NOTES_MARKER),
+  isTakeaway: (row.notes ?? '').includes(TAKEAWAY_NOTES_MARKER),
   prepEtaMinutes: row.prep_eta_minutes,
   isVisible: row.is_visible !== false,
   assignedDriverId: row.assigned_driver_id,
@@ -177,6 +190,7 @@ export interface CreateOrderInput {
   notes?: string;
   source?: OrderSource;
   paymentMethod?: PaymentMethod;
+  isTakeaway?: boolean;
 }
 
 export const detectOrderSource = (): OrderSource => {
@@ -209,6 +223,7 @@ export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord>
       notes: input.notes ?? '',
       source: input.source ?? detectOrderSource(),
       paymentMethod: input.paymentMethod ?? 'cash',
+      isTakeaway: input.isTakeaway ?? false,
     }),
   });
   if (!res.ok) {
