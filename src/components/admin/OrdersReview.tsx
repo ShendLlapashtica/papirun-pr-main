@@ -128,13 +128,13 @@ const PosFlag: React.FC<{ method?: string; size?: 'sm' | 'md' }> = ({ method, si
   );
 };
 
-/** Mini takeaway flag — shown ONLY when the customer checked "Merr vetë"; delivery orders show nothing. */
+/** Takeaway flag — shown ONLY when the customer checked "Merr vetë"; delivery orders show nothing. Deliberately loud/large — this changes how the order must be handled (no driver). */
 const TakeawayFlag: React.FC<{ isTakeaway?: boolean; size?: 'sm' | 'md' }> = ({ isTakeaway, size = 'sm' }) => {
   if (!isTakeaway) return null;
-  const cls = size === 'md' ? 'text-[11px] px-2 py-0.5' : 'text-[10px] px-1.5 py-0.5';
+  const cls = size === 'md' ? 'text-sm px-3 py-1 gap-1.5' : 'text-xs px-2.5 py-1 gap-1';
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-400/30 ${cls}`}>
-      🥡 Merr vetë
+    <span className={`inline-flex items-center rounded-full font-extrabold tracking-wide bg-amber-500 text-white border-2 border-amber-600 shadow-sm ${cls}`}>
+      🚶 TAKEAWAY
     </span>
   );
 };

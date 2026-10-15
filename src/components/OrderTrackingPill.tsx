@@ -635,8 +635,8 @@ const OrderTrackingPill = () => {
             <span className="flex items-center justify-center shrink-0">{icon}</span>
             <span className="text-sm font-semibold truncate tracking-tight">{label}</span>
             {order?.isTakeaway && (
-              <span className="text-[10px] font-bold uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded-full" style={{ background: 'hsl(var(--primary) / 0.18)' }}>
-                🥡 {language === 'sq' ? 'Merr vetë' : 'Takeaway'}
+              <span className="text-xs font-extrabold tracking-wide shrink-0 px-2.5 py-1 rounded-full bg-amber-500 text-white border-2 border-amber-600 shadow-sm">
+                🚶 TAKEAWAY
               </span>
             )}
             {isApproved && (
