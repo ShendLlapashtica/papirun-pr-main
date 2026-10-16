@@ -184,9 +184,15 @@ const Header = ({ cartCount, onCartClick }: HeaderProps) => {
         {searchOpen && (
           <form onSubmit={handleSearch} className="mt-3 animate-slide-up">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <button
+                type="submit"
+                aria-label={language === 'sq' ? 'Kërko' : 'Search'}
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-muted active:scale-90 transition-transform"
+              >
+                <Search className="w-4 h-4 text-muted-foreground" />
+              </button>
               <input
-                type="search"
+                type="text"
                 enterKeyHint="search"
                 autoFocus
                 value={searchQuery}
