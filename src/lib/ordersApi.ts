@@ -228,7 +228,7 @@ export const createOrder = async (input: CreateOrderInput): Promise<OrderRecord>
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'unknown' }));
-    throw new Error(err.error ?? 'Order creation failed');
+    throw new Error(err.code ?? err.error ?? 'Order creation failed');
   }
   const data = await res.json();
   return mapRow(data as Row);
