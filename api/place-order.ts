@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getUnavailableProductIds } from './order-validation';
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
@@ -57,6 +58,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (b[field] === undefined || b[field] === null || b[field] === '') {
       return res.status(400).json({ error: `missing field: ${field}` });
     }
+  }
+
+  if (
+    !Array.isArray(b.items) ||
+    b.items.length === 0 ||
+    b.items.some((item: unknown) =>
+      !item || typeof item !== 'object' || !('id' in item) || typeof item.id !== 'string' || !item.id.trim()
+    )
+  ) {
+    return res.status(400).json({ code: 'invalid_items' });
+  }
+
+  const requestedProductIds = b.items.map((item: { id: string }) => item.id);
+  const { data: products, error: productsError } = await supabase
+    .from('products')
+    .select('id, is_available')
+    .in('id', requestedProductIds);
+
+  if (productsError) {
+    console.error('product availability check failed:', productsError);
+    return res.status(500).json({ error: 'Could not verify product availability' });
+  }
+
+  const unavailableProductIds = getUnavailableProductIds(requestedProductIds, products ?? []);
+  if (unavailableProductIds.length > 0) {
+    return res.status(409).json({ code: 'unavailable_products', productIds: unavailableProductIds });
   }
 
   let status: 'pending' | 'rejected' = 'pending';

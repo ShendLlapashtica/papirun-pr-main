@@ -10,7 +10,7 @@ import AddressMapPicker from '@/components/checkout/AddressMapPicker';
 import { getCartLineTotal } from '@/lib/cartPricing';
 import { groupCartLines } from '@/lib/orderItemsGrouping';
 import { createOrder, detectOrderSource, suggestOrderLocation } from '@/lib/ordersApi';
-import { setActiveOrderId, clearActiveOrderId } from '@/components/OrderTrackingPill';
+import { setActiveOrderId } from '@/components/OrderTrackingPill';
 import { fetchAddresses, deleteAddress, type SavedAddress } from '@/lib/addressesApi';
 import { fetchStorefrontSetting } from '@/lib/storefrontApi';
 import { WHATSAPP_FALLBACK_KEY } from '@/lib/storefrontApi';
@@ -152,20 +152,14 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
     }
     if (!isFormValid) return;
 
-    // --- Optimistic UI: close modal & show pending overlay INSTANTLY ---
-    const optimisticId = `optimistic-${Date.now()}`;
-    setActiveOrderId(optimisticId);
-    onSuccess();
     const savedFormData = { ...formData };
     const savedPayment = paymentMethod;
     const savedIsTakeaway = isTakeaway;
     const savedPosition = selectedPosition;
     const savedItems = [...items];
     const savedTotal = total;
-    resetForm();
-    onClose();
 
-    // --- Fire the actual request in the background ---
+    setSubmitting(true);
     try {
       const order = await createOrder({
         userId: user?.id ?? null,
@@ -186,14 +180,23 @@ const CheckoutModal = ({ isOpen, onClose, items, total, onSuccess }: CheckoutMod
       });
       // Persist guest info for autofill next time
       try { localStorage.setItem(GUEST_INFO_KEY, JSON.stringify({ name: savedFormData.name.trim(), phone: savedFormData.phone.trim() })); } catch {}
-      // Replace optimistic ID with real server ID
       try { localStorage.setItem(ORDER_STORAGE_KEY, order.id); } catch {}
       setActiveOrderId(order.id);
+      resetForm();
+      onSuccess();
+      onClose();
 
     } catch (e) {
       console.error(e);
-      clearActiveOrderId();
-      toast.error(language === 'sq' ? 'Gabim gjatë dërgimit të porosisë — provo përsëri' : 'Order failed — please try again');
+      if (e instanceof Error && e.message === 'unavailable_products') {
+        toast.error(language === 'sq'
+          ? 'Një ose më shumë produkte nuk janë më në dispozicion. Përditëso shportën dhe provo përsëri.'
+          : 'One or more items are no longer available. Update your cart and try again.');
+      } else {
+        toast.error(language === 'sq' ? 'Gabim gjatë dërgimit të porosisë — provo përsëri' : 'Order failed — please try again');
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
