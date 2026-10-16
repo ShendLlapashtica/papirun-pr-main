@@ -171,9 +171,15 @@ const AppShell = ({ children }: { children: ReactNode }) => {
           {searchOpen && (
             <form onSubmit={handleSearchSubmit} className="px-1.5 pt-2 animate-slide-up">
               <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/60 pointer-events-none" />
+                <button
+                  type="submit"
+                  aria-label={language === 'sq' ? 'Kërko' : 'Search'}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-secondary/40 active:scale-90 transition-transform"
+                >
+                  <Search className="w-4 h-4 text-foreground/60" />
+                </button>
                 <input
-                  type="search"
+                  type="text"
                   enterKeyHint="search"
                   autoFocus
                   value={searchQuery}
