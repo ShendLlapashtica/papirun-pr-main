@@ -1,11 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getUnavailableProductIds } from './order-validation';
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+// Inlined on purpose — do NOT turn this back into an import from
+// ./order-validation. Vercel deployed place-order without resolving that
+// sibling module at runtime, so every POST died with
+// FUNCTION_INVOCATION_FAILED and no customer could check out (2026-10-17).
+// api/order-validation.ts still holds the identical logic for the unit test;
+// if you change one, change both.
+interface ProductAvailability {
+  id: string;
+  is_available: boolean;
+}
+
+const getUnavailableProductIds = (
+  requestedIds: string[],
+  products: ProductAvailability[],
+): string[] => {
+  const availableIds = new Set(products.filter((product) => product.is_available).map((product) => product.id));
+  return [...new Set(requestedIds)].filter((id) => !availableIds.has(id));
+};
 
 const RESTAURANT_COORDS = { lat: 42.6629, lng: 21.1655 };
 const CAGLLAVICE_COORDS = { lat: 42.618, lng: 21.077 };
